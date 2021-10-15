@@ -322,4 +322,6 @@ int cz_dpm_powerdown_vce(struct pp_hwmgr *hwmgr);
 int cz_dpm_powerup_vce(struct pp_hwmgr *hwmgr);
 int cz_dpm_update_uvd_dpm(struct pp_hwmgr *hwmgr, bool bgate);
 int  cz_dpm_update_vce_dpm(struct pp_hwmgr *hwmgr);
+
+int cz_init_function_pointers(struct pp_hwmgr *hwmgr);
 #endif /* _CZ_HWMGR_H_ */

@@ -487,6 +487,7 @@ int pp_atomfwctrl_get_gpio_information(struct pp_hwmgr *hwmgr,
 	return 0;
 }
 
+int pp_atomfwctrl__get_clk_information_by_clkid(struct pp_hwmgr *hwmgr, BIOS_CLKID id, uint32_t *frequency);
 int pp_atomfwctrl__get_clk_information_by_clkid(struct pp_hwmgr *hwmgr, BIOS_CLKID id, uint32_t *frequency)
 {
 	struct atom_get_smu_clock_info_parameters_v3_1   parameters;

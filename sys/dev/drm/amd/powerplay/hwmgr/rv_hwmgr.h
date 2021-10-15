@@ -302,6 +302,8 @@ struct rv_hwmgr {
 
 struct pp_hwmgr;
 
+#if 0
 int rv_init_function_pointers(struct pp_hwmgr *hwmgr);
+#endif
 
 #endif

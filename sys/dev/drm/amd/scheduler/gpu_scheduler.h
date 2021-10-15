@@ -39,10 +39,10 @@ struct amd_sched_rq;
 struct amd_sched_entity {
 	struct list_head		list;
 	struct amd_sched_rq		*rq;
-	spinlock_t			rq_lock;
+	struct spinlock			rq_lock;
 	struct amd_gpu_scheduler	*sched;
 
-	spinlock_t			queue_lock;
+	struct spinlock			queue_lock;
 	struct kfifo                    job_queue;
 
 	atomic_t			fence_seq;
@@ -58,7 +58,7 @@ struct amd_sched_entity {
  * the next entity to emit commands from.
 */
 struct amd_sched_rq {
-	spinlock_t		lock;
+	struct spinlock		lock;
 	struct list_head	entities;
 	struct amd_sched_entity	*current_entity;
 };
@@ -69,7 +69,7 @@ struct amd_sched_fence {
 	struct dma_fence_cb             cb;
 	struct dma_fence                *parent;
 	struct amd_gpu_scheduler	*sched;
-	spinlock_t			lock;
+	struct lock			lock;
 	void                            *owner;
 };
 
@@ -141,7 +141,7 @@ struct amd_gpu_scheduler {
 	atomic64_t			job_id_count;
 	struct task_struct		*thread;
 	struct list_head	ring_mirror_list;
-	spinlock_t			job_list_lock;
+	struct spinlock			job_list_lock;
 };
 
 int amd_sched_init(struct amd_gpu_scheduler *sched,

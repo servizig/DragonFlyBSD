@@ -27,4 +27,18 @@
 #ifndef _LINUX_MMU_CONTEXT_H_
 #define _LINUX_MMU_CONTEXT_H_
 
+struct mm_struct;
+
+static inline void
+use_mm(struct mm_struct *mm)
+{
+        /* NOP is deliberate */
+}
+
+static inline void
+unuse_mm(struct mm_struct *mm)
+{
+        /* NOP is deliberate */
+}
+
 #endif	/* _LINUX_MMU_CONTEXT_H_ */

@@ -44,6 +44,8 @@
 #include <linux/hrtimer.h>
 #include "amdgpu_irq.h"
 
+#include "cgs_linux.h"
+
 #include <drm/drm_dp_mst_helper.h>
 #include "modules/inc/mod_freesync.h"
 
@@ -232,7 +234,7 @@ struct amdgpu_i2c_chan {
 	struct amdgpu_i2c_bus_rec rec;
 	struct drm_dp_aux aux;
 	bool has_aux;
-	struct mutex mutex;
+	struct lock mutex;
 };
 
 struct amdgpu_fbdev;
@@ -579,7 +581,9 @@ struct amdgpu_connector {
 	struct drm_dp_mst_port *port;
 	struct amdgpu_connector *mst_port;
 	struct amdgpu_encoder *mst_encoder;
+#if 0
 	struct semaphore mst_sem;
+#endif
 
 	/* TODO see if we can merge with ddc_bus or make a dm_connector */
 	struct amdgpu_i2c_adapter *i2c;
@@ -592,7 +596,7 @@ struct amdgpu_connector {
 	/*freesync caps*/
 	struct mod_freesync_caps caps;
 
-	struct mutex hpd_lock;
+	struct lock hpd_lock;
 
 };
 

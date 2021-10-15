@@ -32,7 +32,6 @@
 #include <linux/atomic.h>
 #include <linux/wait.h>
 #include <linux/kref.h>
-#include <linux/slab.h>
 #include <linux/firmware.h>
 #include <drm/drmP.h>
 #include "amdgpu.h"
@@ -58,18 +57,21 @@ static struct kmem_cache *amdgpu_fence_slab;
 
 int amdgpu_fence_slab_init(void)
 {
+#if 0
 	amdgpu_fence_slab = kmem_cache_create(
 		"amdgpu_fence", sizeof(struct amdgpu_fence), 0,
 		SLAB_HWCACHE_ALIGN, NULL);
 	if (!amdgpu_fence_slab)
 		return -ENOMEM;
+#endif
 	return 0;
 }
 
 void amdgpu_fence_slab_fini(void)
 {
-	rcu_barrier();
+#if 0
 	kmem_cache_destroy(amdgpu_fence_slab);
+#endif
 }
 /*
  * Cast helper
@@ -138,7 +140,11 @@ int amdgpu_fence_emit(struct amdgpu_ring *ring, struct dma_fence **f)
 	struct dma_fence *old, **ptr;
 	uint32_t seq;
 
-	fence = kmem_cache_alloc(amdgpu_fence_slab, GFP_KERNEL);
+#ifndef __DragonFly__
+ 	fence = kmem_cache_alloc(amdgpu_fence_slab, GFP_KERNEL);
+#else
+	fence = kzalloc(sizeof(struct amdgpu_fence), GFP_KERNEL);
+#endif
 	if (fence == NULL)
 		return -ENOMEM;
 
@@ -380,8 +386,8 @@ int amdgpu_fence_driver_start_ring(struct amdgpu_ring *ring,
 		ring->fence_drv.gpu_addr = adev->wb.gpu_addr + (ring->fence_offs * 4);
 	} else {
 		/* put fence directly behind firmware */
-		index = ALIGN(adev->uvd.fw->size, 8);
-		ring->fence_drv.cpu_addr = adev->uvd.cpu_addr + index;
+		index = ALIGN(adev->uvd.fw->datasize, 8);
+		ring->fence_drv.cpu_addr = (uint32_t *)adev->uvd.cpu_addr + index;
 		ring->fence_drv.gpu_addr = adev->uvd.gpu_addr + index;
 	}
 	amdgpu_fence_write(ring, atomic_read(&ring->fence_drv.last_seq));
@@ -391,7 +397,7 @@ int amdgpu_fence_driver_start_ring(struct amdgpu_ring *ring,
 	ring->fence_drv.irq_type = irq_type;
 	ring->fence_drv.initialized = true;
 
-	dev_info(adev->dev, "fence driver on ring %d use gpu addr 0x%016llx, "
+	dev_info(adev->dev, "fence driver on ring %d use gpu addr 0x%016jx, "
 		 "cpu addr 0x%p\n", ring->idx,
 		 ring->fence_drv.gpu_addr, ring->fence_drv.cpu_addr);
 	return 0;
@@ -426,7 +432,7 @@ int amdgpu_fence_driver_init_ring(struct amdgpu_ring *ring,
 	timer_setup(&ring->fence_drv.fallback_timer, amdgpu_fence_fallback, 0);
 
 	ring->fence_drv.num_fences_mask = num_hw_submission * 2 - 1;
-	spin_lock_init(&ring->fence_drv.lock);
+	lockinit(&ring->fence_drv.lock, "agrfdl", 0, LK_CANRECURSE);
 	ring->fence_drv.fences = kcalloc(num_hw_submission * 2, sizeof(void *),
 					 GFP_KERNEL);
 	if (!ring->fence_drv.fences)

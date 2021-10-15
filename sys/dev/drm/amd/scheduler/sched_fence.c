@@ -31,19 +31,23 @@ static struct kmem_cache *sched_fence_slab;
 
 int amd_sched_fence_slab_init(void)
 {
+#if 0
 	sched_fence_slab = kmem_cache_create(
 		"amd_sched_fence", sizeof(struct amd_sched_fence), 0,
 		SLAB_HWCACHE_ALIGN, NULL);
 	if (!sched_fence_slab)
 		return -ENOMEM;
+#endif
 
 	return 0;
 }
 
 void amd_sched_fence_slab_fini(void)
 {
+#if 0
 	rcu_barrier();
 	kmem_cache_destroy(sched_fence_slab);
+#endif
 }
 
 struct amd_sched_fence *amd_sched_fence_create(struct amd_sched_entity *entity,
@@ -52,13 +56,13 @@ struct amd_sched_fence *amd_sched_fence_create(struct amd_sched_entity *entity,
 	struct amd_sched_fence *fence = NULL;
 	unsigned seq;
 
-	fence = kmem_cache_zalloc(sched_fence_slab, GFP_KERNEL);
+	fence = kzalloc(sizeof(struct amd_sched_fence), GFP_KERNEL);
 	if (fence == NULL)
 		return NULL;
 
 	fence->owner = owner;
 	fence->sched = entity->sched;
-	spin_lock_init(&fence->lock);
+	lockinit(&fence->lock, "asfl", 0, LK_CANRECURSE);
 
 	seq = atomic_inc_return(&entity->fence_seq);
 	dma_fence_init(&fence->scheduled, &amd_sched_fence_ops_scheduled,

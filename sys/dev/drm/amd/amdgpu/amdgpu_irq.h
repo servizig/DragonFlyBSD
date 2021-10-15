@@ -61,7 +61,7 @@ struct amdgpu_irq_src_funcs {
 
 struct amdgpu_irq {
 	bool				installed;
-	spinlock_t			lock;
+	struct lock			lock;
 	/* interrupt sources */
 	struct amdgpu_irq_client	client[AMDGPU_IH_CLIENTID_MAX];
 

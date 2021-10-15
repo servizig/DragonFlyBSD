@@ -86,6 +86,8 @@ static uint32_t rv_wait_for_response(struct pp_hwmgr *hwmgr)
 }
 
 int rv_send_msg_to_smc_without_waiting(struct pp_hwmgr *hwmgr,
+		uint16_t msg);
+int rv_send_msg_to_smc_without_waiting(struct pp_hwmgr *hwmgr,
 		uint16_t msg)
 {
 	uint32_t reg;
@@ -112,6 +114,7 @@ int rv_read_arg_from_smc(struct pp_hwmgr *hwmgr, uint32_t *arg)
 	return 0;
 }
 
+int rv_send_msg_to_smc(struct pp_hwmgr *hwmgr, uint16_t msg);
 int rv_send_msg_to_smc(struct pp_hwmgr *hwmgr, uint16_t msg)
 {
 	uint32_t reg;
@@ -131,6 +134,8 @@ int rv_send_msg_to_smc(struct pp_hwmgr *hwmgr, uint16_t msg)
 }
 
 
+int rv_send_msg_to_smc_with_parameter(struct pp_hwmgr *hwmgr,
+		uint16_t msg, uint32_t parameter);
 int rv_send_msg_to_smc_with_parameter(struct pp_hwmgr *hwmgr,
 		uint16_t msg, uint32_t parameter)
 {

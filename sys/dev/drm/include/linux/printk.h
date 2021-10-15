@@ -98,6 +98,8 @@ struct va_format {
 	}					\
 })
 
+#define printk_ratelimit()	1
+
 #define pr_info_once(fmt, ...) do {		\
 	static bool __printed_once;		\
 						\

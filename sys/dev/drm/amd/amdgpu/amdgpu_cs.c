@@ -29,6 +29,9 @@
 #include <drm/drmP.h>
 #include <drm/amdgpu_drm.h>
 #include <drm/drm_syncobj.h>
+
+#include <linux/mm.h>
+
 #include "amdgpu.h"
 #include "amdgpu_trace.h"
 
@@ -467,7 +470,8 @@ static int amdgpu_cs_validate(void *param, struct amdgpu_bo *bo)
 	return r;
 }
 
-static int amdgpu_cs_list_validate(struct amdgpu_cs_parser *p,
+static
+int amdgpu_cs_list_validate(struct amdgpu_cs_parser *p,
 			    struct list_head *validated)
 {
 	struct amdgpu_bo_list_entry *lobj;
@@ -479,8 +483,10 @@ static int amdgpu_cs_list_validate(struct amdgpu_cs_parser *p,
 		struct mm_struct *usermm;
 
 		usermm = amdgpu_ttm_tt_get_usermm(bo->tbo.ttm);
+#if 0
 		if (usermm && usermm != current->mm)
 			return -EPERM;
+#endif
 
 		/* Check if we have user pages and nobody bound the BO already */
 		if (amdgpu_ttm_tt_userptr_needs_pages(bo->tbo.ttm) &&
@@ -619,8 +625,8 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 		list_splice(&need_pages, &p->validated);
 	}
 
-	amdgpu_cs_get_threshold_for_moves(p->adev, &p->bytes_moved_threshold,
-					  &p->bytes_moved_vis_threshold);
+	amdgpu_cs_get_threshold_for_moves(p->adev, (u64 *)&p->bytes_moved_threshold,
+					  (u64 *)&p->bytes_moved_vis_threshold);
 	p->bytes_moved = 0;
 	p->bytes_moved_vis = 0;
 	p->evictable = list_last_entry(&p->validated,
@@ -1197,7 +1203,9 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 	amdgpu_ring_priority_get(job->ring,
 				 amd_sched_get_job_priority(&job->base));
 
+#if 0
 	trace_amdgpu_cs_ioctl(job);
+#endif
 	amd_sched_entity_push_job(&job->base);
 
 	ttm_eu_fence_buffer_objects(&p->ticket, &p->validated, p->fence);
@@ -1212,7 +1220,7 @@ int amdgpu_cs_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 	union drm_amdgpu_cs *cs = data;
 	struct amdgpu_cs_parser parser = {};
 	bool reserved_buffers = false;
-	int i, r;
+	int r;
 
 	if (!adev->accel_working)
 		return -EBUSY;
@@ -1246,9 +1254,10 @@ int amdgpu_cs_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 		DRM_ERROR("Failed in the dependencies handling %d!\n", r);
 		goto out;
 	}
-
+#if 0
 	for (i = 0; i < parser.job->num_ibs; i++)
 		trace_amdgpu_cs(&parser, i);
+#endif
 
 	r = amdgpu_cs_ib_vm_chunk(adev, &parser);
 	if (r)

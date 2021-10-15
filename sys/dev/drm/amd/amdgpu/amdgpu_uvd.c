@@ -223,7 +223,7 @@ int amdgpu_uvd_sw_init(struct amdgpu_device *adev)
 
 	r = amdgpu_bo_create_kernel(adev, bo_size, PAGE_SIZE,
 				    AMDGPU_GEM_DOMAIN_VRAM, &adev->uvd.vcpu_bo,
-				    &adev->uvd.gpu_addr, &adev->uvd.cpu_addr);
+				    (u64 *)&adev->uvd.gpu_addr, &adev->uvd.cpu_addr);
 	if (r) {
 		dev_err(adev->dev, "(%d) failed to allocate UVD bo\n", r);
 		return r;
@@ -275,7 +275,7 @@ int amdgpu_uvd_sw_fini(struct amdgpu_device *adev)
 	amd_sched_entity_fini(&adev->uvd.ring.sched, &adev->uvd.entity);
 
 	amdgpu_bo_free_kernel(&adev->uvd.vcpu_bo,
-			      &adev->uvd.gpu_addr,
+			      (u64 *)&adev->uvd.gpu_addr,
 			      (void **)&adev->uvd.cpu_addr);
 
 	amdgpu_ring_fini(&adev->uvd.ring);
@@ -309,7 +309,7 @@ int amdgpu_uvd_suspend(struct amdgpu_device *adev)
 	size = amdgpu_bo_size(adev->uvd.vcpu_bo);
 	ptr = adev->uvd.cpu_addr;
 
-	adev->uvd.saved_bo = kmalloc(size, GFP_KERNEL);
+	adev->uvd.saved_bo = kmalloc(size, M_DRM, GFP_KERNEL);
 	if (!adev->uvd.saved_bo)
 		return -ENOMEM;
 
@@ -416,7 +416,7 @@ static int amdgpu_uvd_cs_pass1(struct amdgpu_uvd_cs_ctx *ctx)
 
 	r = amdgpu_cs_find_mapping(ctx->parser, addr, &bo, &mapping);
 	if (r) {
-		DRM_ERROR("Can't find BO for addr 0x%08Lx\n", addr);
+		DRM_ERROR("Can't find BO for addr 0x%08lx\n", addr);
 		return r;
 	}
 
@@ -743,7 +743,7 @@ static int amdgpu_uvd_cs_pass2(struct amdgpu_uvd_cs_ctx *ctx)
 
 	r = amdgpu_cs_find_mapping(ctx->parser, addr, &bo, &mapping);
 	if (r) {
-		DRM_ERROR("Can't find BO for addr 0x%08Lx\n", addr);
+		DRM_ERROR("Can't find BO for addr 0x%08lx\n", addr);
 		return r;
 	}
 
@@ -783,14 +783,14 @@ static int amdgpu_uvd_cs_pass2(struct amdgpu_uvd_cs_ctx *ctx)
 
 	if (!ctx->parser->adev->uvd.address_64_bit) {
 		if ((start >> 28) != ((end - 1) >> 28)) {
-			DRM_ERROR("reloc %LX-%LX crossing 256MB boundary!\n",
+			DRM_ERROR("reloc %lX-%lX crossing 256MB boundary!\n",
 				  start, end);
 			return -EINVAL;
 		}
 
 		if ((cmd == 0 || cmd == 0x3) &&
 		    (start >> 28) != (ctx->parser->adev->uvd.gpu_addr >> 28)) {
-			DRM_ERROR("msg/fb buffer %LX-%LX out of 256MB segment!\n",
+			DRM_ERROR("msg/fb buffer %lX-%lX out of 256MB segment!\n",
 				  start, end);
 			return -EINVAL;
 		}

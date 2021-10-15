@@ -40,7 +40,7 @@ struct amdgpu_mm_table {
 
 /* struct error_entry - amdgpu VF error information. */
 struct amdgpu_vf_error_buffer {
-	struct mutex lock;
+	struct lock lock;
 	int read_count;
 	int write_count;
 	uint16_t code[AMDGPU_VF_ERROR_ENTRY_SIZE];
@@ -238,7 +238,7 @@ struct amdgpu_virt {
 	uint64_t			csa_vmid0_addr;
 	bool chained_ib_support;
 	uint32_t			reg_val_offs;
-	struct mutex                    lock_reset;
+	struct lock                    lock_reset;
 	struct amdgpu_irq_src		ack_irq;
 	struct amdgpu_irq_src		rcv_irq;
 	struct work_struct		flr_work;

@@ -30,8 +30,17 @@
 #include <linux/dma-fence.h>
 
 struct dma_fence_array {
+	struct dma_fence base;
+
+	struct lock lock;
 	unsigned num_fences;
+	atomic_t num_pending;
 	struct dma_fence **fences;
+};
+
+struct dma_fence_array_cb {
+	struct dma_fence_cb cb;
+	struct dma_fence_array *array;
 };
 
 static inline bool
@@ -47,5 +56,24 @@ to_dma_fence_array(struct dma_fence *fence)
 	kprintf("to_dma_fence_array() called!\n");
 	return NULL;
 }
+
+struct dma_fence_array *dma_fence_array_create(int num_fences,
+					       struct dma_fence **fences,
+					       u64 context, unsigned seqno,
+					       bool signal_on_any);
+
+#if 0
+extern const struct dma_fence_ops dma_fence_array_ops;
+
+/* From Linux */
+static inline struct dma_fence_array *
+to_dma_fence_array(struct dma_fence *fence)
+{
+	if (fence->ops != &dma_fence_array_ops)
+		return NULL;
+
+	return container_of(fence, struct dma_fence_array, base);
+}
+#endif
 
 #endif	/* _LINUX_DMA_FENCE_ARRAY_H_ */

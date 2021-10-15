@@ -44,7 +44,9 @@ int amdgpu_amdkfd_init(void)
 
 	ret = kgd2kfd_init_p(KFD_INTERFACE_VERSION, &kgd2kfd);
 	if (ret) {
+#if 0
 		symbol_put(kgd2kfd_init);
+#endif
 		kgd2kfd = NULL;
 	}
 
@@ -64,7 +66,9 @@ void amdgpu_amdkfd_fini(void)
 {
 	if (kgd2kfd) {
 		kgd2kfd->exit();
+#if 0
 		symbol_put(kgd2kfd_init);
+#endif
 	}
 }
 
@@ -166,6 +170,16 @@ int amdgpu_amdkfd_resume(struct amdgpu_device *adev)
 	return r;
 }
 
+#if 0
+u32 pool_to_domain(enum kgd_memory_pool p)
+{
+	switch (p) {
+	case KGD_POOL_FRAMEBUFFER: return AMDGPU_GEM_DOMAIN_VRAM;
+	default: return AMDGPU_GEM_DOMAIN_GTT;
+	}
+}
+#endif
+
 int alloc_gtt_mem(struct kgd_dev *kgd, size_t size,
 			void **mem_obj, uint64_t *gpu_addr,
 			void **cpu_ptr)
@@ -178,7 +192,7 @@ int alloc_gtt_mem(struct kgd_dev *kgd, size_t size,
 	BUG_ON(gpu_addr == NULL);
 	BUG_ON(cpu_ptr == NULL);
 
-	*mem = kmalloc(sizeof(struct kgd_mem), GFP_KERNEL);
+	*mem = kmalloc(sizeof(struct kgd_mem), M_DRM, GFP_KERNEL);
 	if ((*mem) == NULL)
 		return -ENOMEM;
 
@@ -199,7 +213,7 @@ int alloc_gtt_mem(struct kgd_dev *kgd, size_t size,
 	}
 
 	r = amdgpu_bo_pin((*mem)->bo, AMDGPU_GEM_DOMAIN_GTT,
-				&(*mem)->gpu_addr);
+				(u64 *)&(*mem)->gpu_addr);
 	if (r) {
 		dev_err(adev->dev, "(%d) failed to pin bo for amdkfd\n", r);
 		goto allocate_mem_pin_bo_failed;

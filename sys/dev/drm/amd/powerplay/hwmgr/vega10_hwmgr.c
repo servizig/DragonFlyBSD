@@ -84,6 +84,8 @@ static int vega10_force_clock_level(struct pp_hwmgr *hwmgr,
 static const ULONG PhwVega10_Magic = (ULONG)(PHM_VIslands_Magic);
 
 struct vega10_power_state *cast_phw_vega10_power_state(
+				  struct pp_hw_power_state *hw_ps);
+struct vega10_power_state *cast_phw_vega10_power_state(
 				  struct pp_hw_power_state *hw_ps)
 {
 	PP_ASSERT_WITH_CODE((PhwVega10_Magic == hw_ps->magic),
@@ -93,6 +95,8 @@ struct vega10_power_state *cast_phw_vega10_power_state(
 	return (struct vega10_power_state *)hw_ps;
 }
 
+const struct vega10_power_state *cast_const_phw_vega10_power_state(
+				 const struct pp_hw_power_state *hw_ps);
 const struct vega10_power_state *cast_const_phw_vega10_power_state(
 				 const struct pp_hw_power_state *hw_ps)
 {
@@ -1626,6 +1630,9 @@ static int vega10_populate_single_soc_level(struct pp_hwmgr *hwmgr,
 	return 0;
 }
 
+uint16_t vega10_locate_vddc_given_clock(struct pp_hwmgr *hwmgr,
+		uint32_t clk,
+		struct phm_ppt_v1_clock_voltage_dependency_table *dep_table);
 uint16_t vega10_locate_vddc_given_clock(struct pp_hwmgr *hwmgr,
 		uint32_t clk,
 		struct phm_ppt_v1_clock_voltage_dependency_table *dep_table)
@@ -4016,6 +4023,8 @@ static int vega10_notify_smc_display_change(struct pp_hwmgr *hwmgr,
 }
 
 int vega10_display_clock_voltage_request(struct pp_hwmgr *hwmgr,
+		struct pp_display_clock_request *clock_req);
+int vega10_display_clock_voltage_request(struct pp_hwmgr *hwmgr,
 		struct pp_display_clock_request *clock_req)
 {
 	int result = 0;
@@ -4691,6 +4700,7 @@ static int vega10_display_configuration_changed_task(struct pp_hwmgr *hwmgr)
 	return result;
 }
 
+int vega10_enable_disable_uvd_dpm(struct pp_hwmgr *hwmgr, bool enable);
 int vega10_enable_disable_uvd_dpm(struct pp_hwmgr *hwmgr, bool enable)
 {
 	struct vega10_hwmgr *data =

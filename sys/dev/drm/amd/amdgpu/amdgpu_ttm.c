@@ -42,7 +42,8 @@
 #include <linux/swap.h>
 #include <linux/pagemap.h>
 #include <linux/debugfs.h>
-#include <linux/iommu.h>
+/*#include <linux/iommu.h>*/
+#include <linux/pfn_t.h>
 #include "amdgpu.h"
 #include "amdgpu_object.h"
 #include "amdgpu_trace.h"
@@ -105,7 +106,7 @@ static int amdgpu_ttm_global_init(struct amdgpu_device *adev)
 		goto error_bo;
 	}
 
-	mutex_init(&adev->mman.gtt_window_lock);
+	lockinit(&adev->mman.gtt_window_lock, "agmmgtl", 0, LK_CANRECURSE);
 
 	ring = adev->mman.buffer_funcs_ring;
 	rq = &ring->sched.sched_rq[AMD_SCHED_PRIORITY_KERNEL];
@@ -686,7 +687,7 @@ struct amdgpu_ttm_tt {
 	uint64_t		userptr;
 	struct mm_struct	*usermm;
 	uint32_t		userflags;
-	spinlock_t              guptasklock;
+	struct spinlock         guptasklock;
 	struct list_head        guptasks;
 	atomic_t		mmu_invalidations;
 	uint32_t		last_set_pages;
@@ -695,13 +696,13 @@ struct amdgpu_ttm_tt {
 
 int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 {
+	kprintf("amdgpu_ttm_tt_get_user_pages: not implemented\n");
+	return -EINVAL;
+#if 0
 	struct amdgpu_ttm_tt *gtt = (void *)ttm;
-	unsigned int flags = 0;
+	int write = !(gtt->userflags & AMDGPU_GEM_USERPTR_READONLY);
 	unsigned pinned = 0;
 	int r;
-
-	if (!(gtt->userflags & AMDGPU_GEM_USERPTR_READONLY))
-		flags |= FOLL_WRITE;
 
 	down_read(&current->mm->mmap_sem);
 
@@ -729,7 +730,7 @@ int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 		list_add(&guptask.list, &gtt->guptasks);
 		spin_unlock(&gtt->guptasklock);
 
-		r = get_user_pages(userptr, num_pages, flags, p, NULL);
+		r = get_user_pages(userptr, num_pages, write, 0, p, NULL);
 
 		spin_lock(&gtt->guptasklock);
 		list_del(&guptask.list);
@@ -749,6 +750,7 @@ release_pages:
 	release_pages(pages, pinned);
 	up_read(&current->mm->mmap_sem);
 	return r;
+#endif
 }
 
 void amdgpu_ttm_tt_set_user_pages(struct ttm_tt *ttm, struct page **pages)
@@ -1087,7 +1089,7 @@ int amdgpu_ttm_tt_set_userptr(struct ttm_tt *ttm, uint64_t addr,
 	gtt->userptr = addr;
 	gtt->usermm = current->mm;
 	gtt->userflags = flags;
-	spin_lock_init(&gtt->guptasklock);
+	spin_init(&gtt->guptasklock, "agggtl");
 	INIT_LIST_HEAD(&gtt->guptasks);
 	atomic_set(&gtt->mmu_invalidations, 0);
 	gtt->last_set_pages = 0;
@@ -1101,8 +1103,12 @@ struct mm_struct *amdgpu_ttm_tt_get_usermm(struct ttm_tt *ttm)
 
 	if (gtt == NULL)
 		return NULL;
-
+#if 0
 	return gtt->usermm;
+#else
+	kprintf("amdgpu_ttm_tt_get_user_pages: not implemented\n");
+	return NULL;
+#endif
 }
 
 bool amdgpu_ttm_tt_affect_userptr(struct ttm_tt *ttm, unsigned long start,
@@ -1306,7 +1312,11 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 	r = ttm_bo_device_init(&adev->mman.bdev,
 			       adev->mman.bo_global_ref.ref.object,
 			       &amdgpu_bo_driver,
+#ifdef __DragonFly__
+			       NULL,
+#else
 			       adev->ddev->anon_inode->i_mapping,
+#endif
 			       DRM_FILE_PAGE_OFFSET,
 			       adev->need_dma32);
 	if (r) {
@@ -1826,7 +1836,7 @@ static ssize_t amdgpu_ttm_gtt_read(struct file *f, char __user *buf,
 
 	while (size) {
 		loff_t p = *pos / PAGE_SIZE;
-		unsigned off = *pos & ~PAGE_MASK;
+		unsigned off = *pos & ~LINUX_PAGE_MASK;
 		size_t cur_size = min_t(size_t, size, PAGE_SIZE - off);
 		struct page *page;
 		void *ptr;

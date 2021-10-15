@@ -43,6 +43,7 @@ static int amdgpu_pp_early_init(void *handle)
 	amd_pp = &(adev->powerplay);
 	amd_pp->pp_handle = (void *)adev;
 
+kprintf("amdgpu_pp_early_init(): 0\n");
 	switch (adev->asic_type) {
 	case CHIP_POLARIS11:
 	case CHIP_POLARIS10:
@@ -93,11 +94,12 @@ static int amdgpu_pp_early_init(void *handle)
 		break;
 	}
 
+kprintf("amdgpu_pp_early_init(): 1\n");
 	if (adev->powerplay.ip_funcs->early_init)
 		ret = adev->powerplay.ip_funcs->early_init(
 					amd_pp->cgs_device ? amd_pp->cgs_device :
 					amd_pp->pp_handle);
-
+kprintf("amdgpu_pp_early_init(): 2\n");
 	return ret;
 }
 

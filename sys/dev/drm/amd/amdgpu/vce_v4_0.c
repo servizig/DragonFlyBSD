@@ -56,7 +56,7 @@ static void vce_v4_0_set_irq_funcs(struct amdgpu_device *adev);
  *
  * Returns the current hardware read pointer
  */
-static uint64_t vce_v4_0_ring_get_rptr(struct amdgpu_ring *ring)
+static u64 vce_v4_0_ring_get_rptr(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 
@@ -75,7 +75,7 @@ static uint64_t vce_v4_0_ring_get_rptr(struct amdgpu_ring *ring)
  *
  * Returns the current hardware write pointer
  */
-static uint64_t vce_v4_0_ring_get_wptr(struct amdgpu_ring *ring)
+static u64 vce_v4_0_ring_get_wptr(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 
@@ -422,9 +422,11 @@ static int vce_v4_0_sw_init(void *handle)
 
 	if (adev->firmware.load_type == AMDGPU_FW_LOAD_PSP) {
 		const struct common_firmware_header *hdr;
+#if 0
 		unsigned size = amdgpu_bo_size(adev->vce.vcpu_bo);
+#endif
 
-		adev->vce.saved_bo = kmalloc(size, GFP_KERNEL);
+		adev->vce.saved_bo = kmalloc(size, M_DRM, GFP_KERNEL);
 		if (!adev->vce.saved_bo)
 			return -ENOMEM;
 
@@ -936,8 +938,8 @@ static void vce_v4_0_ring_emit_ib(struct amdgpu_ring *ring,
 	amdgpu_ring_write(ring, ib->length_dw);
 }
 
-static void vce_v4_0_ring_emit_fence(struct amdgpu_ring *ring, u64 addr,
-			u64 seq, unsigned flags)
+static void vce_v4_0_ring_emit_fence(struct amdgpu_ring *ring, uint64_t addr,
+			uint64_t seq, unsigned flags)
 {
 	WARN_ON(flags & AMDGPU_FENCE_FLAG_64BIT);
 

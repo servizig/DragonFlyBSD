@@ -247,7 +247,7 @@ static int vcn_v1_0_resume(void *handle)
  */
 static void vcn_v1_0_mc_resume(struct amdgpu_device *adev)
 {
-	uint32_t size = AMDGPU_GPU_PAGE_ALIGN(adev->vcn.fw->size + 4);
+	uint32_t size = AMDGPU_GPU_PAGE_ALIGN(adev->vcn.fw->datasize + 4);
 
 	WREG32_SOC15(UVD, 0, mmUVD_LMI_VCPU_CACHE_64BIT_BAR_LOW,
 			lower_32_bits(adev->vcn.gpu_addr));
@@ -700,7 +700,7 @@ static int vcn_v1_0_set_clockgating_state(void *handle,
  *
  * Returns the current hardware read pointer
  */
-static uint64_t vcn_v1_0_dec_ring_get_rptr(struct amdgpu_ring *ring)
+static u64 vcn_v1_0_dec_ring_get_rptr(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 
@@ -714,7 +714,7 @@ static uint64_t vcn_v1_0_dec_ring_get_rptr(struct amdgpu_ring *ring)
  *
  * Returns the current hardware write pointer
  */
-static uint64_t vcn_v1_0_dec_ring_get_wptr(struct amdgpu_ring *ring)
+static u64 vcn_v1_0_dec_ring_get_wptr(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 
@@ -774,7 +774,7 @@ static void vcn_v1_0_dec_ring_insert_end(struct amdgpu_ring *ring)
  *
  * Write a fence and a trap command to the ring.
  */
-static void vcn_v1_0_dec_ring_emit_fence(struct amdgpu_ring *ring, u64 addr, u64 seq,
+static void vcn_v1_0_dec_ring_emit_fence(struct amdgpu_ring *ring, uint64_t addr, uint64_t seq,
 				     unsigned flags)
 {
 	WARN_ON(flags & AMDGPU_FENCE_FLAG_64BIT);
@@ -917,7 +917,7 @@ static void vcn_v1_0_dec_ring_emit_vm_flush(struct amdgpu_ring *ring,
  *
  * Returns the current hardware enc read pointer
  */
-static uint64_t vcn_v1_0_enc_ring_get_rptr(struct amdgpu_ring *ring)
+static u64 vcn_v1_0_enc_ring_get_rptr(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 
@@ -934,7 +934,7 @@ static uint64_t vcn_v1_0_enc_ring_get_rptr(struct amdgpu_ring *ring)
  *
  * Returns the current hardware enc write pointer
  */
-static uint64_t vcn_v1_0_enc_ring_get_wptr(struct amdgpu_ring *ring)
+static u64 vcn_v1_0_enc_ring_get_wptr(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 
@@ -971,8 +971,8 @@ static void vcn_v1_0_enc_ring_set_wptr(struct amdgpu_ring *ring)
  *
  * Write enc a fence and a trap command to the ring.
  */
-static void vcn_v1_0_enc_ring_emit_fence(struct amdgpu_ring *ring, u64 addr,
-			u64 seq, unsigned flags)
+static void vcn_v1_0_enc_ring_emit_fence(struct amdgpu_ring *ring, uint64_t addr,
+			uint64_t seq, unsigned flags)
 {
 	WARN_ON(flags & AMDGPU_FENCE_FLAG_64BIT);
 

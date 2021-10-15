@@ -94,13 +94,13 @@ void amdgpu_gem_force_release(struct amdgpu_device *adev)
 		int handle;
 
 		WARN_ONCE(1, "Still active user space clients!\n");
-		spin_lock(&file->table_lock);
+		lockmgr(&file->table_lock, LK_EXCLUSIVE);
 		idr_for_each_entry(&file->object_idr, gobj, handle) {
 			WARN_ONCE(1, "And also active allocations!\n");
 			drm_gem_object_put_unlocked(gobj);
 		}
 		idr_destroy(&file->object_idr);
-		spin_unlock(&file->table_lock);
+		lockmgr(&file->table_lock, LK_RELEASE);
 	}
 
 	mutex_unlock(&ddev->filelist_mutex);
@@ -282,6 +282,9 @@ int amdgpu_gem_create_ioctl(struct drm_device *dev, void *data,
 int amdgpu_gem_userptr_ioctl(struct drm_device *dev, void *data,
 			     struct drm_file *filp)
 {
+	kprintf("amdgpu_gem_userptr_ioctl: not implemented\n");
+	return -EINVAL;
+#if 0
 	struct amdgpu_device *adev = dev->dev_private;
 	struct drm_amdgpu_gem_userptr *args = data;
 	struct drm_gem_object *gobj;
@@ -357,6 +360,7 @@ release_object:
 	drm_gem_object_put_unlocked(gobj);
 
 	return r;
+#endif
 }
 
 int amdgpu_mode_dumb_mmap(struct drm_file *filp,
@@ -387,7 +391,7 @@ int amdgpu_gem_mmap_ioctl(struct drm_device *dev, void *data,
 	union drm_amdgpu_gem_mmap *args = data;
 	uint32_t handle = args->in.handle;
 	memset(args, 0, sizeof(*args));
-	return amdgpu_mode_dumb_mmap(filp, dev, handle, &args->out.addr_ptr);
+	return amdgpu_mode_dumb_mmap(filp, dev, handle, (uint64_t *)&args->out.addr_ptr);
 }
 
 /**
@@ -474,7 +478,7 @@ int amdgpu_gem_metadata_ioctl(struct drm_device *dev, void *data,
 		r = amdgpu_bo_get_metadata(robj, args->data.data,
 					   sizeof(args->data.data),
 					   &args->data.data_size_bytes,
-					   &args->data.flags);
+					   (uint64_t *)&args->data.flags);
 	} else if (args->op == AMDGPU_GEM_METADATA_OP_SET_METADATA) {
 		if (args->data.data_size_bytes > sizeof(args->data.data)) {
 			r = -EINVAL;
@@ -825,9 +829,9 @@ static int amdgpu_debugfs_gem_info(struct seq_file *m, void *data)
 			   task ? task->comm : "<unknown>");
 		rcu_read_unlock();
 
-		spin_lock(&file->table_lock);
+		lockmgr(&file->table_lock, LK_EXCLUSIVE);
 		idr_for_each(&file->object_idr, amdgpu_debugfs_gem_bo_info, m);
-		spin_unlock(&file->table_lock);
+		lockmgr(&file->table_lock, LK_RELEASE);
 	}
 
 	mutex_unlock(&dev->filelist_mutex);

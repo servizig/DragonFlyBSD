@@ -31,6 +31,8 @@
 #include <linux/types.h>
 #include <linux/bitmap.h>
 
+#include <linux/mm_types.h>
+
 struct pci_dev;
 
 #define KFD_INTERFACE_VERSION 2

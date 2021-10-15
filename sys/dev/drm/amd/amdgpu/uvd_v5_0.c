@@ -51,7 +51,7 @@ static void uvd_v5_0_enable_mgcg(struct amdgpu_device *adev,
  *
  * Returns the current hardware read pointer
  */
-static uint64_t uvd_v5_0_ring_get_rptr(struct amdgpu_ring *ring)
+static u64 uvd_v5_0_ring_get_rptr(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 
@@ -65,7 +65,7 @@ static uint64_t uvd_v5_0_ring_get_rptr(struct amdgpu_ring *ring)
  *
  * Returns the current hardware write pointer
  */
-static uint64_t uvd_v5_0_ring_get_wptr(struct amdgpu_ring *ring)
+static u64 uvd_v5_0_ring_get_wptr(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 
@@ -116,7 +116,7 @@ static int uvd_v5_0_sw_init(void *handle)
 		return r;
 
 	ring = &adev->uvd.ring;
-	sprintf(ring->name, "uvd");
+	ksprintf(ring->name, "uvd");
 	r = amdgpu_ring_init(adev, ring, 512, &adev->uvd.irq, 0);
 
 	return r;
@@ -258,7 +258,7 @@ static void uvd_v5_0_mc_resume(struct amdgpu_device *adev)
 			upper_32_bits(adev->uvd.gpu_addr));
 
 	offset = AMDGPU_UVD_FIRMWARE_OFFSET;
-	size = AMDGPU_GPU_PAGE_ALIGN(adev->uvd.fw->size + 4);
+	size = AMDGPU_GPU_PAGE_ALIGN(adev->uvd.fw->datasize + 4);
 	WREG32(mmUVD_VCPU_CACHE_OFFSET0, offset >> 3);
 	WREG32(mmUVD_VCPU_CACHE_SIZE0, size);
 
@@ -456,7 +456,7 @@ static void uvd_v5_0_stop(struct amdgpu_device *adev)
  *
  * Write a fence and a trap command to the ring.
  */
-static void uvd_v5_0_ring_emit_fence(struct amdgpu_ring *ring, u64 addr, u64 seq,
+static void uvd_v5_0_ring_emit_fence(struct amdgpu_ring *ring, uint64_t addr, uint64_t seq,
 				     unsigned flags)
 {
 	WARN_ON(flags & AMDGPU_FENCE_FLAG_64BIT);

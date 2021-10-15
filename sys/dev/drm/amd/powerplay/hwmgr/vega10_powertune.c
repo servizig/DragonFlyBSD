@@ -651,6 +651,7 @@ static const struct vega10_didt_config_reg   PSMSEEDCStallDelayConfig_Vega10[] =
 	{   0xFFFFFFFF  }  /* End of list */
 };
 
+#if 0
 static const struct vega10_didt_config_reg   PSMSEEDCThresholdConfig_Vega10[] =
 {
 /* ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -662,6 +663,7 @@ static const struct vega10_didt_config_reg   PSMSEEDCThresholdConfig_Vega10[] =
 
 	{   0xFFFFFFFF  }  /* End of list */
 };
+#endif
 
 static const struct vega10_didt_config_reg   PSMSEEDCCtrlResetConfig_Vega10[] =
 {
@@ -707,6 +709,7 @@ static const struct vega10_didt_config_reg   PSMSEEDCCtrlConfig_Vega10[] =
 	{   0xFFFFFFFF  }  /* End of list */
 };
 
+#if 0
 static const struct vega10_didt_config_reg   PSMGCEDCThresholdConfig_vega10[] =
 {
 /* ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -717,6 +720,7 @@ static const struct vega10_didt_config_reg   PSMGCEDCThresholdConfig_vega10[] =
 
 	{   0xFFFFFFFF  }  /* End of list */
 };
+#endif
 
 static const struct vega10_didt_config_reg   PSMGCEDCDroopCtrlConfig_vega10[] =
 {

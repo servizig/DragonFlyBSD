@@ -80,7 +80,7 @@ static int phm_thermal_l2h_irq(void *private_data,
 	if (result)
 		return -EINVAL;
 
-	pr_warn("GPU over temperature range detected on PCIe %lld:%lld.%lld!\n",
+	pr_warn("GPU over temperature range detected on PCIe %ld:%ld.%ld!\n",
 			PCI_BUS_NUM(sys_info.value),
 			PCI_SLOT(sys_info.value),
 			PCI_FUNC(sys_info.value));
@@ -98,7 +98,7 @@ static int phm_thermal_h2l_irq(void *private_data,
 	if (result)
 		return -EINVAL;
 
-	pr_warn("GPU under temperature range detected on PCIe %lld:%lld.%lld!\n",
+	pr_warn("GPU under temperature range detected on PCIe %ld:%ld.%ld!\n",
 			PCI_BUS_NUM(sys_info.value),
 			PCI_SLOT(sys_info.value),
 			PCI_FUNC(sys_info.value));
@@ -116,7 +116,7 @@ static int phm_ctf_irq(void *private_data,
 	if (result)
 		return -EINVAL;
 
-	pr_warn("GPU Critical Temperature Fault detected on PCIe %lld:%lld.%lld!\n",
+	pr_warn("GPU Critical Temperature Fault detected on PCIe %ld:%ld.%ld!\n",
 			PCI_BUS_NUM(sys_info.value),
 			PCI_SLOT(sys_info.value),
 			PCI_FUNC(sys_info.value));

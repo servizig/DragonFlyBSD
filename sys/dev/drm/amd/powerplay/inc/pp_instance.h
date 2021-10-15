@@ -32,7 +32,7 @@ struct pp_instance {
 	uint32_t feature_mask;
 	void *device;
 	struct pp_hwmgr *hwmgr;
-	struct mutex pp_lock;
+	struct lock pp_lock;
 };
 
 #endif

@@ -676,7 +676,7 @@ static uint64_t gmc_v8_0_get_vm_pte_flags(struct amdgpu_device *adev,
 	return pte_flag;
 }
 
-static uint64_t gmc_v8_0_get_vm_pde(struct amdgpu_device *adev, uint64_t addr)
+static u64 gmc_v8_0_get_vm_pde(struct amdgpu_device *adev, u64 addr)
 {
 	BUG_ON(addr & 0xFFFFFF0000000FFFULL);
 	return addr;

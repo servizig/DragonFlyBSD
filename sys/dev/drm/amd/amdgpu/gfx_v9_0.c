@@ -499,7 +499,7 @@ static int gfx_v9_0_init_microcode(struct amdgpu_device *adev)
 			le32_to_cpu(rlc_hdr->reg_list_size_bytes);
 	adev->gfx.rlc.register_list_format =
 			kmalloc(adev->gfx.rlc.reg_list_format_size_bytes +
-				adev->gfx.rlc.reg_list_size_bytes, GFP_KERNEL);
+				adev->gfx.rlc.reg_list_size_bytes, M_DRM, GFP_KERNEL);
 	if (!adev->gfx.rlc.register_list_format) {
 		err = -ENOMEM;
 		goto out;
@@ -812,12 +812,12 @@ static void gfx_v9_0_rlc_fini(struct amdgpu_device *adev)
 {
 	/* clear state block */
 	amdgpu_bo_free_kernel(&adev->gfx.rlc.clear_state_obj,
-			&adev->gfx.rlc.clear_state_gpu_addr,
+			(u64 *)&adev->gfx.rlc.clear_state_gpu_addr,
 			(void **)&adev->gfx.rlc.cs_ptr);
 
 	/* jump table block */
 	amdgpu_bo_free_kernel(&adev->gfx.rlc.cp_table_obj,
-			&adev->gfx.rlc.cp_table_gpu_addr,
+			(u64 *)&adev->gfx.rlc.cp_table_gpu_addr,
 			(void **)&adev->gfx.rlc.cp_table_ptr);
 }
 
@@ -838,7 +838,7 @@ static int gfx_v9_0_rlc_init(struct amdgpu_device *adev)
 		r = amdgpu_bo_create_reserved(adev, dws * 4, PAGE_SIZE,
 					      AMDGPU_GEM_DOMAIN_VRAM,
 					      &adev->gfx.rlc.clear_state_obj,
-					      &adev->gfx.rlc.clear_state_gpu_addr,
+					      (u64 *)&adev->gfx.rlc.clear_state_gpu_addr,
 					      (void **)&adev->gfx.rlc.cs_ptr);
 		if (r) {
 			dev_err(adev->dev, "(%d) failed to create rlc csb bo\n",
@@ -859,7 +859,7 @@ static int gfx_v9_0_rlc_init(struct amdgpu_device *adev)
 		r = amdgpu_bo_create_reserved(adev, adev->gfx.rlc.cp_table_size,
 					      PAGE_SIZE, AMDGPU_GEM_DOMAIN_VRAM,
 					      &adev->gfx.rlc.cp_table_obj,
-					      &adev->gfx.rlc.cp_table_gpu_addr,
+					      (u64 *)&adev->gfx.rlc.cp_table_gpu_addr,
 					      (void **)&adev->gfx.rlc.cp_table_ptr);
 		if (r) {
 			dev_err(adev->dev,
@@ -1098,7 +1098,7 @@ static int gfx_v9_0_ngg_create_buf(struct amdgpu_device *adev,
 	r = amdgpu_bo_create_kernel(adev, ngg_buf->size,
 				    PAGE_SIZE, AMDGPU_GEM_DOMAIN_VRAM,
 				    &ngg_buf->bo,
-				    &ngg_buf->gpu_addr,
+				    (u64 *)&ngg_buf->gpu_addr,
 				    NULL);
 	if (r) {
 		dev_err(adev->dev, "(%d) failed to create NGG buffer\n", r);
@@ -1115,7 +1115,7 @@ static int gfx_v9_0_ngg_fini(struct amdgpu_device *adev)
 
 	for (i = 0; i < NGG_BUF_MAX; i++)
 		amdgpu_bo_free_kernel(&adev->gfx.ngg.buf[i].bo,
-				      &adev->gfx.ngg.buf[i].gpu_addr,
+				      (u64 *)&adev->gfx.ngg.buf[i].gpu_addr,
 				      NULL);
 
 	memset(&adev->gfx.ngg.buf[0], 0,
@@ -1464,16 +1464,16 @@ static int gfx_v9_0_sw_fini(void *handle)
 	amdgpu_gfx_compute_mqd_sw_fini(adev);
 	amdgpu_gfx_kiq_free_ring(&adev->gfx.kiq.ring, &adev->gfx.kiq.irq);
 	amdgpu_gfx_kiq_fini(adev);
-	amdgpu_bo_free_kernel(&adev->virt.csa_obj, &adev->virt.csa_vmid0_addr, NULL);
+	amdgpu_bo_free_kernel(&adev->virt.csa_obj, (u64 *)&adev->virt.csa_vmid0_addr, NULL);
 
 	gfx_v9_0_mec_fini(adev);
 	gfx_v9_0_ngg_fini(adev);
 	amdgpu_bo_free_kernel(&adev->gfx.rlc.clear_state_obj,
-				&adev->gfx.rlc.clear_state_gpu_addr,
+			        (u64 *)&adev->gfx.rlc.clear_state_gpu_addr,
 				(void **)&adev->gfx.rlc.cs_ptr);
 	if (adev->asic_type == CHIP_RAVEN) {
 		amdgpu_bo_free_kernel(&adev->gfx.rlc.cp_table_obj,
-				&adev->gfx.rlc.cp_table_gpu_addr,
+				(u64 *)&adev->gfx.rlc.cp_table_gpu_addr,
 				(void **)&adev->gfx.rlc.cp_table_ptr);
 	}
 	gfx_v9_0_free_microcode(adev);
@@ -1746,7 +1746,7 @@ static int gfx_v9_0_init_rlc_save_restore_list(struct amdgpu_device *adev)
 	u32 tmp = 0;
 
 	u32 *register_list_format =
-		kmalloc(adev->gfx.rlc.reg_list_format_size_bytes, GFP_KERNEL);
+	  kmalloc(adev->gfx.rlc.reg_list_format_size_bytes, M_DRM, GFP_KERNEL);
 	if (!register_list_format)
 		return -ENOMEM;
 	memcpy(register_list_format, adev->gfx.rlc.register_list_format,
@@ -2018,6 +2018,7 @@ static void gfx_v9_0_init_pg(struct amdgpu_device *adev)
 	}
 }
 
+void gfx_v9_0_rlc_stop(struct amdgpu_device *adev);
 void gfx_v9_0_rlc_stop(struct amdgpu_device *adev)
 {
 	WREG32_FIELD15(GC, 0, RLC_CNTL, RLC_ENABLE_F32, 0);
@@ -3695,8 +3696,8 @@ static void gfx_v9_0_ring_emit_ib_compute(struct amdgpu_ring *ring,
         amdgpu_ring_write(ring, control);
 }
 
-static void gfx_v9_0_ring_emit_fence(struct amdgpu_ring *ring, u64 addr,
-				     u64 seq, unsigned flags)
+static void gfx_v9_0_ring_emit_fence(struct amdgpu_ring *ring, uint64_t addr,
+				     uint64_t seq, unsigned flags)
 {
 	bool write64bit = flags & AMDGPU_FENCE_FLAG_64BIT;
 	bool int_sel = flags & AMDGPU_FENCE_FLAG_INT;
@@ -3801,8 +3802,8 @@ static void gfx_v9_0_ring_set_wptr_compute(struct amdgpu_ring *ring)
 	}
 }
 
-static void gfx_v9_0_ring_emit_fence_kiq(struct amdgpu_ring *ring, u64 addr,
-					 u64 seq, unsigned int flags)
+static void gfx_v9_0_ring_emit_fence_kiq(struct amdgpu_ring *ring, uint64_t addr,
+					 uint64_t seq, unsigned int flags)
 {
 	/* we only allocate 32bit for each seq wb address */
 	BUG_ON(flags & AMDGPU_FENCE_FLAG_64BIT);

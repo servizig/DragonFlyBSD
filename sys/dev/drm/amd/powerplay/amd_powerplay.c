@@ -69,7 +69,7 @@ static int amd_powerplay_create(struct amd_pp_init *pp_init,
 	instance->pm_en = pp_init->pm_en;
 	instance->feature_mask = pp_init->feature_mask;
 	instance->device = pp_init->device;
-	mutex_init(&instance->pp_lock);
+	lockinit(&instance->pp_lock, "appippl", 0, LK_CANRECURSE);
 	*handle = instance;
 	return 0;
 }

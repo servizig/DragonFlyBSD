@@ -37,6 +37,11 @@
 #include "amdgpu.h"
 #include "amdgpu_trace.h"
 
+/* undo vm namespace pollution  */
+#undef min_offset
+#undef max_offset
+ 
+
 static void amdgpu_ttm_bo_destroy(struct ttm_buffer_object *tbo)
 {
 	struct amdgpu_device *adev = amdgpu_ttm_adev(tbo->bdev);
@@ -401,7 +406,9 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 		amdgpu_bo_unreserve(bo);
 	*bo_ptr = bo;
 
+#if 0
 	trace_amdgpu_bo_create(bo);
+#endif
 
 	/* Treat CPU_ACCESS_REQUIRED only as a hint if given by UMD */
 	if (type == ttm_bo_type_device)

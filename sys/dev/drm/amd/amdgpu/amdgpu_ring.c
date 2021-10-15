@@ -307,7 +307,7 @@ int amdgpu_ring_init(struct amdgpu_device *adev, struct amdgpu_ring *ring,
 		r = amdgpu_bo_create_kernel(adev, ring->ring_size, PAGE_SIZE,
 					    AMDGPU_GEM_DOMAIN_GTT,
 					    &ring->ring_obj,
-					    &ring->gpu_addr,
+					    (u64 *)&ring->gpu_addr,
 					    (void **)&ring->ring);
 		if (r) {
 			dev_err(adev->dev, "(%d) ring create failed\n", r);
@@ -318,7 +318,7 @@ int amdgpu_ring_init(struct amdgpu_device *adev, struct amdgpu_ring *ring,
 
 	ring->max_dw = max_dw;
 	ring->priority = AMD_SCHED_PRIORITY_NORMAL;
-	mutex_init(&ring->priority_mutex);
+	lockinit(&ring->priority_mutex, "agrpm", 0, LK_CANRECURSE);
 	INIT_LIST_HEAD(&ring->lru_list);
 	amdgpu_ring_lru_touch(adev, ring);
 
@@ -355,7 +355,7 @@ void amdgpu_ring_fini(struct amdgpu_ring *ring)
 	amdgpu_wb_free(ring->adev, ring->fence_offs);
 
 	amdgpu_bo_free_kernel(&ring->ring_obj,
-			      &ring->gpu_addr,
+			      (u64 *)&ring->gpu_addr,
 			      (void **)&ring->ring);
 
 	amdgpu_debugfs_ring_fini(ring);
@@ -406,7 +406,7 @@ int amdgpu_ring_lru_get(struct amdgpu_device *adev, int type,
 	/* List is sorted in LRU order, find first entry corresponding
 	 * to the desired HW IP */
 	*ring = NULL;
-	spin_lock(&adev->ring_lru_list_lock);
+	lockmgr(&adev->ring_lru_list_lock, LK_EXCLUSIVE);
 	list_for_each_entry(entry, &adev->ring_lru_list, lru_list) {
 		if (entry->funcs->type != type)
 			continue;
@@ -431,7 +431,7 @@ int amdgpu_ring_lru_get(struct amdgpu_device *adev, int type,
 	if (*ring)
 		amdgpu_ring_lru_touch_locked(adev, *ring);
 
-	spin_unlock(&adev->ring_lru_list_lock);
+	lockmgr(&adev->ring_lru_list_lock, LK_RELEASE);
 
 	if (!*ring) {
 		DRM_ERROR("Ring LRU contains no entries for ring type:%d\n", type);
@@ -451,9 +451,9 @@ int amdgpu_ring_lru_get(struct amdgpu_device *adev, int type,
  */
 void amdgpu_ring_lru_touch(struct amdgpu_device *adev, struct amdgpu_ring *ring)
 {
-	spin_lock(&adev->ring_lru_list_lock);
+	lockmgr(&adev->ring_lru_list_lock, LK_EXCLUSIVE);
 	amdgpu_ring_lru_touch_locked(adev, ring);
-	spin_unlock(&adev->ring_lru_list_lock);
+	lockmgr(&adev->ring_lru_list_lock, LK_RELEASE);
 }
 
 /*

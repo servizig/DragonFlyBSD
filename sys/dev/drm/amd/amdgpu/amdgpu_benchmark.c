@@ -88,7 +88,7 @@ static void amdgpu_benchmark_move(struct amdgpu_device *adev, unsigned size,
 	r = amdgpu_bo_reserve(sobj, false);
 	if (unlikely(r != 0))
 		goto out_cleanup;
-	r = amdgpu_bo_pin(sobj, sdomain, &saddr);
+	r = amdgpu_bo_pin(sobj, sdomain, (u64 *)&saddr);
 	amdgpu_bo_unreserve(sobj);
 	if (r) {
 		goto out_cleanup;
@@ -101,7 +101,7 @@ static void amdgpu_benchmark_move(struct amdgpu_device *adev, unsigned size,
 	r = amdgpu_bo_reserve(dobj, false);
 	if (unlikely(r != 0))
 		goto out_cleanup;
-	r = amdgpu_bo_pin(dobj, ddomain, &daddr);
+	r = amdgpu_bo_pin(dobj, ddomain, (u64 *)&daddr);
 	amdgpu_bo_unreserve(dobj);
 	if (r) {
 		goto out_cleanup;

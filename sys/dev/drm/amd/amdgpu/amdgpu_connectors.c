@@ -288,7 +288,7 @@ amdgpu_connector_get_hardcoded_edid(struct amdgpu_device *adev)
 	struct edid *edid;
 
 	if (adev->mode_info.bios_hardcoded_edid) {
-		edid = kmalloc(adev->mode_info.bios_hardcoded_edid_size, GFP_KERNEL);
+		edid = kmalloc(adev->mode_info.bios_hardcoded_edid_size, M_DRM, GFP_KERNEL);
 		if (edid) {
 			memcpy((unsigned char *)edid,
 			       (unsigned char *)adev->mode_info.bios_hardcoded_edid,
@@ -735,11 +735,13 @@ amdgpu_connector_lvds_detect(struct drm_connector *connector, bool force)
 	struct amdgpu_connector *amdgpu_connector = to_amdgpu_connector(connector);
 	struct drm_encoder *encoder = amdgpu_connector_best_single_encoder(connector);
 	enum drm_connector_status ret = connector_status_disconnected;
+#if 0
 	int r;
 
 	r = pm_runtime_get_sync(connector->dev->dev);
 	if (r < 0)
 		return connector_status_disconnected;
+#endif
 
 	if (encoder) {
 		struct amdgpu_encoder *amdgpu_encoder = to_amdgpu_encoder(encoder);
@@ -759,7 +761,9 @@ amdgpu_connector_lvds_detect(struct drm_connector *connector, bool force)
 
 	amdgpu_connector_update_scratch_regs(connector, ret);
 	pm_runtime_mark_last_busy(connector->dev->dev);
+#if 0
 	pm_runtime_put_autosuspend(connector->dev->dev);
+#endif
 	return ret;
 }
 
@@ -867,11 +871,13 @@ amdgpu_connector_vga_detect(struct drm_connector *connector, bool force)
 	const struct drm_encoder_helper_funcs *encoder_funcs;
 	bool dret = false;
 	enum drm_connector_status ret = connector_status_disconnected;
+#if 0
 	int r;
 
 	r = pm_runtime_get_sync(connector->dev->dev);
 	if (r < 0)
 		return connector_status_disconnected;
+#endif
 
 	encoder = amdgpu_connector_best_single_encoder(connector);
 	if (!encoder)
@@ -985,13 +991,15 @@ amdgpu_connector_dvi_detect(struct drm_connector *connector, bool force)
 	struct amdgpu_connector *amdgpu_connector = to_amdgpu_connector(connector);
 	struct drm_encoder *encoder = NULL;
 	const struct drm_encoder_helper_funcs *encoder_funcs;
-	int i, r;
+	int i;
 	enum drm_connector_status ret = connector_status_disconnected;
 	bool dret = false, broken_edid = false;
 
+#if 0
 	r = pm_runtime_get_sync(connector->dev->dev);
 	if (r < 0)
 		return connector_status_disconnected;
+#endif
 
 	if (!force && amdgpu_connector_check_hpd_status_unchanged(connector)) {
 		ret = connector->status;

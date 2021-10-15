@@ -94,6 +94,13 @@ struct sg_page_iter {
 #define	SG_END		0x01
 #define	SG_CHAIN	0x02
 
+#define for_each_sg_page(sgl, iter, nents, pgoffset)			\
+	for (_sg_iter_init(sgl, iter, nents, pgoffset);			\
+	     (iter)->sg; _sg_iter_next(iter))
+
+#define	for_each_sg(sglist, sg, sgmax, _itr)				\
+	for (_itr = 0, sg = (sglist); _itr < (sgmax); _itr++, sg = sg_next(sg)) 
+
 static inline void
 sg_set_page(struct scatterlist *sg, struct page *page, unsigned int len,
     unsigned int offset)

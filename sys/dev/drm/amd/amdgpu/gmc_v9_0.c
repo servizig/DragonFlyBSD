@@ -552,7 +552,7 @@ static int gmc_v9_0_sw_init(void *handle)
 	gfxhub_v1_0_init(adev);
 	mmhub_v1_0_init(adev);
 
-	spin_lock_init(&adev->mc.invalidate_lock);
+	spin_init(&adev->mc.invalidate_lock, "agdmcil");
 
 	switch (adev->asic_type) {
 	case CHIP_RAVEN:
@@ -585,7 +585,7 @@ static int gmc_v9_0_sw_init(void *handle)
 		break;
 	}
 
-	DRM_INFO("vm size is %llu GB, block size is %u-bit,fragment size is %u-bit\n",
+	DRM_INFO("vm size is %lu GB, block size is %u-bit,fragment size is %u-bit\n",
 			adev->vm_manager.vm_size,
 			adev->vm_manager.block_size,
 			adev->vm_manager.fragment_size);

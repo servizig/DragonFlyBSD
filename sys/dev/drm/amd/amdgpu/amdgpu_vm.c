@@ -33,6 +33,7 @@
 #include "amdgpu.h"
 #include "amdgpu_trace.h"
 
+
 /*
  * PASID manager
  *
@@ -102,11 +103,73 @@ void amdgpu_vm_free_pasid(unsigned int pasid)
 #define START(node) ((node)->start)
 #define LAST(node) ((node)->last)
 
+#ifdef __linux__
 INTERVAL_TREE_DEFINE(struct amdgpu_bo_va_mapping, rb, uint64_t, __subtree_last,
 		     START, LAST, static, amdgpu_vm_it)
+#else
+static struct amdgpu_bo_va_mapping *
+amdgpu_vm_it_iter_first(struct rb_root_cached *root, uint64_t start,
+    uint64_t last)
+{
+	struct amdgpu_bo_va_mapping *node;
+	struct rb_node *rb;
+
+	for (rb = rb_first_cached(root); rb; rb = rb_next(rb)) {
+		node = rb_entry(rb, typeof(*node), rb);
+		if (LAST(node) >= start && START(node) <= last)
+			return node;
+	}
+	return NULL;
+}
+
+static struct amdgpu_bo_va_mapping *
+amdgpu_vm_it_iter_next(struct amdgpu_bo_va_mapping *node, uint64_t start,
+    uint64_t last)
+{
+	STUB();
+	struct rb_node *rb = &node->rb;
+
+	for (rb = rb_next(rb); rb; rb = rb_next(rb)) {
+		node = rb_entry(rb, typeof(*node), rb);
+		if (LAST(node) >= start && START(node) <= last)
+			return node;
+	}
+	return NULL;
+}
+
+static void
+amdgpu_vm_it_remove(struct amdgpu_bo_va_mapping *node,
+    struct rb_root_cached *root) 
+{
+	rb_erase_cached(&node->rb, root);
+}
+
+static void
+amdgpu_vm_it_insert(struct amdgpu_bo_va_mapping *node,
+    struct rb_root_cached *root)
+{
+	struct rb_node **iter = &root->rb_root.rb_node;
+	struct rb_node *parent = NULL;
+	struct amdgpu_bo_va_mapping *iter_node;
+
+	while (*iter) {
+		parent = *iter;
+		iter_node = rb_entry(*iter, struct amdgpu_bo_va_mapping, rb);
+
+		if (node->start < iter_node->start)
+			iter = &(*iter)->rb_left;
+		else
+			iter = &(*iter)->rb_right;
+	}
+
+	rb_link_node(&node->rb, parent, iter);
+	rb_insert_color_cached(&node->rb, root, false);
+}
+#endif
 
 #undef START
 #undef LAST
+
 
 /* Local structure. Encapsulate some VM table update parameters to reduce
  * the number of function parameters
@@ -212,7 +275,7 @@ int amdgpu_vm_validate_pt_bos(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	struct ttm_bo_global *glob = adev->mman.bdev.glob;
 	int r;
 
-	spin_lock(&vm->status_lock);
+	lockmgr(&vm->status_lock, LK_EXCLUSIVE);
 	while (!list_empty(&vm->evicted)) {
 		struct amdgpu_vm_bo_base *bo_base;
 		struct amdgpu_bo *bo;
@@ -220,7 +283,7 @@ int amdgpu_vm_validate_pt_bos(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 		bo_base = list_first_entry(&vm->evicted,
 					   struct amdgpu_vm_bo_base,
 					   vm_status);
-		spin_unlock(&vm->status_lock);
+		lockmgr(&vm->status_lock, LK_RELEASE);
 
 		bo = bo_base->bo;
 		BUG_ON(!bo);
@@ -229,11 +292,11 @@ int amdgpu_vm_validate_pt_bos(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 			if (r)
 				return r;
 
-			spin_lock(&glob->lru_lock);
+			lockmgr(&glob->lru_lock, LK_EXCLUSIVE);
 			ttm_bo_move_to_lru_tail(&bo->tbo);
 			if (bo->shadow)
 				ttm_bo_move_to_lru_tail(&bo->shadow->tbo);
-			spin_unlock(&glob->lru_lock);
+			lockmgr(&glob->lru_lock, LK_RELEASE);
 		}
 
 		if (bo->tbo.type == ttm_bo_type_kernel &&
@@ -243,13 +306,13 @@ int amdgpu_vm_validate_pt_bos(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 				return r;
 		}
 
-		spin_lock(&vm->status_lock);
+		lockmgr(&vm->status_lock, LK_EXCLUSIVE);
 		if (bo->tbo.type != ttm_bo_type_kernel)
 			list_move(&bo_base->vm_status, &vm->moved);
 		else
 			list_move(&bo_base->vm_status, &vm->relocated);
 	}
-	spin_unlock(&vm->status_lock);
+	lockmgr(&vm->status_lock, LK_RELEASE);
 
 	return 0;
 }
@@ -265,9 +328,9 @@ bool amdgpu_vm_ready(struct amdgpu_vm *vm)
 {
 	bool ready;
 
-	spin_lock(&vm->status_lock);
+	lockmgr(&vm->status_lock, LK_EXCLUSIVE);
 	ready = list_empty(&vm->evicted);
-	spin_unlock(&vm->status_lock);
+	lockmgr(&vm->status_lock, LK_RELEASE);
 
 	return ready;
 }
@@ -366,9 +429,9 @@ static int amdgpu_vm_alloc_levels(struct amdgpu_device *adev,
 			entry->base.vm = vm;
 			entry->base.bo = pt;
 			list_add_tail(&entry->base.bo_list, &pt->va);
-			spin_lock(&vm->status_lock);
+			lockmgr(&vm->status_lock, LK_EXCLUSIVE);
 			list_add(&entry->base.vm_status, &vm->relocated);
-			spin_unlock(&vm->status_lock);
+			lockmgr(&vm->status_lock, LK_RELEASE);
 			entry->addr = 0;
 		}
 
@@ -410,7 +473,7 @@ int amdgpu_vm_alloc_pts(struct amdgpu_device *adev,
 	eaddr = saddr + size - 1;
 	last_pfn = eaddr / AMDGPU_GPU_PAGE_SIZE;
 	if (last_pfn >= adev->vm_manager.max_pfn) {
-		dev_err(adev->dev, "va above limit (0x%08llX >= 0x%08llX)\n",
+		dev_err(adev->dev, "va above limit (0x%08lX >= 0x%08lX)\n",
 			last_pfn, adev->vm_manager.max_pfn);
 		return -EINVAL;
 	}
@@ -989,7 +1052,7 @@ static uint64_t amdgpu_vm_map_gart(const dma_addr_t *pages_addr, uint64_t addr)
 	result = pages_addr[addr >> PAGE_SHIFT];
 
 	/* in case cpu page size != gpu page size*/
-	result |= addr & (~PAGE_MASK);
+	result |= addr & (~LINUX_PAGE_MASK);
 
 	result &= 0xFFFFFFFFFFFFF000ULL;
 
@@ -1119,9 +1182,9 @@ static int amdgpu_vm_update_level(struct amdgpu_device *adev,
 		if (bo == NULL)
 			continue;
 
-		spin_lock(&vm->status_lock);
+		lockmgr(&vm->status_lock, LK_EXCLUSIVE);
 		list_del_init(&entry->base.vm_status);
-		spin_unlock(&vm->status_lock);
+		lockmgr(&vm->status_lock, LK_RELEASE);
 
 		pt = amdgpu_bo_gpu_offset(bo);
 		pt = amdgpu_gart_get_vm_pde(adev, pt);
@@ -1224,10 +1287,10 @@ static void amdgpu_vm_invalidate_level(struct amdgpu_vm *vm,
 			continue;
 
 		entry->addr = ~0ULL;
-		spin_lock(&vm->status_lock);
+		lockmgr(&vm->status_lock, LK_EXCLUSIVE);
 		if (list_empty(&entry->base.vm_status))
 			list_add(&entry->base.vm_status, &vm->relocated);
-		spin_unlock(&vm->status_lock);
+		lockmgr(&vm->status_lock, LK_RELEASE);
 		amdgpu_vm_invalidate_level(vm, entry);
 	}
 }
@@ -1246,7 +1309,7 @@ int amdgpu_vm_update_directories(struct amdgpu_device *adev,
 {
 	int r = 0;
 
-	spin_lock(&vm->status_lock);
+	lockmgr(&vm->status_lock, LK_EXCLUSIVE);
 	while (!list_empty(&vm->relocated)) {
 		struct amdgpu_vm_bo_base *bo_base;
 		struct amdgpu_bo *bo;
@@ -1254,7 +1317,7 @@ int amdgpu_vm_update_directories(struct amdgpu_device *adev,
 		bo_base = list_first_entry(&vm->relocated,
 					   struct amdgpu_vm_bo_base,
 					   vm_status);
-		spin_unlock(&vm->status_lock);
+		lockmgr(&vm->status_lock, LK_RELEASE);
 
 		bo = bo_base->bo->parent;
 		if (bo) {
@@ -1271,13 +1334,13 @@ int amdgpu_vm_update_directories(struct amdgpu_device *adev,
 				amdgpu_vm_invalidate_level(vm, &vm->root);
 				return r;
 			}
-			spin_lock(&vm->status_lock);
+			lockmgr(&vm->status_lock, LK_EXCLUSIVE);
 		} else {
-			spin_lock(&vm->status_lock);
+		  lockmgr(&vm->status_lock, LK_EXCLUSIVE);
 			list_del_init(&bo_base->vm_status);
 		}
 	}
-	spin_unlock(&vm->status_lock);
+	lockmgr(&vm->status_lock, LK_RELEASE);
 
 	if (vm->use_cpu_for_update) {
 		/* Flush HDP */
@@ -1298,6 +1361,10 @@ int amdgpu_vm_update_directories(struct amdgpu_device *adev,
  *
  * Find the vm_pt entry and it's parent for the given address.
  */
+
+void amdgpu_vm_get_entry(struct amdgpu_pte_update_params *p, uint64_t addr,
+			 struct amdgpu_vm_pt **entry,
+			 struct amdgpu_vm_pt **parent);
 void amdgpu_vm_get_entry(struct amdgpu_pte_update_params *p, uint64_t addr,
 			 struct amdgpu_vm_pt **entry,
 			 struct amdgpu_vm_pt **parent)
@@ -1864,9 +1931,9 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 		amdgpu_gart_flush_gpu_tlb(adev, 0);
 	}
 
-	spin_lock(&vm->status_lock);
+	lockmgr(&vm->status_lock, LK_EXCLUSIVE);
 	list_del_init(&bo_va->base.vm_status);
-	spin_unlock(&vm->status_lock);
+	lockmgr(&vm->status_lock, LK_RELEASE);
 
 	list_splice_init(&bo_va->invalids, &bo_va->valids);
 	bo_va->cleared = clear;
@@ -1936,7 +2003,7 @@ static void amdgpu_vm_add_prt_cb(struct amdgpu_device *adev,
 	if (!adev->gart.gart_funcs->set_prt)
 		return;
 
-	cb = kmalloc(sizeof(struct amdgpu_prt_cb), GFP_KERNEL);
+	cb = kmalloc(sizeof(struct amdgpu_prt_cb), M_DRM, GFP_KERNEL);
 	if (!cb) {
 		/* Last resort when we are OOM */
 		if (fence)
@@ -2078,13 +2145,13 @@ int amdgpu_vm_handle_moved(struct amdgpu_device *adev,
 	bool clear;
 	int r = 0;
 
-	spin_lock(&vm->status_lock);
+	lockmgr(&vm->status_lock, LK_EXCLUSIVE);
 	while (!list_empty(&vm->moved)) {
 		struct amdgpu_bo_va *bo_va;
 
 		bo_va = list_first_entry(&vm->moved,
 			struct amdgpu_bo_va, base.vm_status);
-		spin_unlock(&vm->status_lock);
+		lockmgr(&vm->status_lock, LK_RELEASE);
 
 		/* Per VM BOs never need to bo cleared in the page tables */
 		clear = bo_va->base.bo->tbo.resv != vm->root.base.bo->tbo.resv;
@@ -2093,9 +2160,9 @@ int amdgpu_vm_handle_moved(struct amdgpu_device *adev,
 		if (r)
 			return r;
 
-		spin_lock(&vm->status_lock);
+		lockmgr(&vm->status_lock, LK_EXCLUSIVE);
 	}
-	spin_unlock(&vm->status_lock);
+	lockmgr(&vm->status_lock, LK_RELEASE);
 
 	return r;
 }
@@ -2163,12 +2230,14 @@ static void amdgpu_vm_bo_insert_map(struct amdgpu_device *adev,
 		amdgpu_vm_prt_get(adev);
 
 	if (bo && bo->tbo.resv == vm->root.base.bo->tbo.resv) {
-		spin_lock(&vm->status_lock);
+	  lockmgr(&vm->status_lock, LK_EXCLUSIVE);
 		if (list_empty(&bo_va->base.vm_status))
 			list_add(&bo_va->base.vm_status, &vm->moved);
-		spin_unlock(&vm->status_lock);
+		lockmgr(&vm->status_lock, LK_RELEASE);
 	}
+#if 0
 	trace_amdgpu_vm_bo_map(bo_va, mapping);
+#endif
 }
 
 /**
@@ -2212,13 +2281,13 @@ int amdgpu_vm_bo_map(struct amdgpu_device *adev,
 	tmp = amdgpu_vm_it_iter_first(&vm->va, saddr, eaddr);
 	if (tmp) {
 		/* bo and tmp overlap, invalid addr */
-		dev_err(adev->dev, "bo %p va 0x%010Lx-0x%010Lx conflict with "
-			"0x%010Lx-0x%010Lx\n", bo, saddr, eaddr,
+		dev_err(adev->dev, "bo %p va 0x%010lx-0x%010lx conflict with "
+			"0x%010lx-0x%010lx\n", bo, saddr, eaddr,
 			tmp->start, tmp->last + 1);
 		return -EINVAL;
 	}
 
-	mapping = kmalloc(sizeof(*mapping), GFP_KERNEL);
+	mapping = kmalloc(sizeof(*mapping), M_DRM, GFP_KERNEL);
 	if (!mapping)
 		return -ENOMEM;
 
@@ -2269,7 +2338,7 @@ int amdgpu_vm_bo_replace_map(struct amdgpu_device *adev,
 		return -EINVAL;
 
 	/* Allocate all the needed memory */
-	mapping = kmalloc(sizeof(*mapping), GFP_KERNEL);
+	mapping = kmalloc(sizeof(*mapping), M_DRM, GFP_KERNEL);
 	if (!mapping)
 		return -ENOMEM;
 
@@ -2361,7 +2430,7 @@ int amdgpu_vm_bo_clear_mappings(struct amdgpu_device *adev,
 				uint64_t saddr, uint64_t size)
 {
 	struct amdgpu_bo_va_mapping *before, *after, *tmp, *next;
-	LIST_HEAD(removed);
+	DRM_LIST_HEAD(removed);
 	uint64_t eaddr;
 
 	eaddr = saddr + size - 1;
@@ -2476,9 +2545,9 @@ void amdgpu_vm_bo_rmv(struct amdgpu_device *adev,
 
 	list_del(&bo_va->base.bo_list);
 
-	spin_lock(&vm->status_lock);
+	lockmgr(&vm->status_lock, LK_EXCLUSIVE);
 	list_del(&bo_va->base.vm_status);
-	spin_unlock(&vm->status_lock);
+	lockmgr(&vm->status_lock, LK_RELEASE);
 
 	list_for_each_entry_safe(mapping, next, &bo_va->valids, list) {
 		list_del(&mapping->list);
@@ -2517,28 +2586,28 @@ void amdgpu_vm_bo_invalidate(struct amdgpu_device *adev,
 
 		bo_base->moved = true;
 		if (evicted && bo->tbo.resv == vm->root.base.bo->tbo.resv) {
-			spin_lock(&bo_base->vm->status_lock);
+		  lockmgr(&bo_base->vm->status_lock, LK_EXCLUSIVE);
 			if (bo->tbo.type == ttm_bo_type_kernel)
 				list_move(&bo_base->vm_status, &vm->evicted);
 			else
 				list_move_tail(&bo_base->vm_status,
 					       &vm->evicted);
-			spin_unlock(&bo_base->vm->status_lock);
+			lockmgr(&bo_base->vm->status_lock, LK_RELEASE);
 			continue;
 		}
 
 		if (bo->tbo.type == ttm_bo_type_kernel) {
-			spin_lock(&bo_base->vm->status_lock);
+			lockmgr(&bo_base->vm->status_lock, LK_EXCLUSIVE);
 			if (list_empty(&bo_base->vm_status))
 				list_add(&bo_base->vm_status, &vm->relocated);
-			spin_unlock(&bo_base->vm->status_lock);
+			lockmgr(&bo_base->vm->status_lock, LK_RELEASE);
 			continue;
 		}
 
-		spin_lock(&bo_base->vm->status_lock);
+		lockmgr(&bo_base->vm->status_lock, LK_EXCLUSIVE);
 		if (list_empty(&bo_base->vm_status))
 			list_add(&bo_base->vm_status, &vm->moved);
-		spin_unlock(&bo_base->vm->status_lock);
+		lockmgr(&bo_base->vm->status_lock, LK_RELEASE);
 	}
 }
 
@@ -2594,7 +2663,7 @@ void amdgpu_vm_adjust_size(struct amdgpu_device *adev, uint64_t vm_size,
 
 	amdgpu_vm_set_fragment_size(adev, fragment_size_default);
 
-	DRM_INFO("vm size is %llu GB, block size is %u-bit, fragment size is %u-bit\n",
+	DRM_INFO("vm size is %lu GB, block size is %u-bit, fragment size is %u-bit\n",
 		adev->vm_manager.vm_size, adev->vm_manager.block_size,
 		adev->vm_manager.fragment_size);
 }
@@ -2620,11 +2689,11 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	u64 flags;
 	uint64_t init_pde_value = 0;
 
-	vm->va = RB_ROOT_CACHED;
+	vm->va = LINUX_RB_ROOT_CACHED;
 	vm->client_id = atomic64_inc_return(&adev->vm_manager.client_counter);
 	for (i = 0; i < AMDGPU_MAX_VMHUBS; i++)
 		vm->reserved_vmid[i] = NULL;
-	spin_lock_init(&vm->status_lock);
+	lockinit(&vm->status_lock, "agvmsl", 0, LK_CANRECURSE);
 	INIT_LIST_HEAD(&vm->evicted);
 	INIT_LIST_HEAD(&vm->relocated);
 	INIT_LIST_HEAD(&vm->moved);
@@ -2705,7 +2774,9 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 		vm->pasid = pasid;
 	}
 
+#if 0
 	INIT_KFIFO(vm->faults);
+#endif
 	vm->fault_credit = 16;
 
 	return 0;
@@ -2760,12 +2831,16 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 	struct amdgpu_bo_va_mapping *mapping, *tmp;
 	bool prt_fini_needed = !!adev->gart.gart_funcs->set_prt;
 	struct amdgpu_bo *root;
+#if 0
 	u64 fault;
+#endif
 	int i, r;
 
+#if 0
 	/* Clear pending page faults from IH when the VM is destroyed */
 	while (kfifo_get(&vm->faults, &fault))
 		amdgpu_ih_clear_fault(adev, fault);
+#endif
 
 	if (vm->pasid) {
 		unsigned long flags;
@@ -2824,9 +2899,9 @@ bool amdgpu_vm_pasid_fault_credit(struct amdgpu_device *adev,
 {
 	struct amdgpu_vm *vm;
 
-	spin_lock(&adev->vm_manager.pasid_lock);
+	lockmgr(&adev->vm_manager.pasid_lock, LK_EXCLUSIVE);
 	vm = idr_find(&adev->vm_manager.pasid_idr, pasid);
-	spin_unlock(&adev->vm_manager.pasid_lock);
+	lockmgr(&adev->vm_manager.pasid_lock, LK_RELEASE);
 	if (!vm)
 		/* VM not found, can't track fault credit */
 		return true;
@@ -2855,7 +2930,7 @@ void amdgpu_vm_manager_init(struct amdgpu_device *adev)
 		struct amdgpu_vm_id_manager *id_mgr =
 			&adev->vm_manager.id_mgr[i];
 
-		mutex_init(&id_mgr->lock);
+		lockinit(&id_mgr->lock, "agvmim", 0, LK_CANRECURSE);
 		INIT_LIST_HEAD(&id_mgr->ids_lru);
 		atomic_set(&id_mgr->reserved_vmid_num, 0);
 
@@ -2874,7 +2949,7 @@ void amdgpu_vm_manager_init(struct amdgpu_device *adev)
 
 	atomic_set(&adev->vm_manager.vm_pte_next_ring, 0);
 	atomic64_set(&adev->vm_manager.client_counter, 0);
-	spin_lock_init(&adev->vm_manager.prt_lock);
+	lockinit(&adev->vm_manager.prt_lock, "agvmmpl", 0, LK_CANRECURSE);
 	atomic_set(&adev->vm_manager.num_prt_users, 0);
 
 	/* If not overridden by the user, by default, only in large BAR systems
@@ -2894,7 +2969,7 @@ void amdgpu_vm_manager_init(struct amdgpu_device *adev)
 #endif
 
 	idr_init(&adev->vm_manager.pasid_idr);
-	spin_lock_init(&adev->vm_manager.pasid_lock);
+	lockinit(&adev->vm_manager.pasid_lock, "agvmmpl", 0, LK_CANRECURSE);
 }
 
 /**
@@ -2908,7 +2983,10 @@ void amdgpu_vm_manager_fini(struct amdgpu_device *adev)
 {
 	unsigned i, j;
 
+#if 0
 	WARN_ON(!idr_is_empty(&adev->vm_manager.pasid_idr));
+#endif
+
 	idr_destroy(&adev->vm_manager.pasid_idr);
 
 	for (i = 0; i < AMDGPU_MAX_VMHUBS; ++i) {

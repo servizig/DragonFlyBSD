@@ -22,7 +22,6 @@
  *
  */
 #include <linux/list.h>
-#include <linux/slab.h>
 #include <linux/pci.h>
 #include <linux/acpi.h>
 #include <drm/drmP.h>
@@ -147,7 +146,7 @@ static int amdgpu_cgs_gmap_gpu_mem(struct cgs_device *cgs_device, cgs_handle_t h
 	r = amdgpu_bo_reserve(obj, true);
 	if (unlikely(r != 0))
 		return r;
-	r = amdgpu_bo_pin(obj, obj->preferred_domains, mcaddr);
+	r = amdgpu_bo_pin(obj, obj->preferred_domains, (u64 *)mcaddr);
 	amdgpu_bo_unreserve(obj);
 	return r;
 }
@@ -534,6 +533,9 @@ static int amdgpu_cgs_rel_firmware(struct cgs_device *cgs_device, enum cgs_ucode
 	return -EINVAL;
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdiscarded-qualifiers"
+
 static uint16_t amdgpu_get_firmware_version(struct cgs_device *cgs_device,
 					enum cgs_ucode_id type)
 {
@@ -841,10 +843,12 @@ static int amdgpu_cgs_get_firmware_info(struct cgs_device *cgs_device,
 		info->version = adev->pm.fw_version;
 		info->image_size = ucode_size;
 		info->ucode_start_address = ucode_start_address;
-		info->kptr = (void *)src;
+		info->kptr = (const void *)src;
 	}
 	return 0;
 }
+
+#pragma GCC diagnostic pop
 
 static int amdgpu_cgs_is_virtualization_enabled(void *cgs_device)
 {
@@ -985,17 +989,17 @@ static int amdgpu_cgs_acpi_eval_object(struct cgs_device *cgs_device,
 				    struct cgs_acpi_method_info *info)
 {
 	CGS_FUNC_ADEV;
-	acpi_handle handle;
-	struct acpi_object_list input;
-	struct acpi_buffer output = { ACPI_ALLOCATE_BUFFER, NULL };
-	union acpi_object *params, *obj;
+	ACPI_HANDLE handle;
+	ACPI_OBJECT_LIST input;
+	ACPI_BUFFER output = { ACPI_ALLOCATE_BUFFER, NULL };
+	ACPI_OBJECT *params, *obj;
 	uint8_t name[5] = {'\0'};
 	struct cgs_acpi_method_argument *argument;
 	uint32_t i, count;
-	acpi_status status;
+	ACPI_STATUS status;
 	int result;
 
-	handle = ACPI_HANDLE(&adev->pdev->dev);
+	handle = acpi_get_handle(adev->pdev->dev.bsddev);
 	if (!handle)
 		return -ENODEV;
 
@@ -1005,7 +1009,7 @@ static int amdgpu_cgs_acpi_eval_object(struct cgs_device *cgs_device,
 	if (info->size != sizeof(struct cgs_acpi_method_info))
 		return -EINVAL;
 
-	input.count = info->input_count;
+	input.Count = info->input_count;
 	if (info->input_count > 0) {
 		if (info->pinput_argument == NULL)
 			return -EINVAL;
@@ -1039,27 +1043,27 @@ static int amdgpu_cgs_acpi_eval_object(struct cgs_device *cgs_device,
 	}
 
 	/* parse input parameters */
-	if (input.count > 0) {
-		input.pointer = params =
-				kzalloc(sizeof(union acpi_object) * input.count, GFP_KERNEL);
+	if (input.Count > 0) {
+		input.Pointer = params =
+				kzalloc(sizeof(union acpi_object) * input.Count, GFP_KERNEL);
 		if (params == NULL)
 			return -EINVAL;
 
 		argument = info->pinput_argument;
 
-		for (i = 0; i < input.count; i++) {
-			params->type = argument->type;
-			switch (params->type) {
+		for (i = 0; i < input.Count; i++) {
+			params->Type = argument->type;
+			switch (params->Type) {
 			case ACPI_TYPE_INTEGER:
-				params->integer.value = argument->value;
+				params->Integer.Value = argument->value;
 				break;
 			case ACPI_TYPE_STRING:
-				params->string.length = argument->data_length;
-				params->string.pointer = argument->pointer;
+				params->String.Length = argument->data_length;
+				params->String.Pointer = argument->pointer;
 				break;
 			case ACPI_TYPE_BUFFER:
-				params->buffer.length = argument->data_length;
-				params->buffer.pointer = argument->pointer;
+				params->Buffer.Length = argument->data_length;
+				params->Buffer.Pointer = argument->pointer;
 				break;
 			default:
 				break;
@@ -1074,7 +1078,7 @@ static int amdgpu_cgs_acpi_eval_object(struct cgs_device *cgs_device,
 	argument = info->poutput_argument;
 
 	/* evaluate the acpi method */
-	status = acpi_evaluate_object(handle, name, &input, &output);
+	status = AcpiEvaluateObject(handle, name, &input, &output);
 
 	if (ACPI_FAILURE(status)) {
 		result = -EIO;
@@ -1082,15 +1086,15 @@ static int amdgpu_cgs_acpi_eval_object(struct cgs_device *cgs_device,
 	}
 
 	/* return the output info */
-	obj = output.pointer;
+	obj = output.Pointer;
 
 	if (count > 1) {
-		if ((obj->type != ACPI_TYPE_PACKAGE) ||
-			(obj->package.count != count)) {
+		if ((obj->Type != ACPI_TYPE_PACKAGE) ||
+			(obj->Package.Count != count)) {
 			result = -EIO;
 			goto free_obj;
 		}
-		params = obj->package.elements;
+		params = obj->Package.Elements;
 	} else
 		params = obj;
 
@@ -1100,31 +1104,31 @@ static int amdgpu_cgs_acpi_eval_object(struct cgs_device *cgs_device,
 	}
 
 	for (i = 0; i < count; i++) {
-		if (argument->type != params->type) {
+		if (argument->type != params->Type) {
 			result = -EIO;
 			goto free_obj;
 		}
-		switch (params->type) {
+		switch (params->Type) {
 		case ACPI_TYPE_INTEGER:
-			argument->value = params->integer.value;
+			argument->value = params->Integer.Value;
 			break;
 		case ACPI_TYPE_STRING:
-			if ((params->string.length != argument->data_length) ||
-				(params->string.pointer == NULL)) {
+			if ((params->String.Length != argument->data_length) ||
+				(params->String.Pointer == NULL)) {
 				result = -EIO;
 				goto free_obj;
 			}
 			strncpy(argument->pointer,
-				params->string.pointer,
-				params->string.length);
+				params->String.Pointer,
+				params->String.Length);
 			break;
 		case ACPI_TYPE_BUFFER:
-			if (params->buffer.pointer == NULL) {
+			if (params->Buffer.Pointer == NULL) {
 				result = -EIO;
 				goto free_obj;
 			}
 			memcpy(argument->pointer,
-				params->buffer.pointer,
+				params->Buffer.Pointer,
 				argument->data_length);
 			break;
 		default:
@@ -1138,7 +1142,7 @@ static int amdgpu_cgs_acpi_eval_object(struct cgs_device *cgs_device,
 free_obj:
 	kfree(obj);
 free_input:
-	kfree((void *)input.pointer);
+	kfree((void *)input.Pointer);
 	return result;
 }
 #else
@@ -1222,7 +1226,7 @@ static const struct cgs_os_ops amdgpu_cgs_os_ops = {
 struct cgs_device *amdgpu_cgs_create_device(struct amdgpu_device *adev)
 {
 	struct amdgpu_cgs_device *cgs_device =
-		kmalloc(sizeof(*cgs_device), GFP_KERNEL);
+		kmalloc(sizeof(*cgs_device), M_DRM, GFP_KERNEL);
 
 	if (!cgs_device) {
 		DRM_ERROR("Couldn't allocate CGS device structure\n");

@@ -1961,14 +1961,14 @@ static int dce_v11_0_crtc_do_set_base(struct drm_crtc *crtc,
 	if (atomic) {
 		fb_location = amdgpu_bo_gpu_offset(abo);
 	} else {
-		r = amdgpu_bo_pin(abo, AMDGPU_GEM_DOMAIN_VRAM, &fb_location);
+		r = amdgpu_bo_pin(abo, AMDGPU_GEM_DOMAIN_VRAM, (u64 *)&fb_location);
 		if (unlikely(r != 0)) {
 			amdgpu_bo_unreserve(abo);
 			return -EINVAL;
 		}
 	}
 
-	amdgpu_bo_get_tiling_flags(abo, &tiling_flags);
+	amdgpu_bo_get_tiling_flags(abo, (u64 *)&tiling_flags);
 	amdgpu_bo_unreserve(abo);
 
 	pipe_config = AMDGPU_TILING_GET(tiling_flags, PIPE_CONFIG);
@@ -2510,7 +2510,7 @@ static int dce_v11_0_crtc_cursor_set2(struct drm_crtc *crtc,
 		return ret;
 	}
 
-	ret = amdgpu_bo_pin(aobj, AMDGPU_GEM_DOMAIN_VRAM, &amdgpu_crtc->cursor_addr);
+	ret = amdgpu_bo_pin(aobj, AMDGPU_GEM_DOMAIN_VRAM, (u64 *)&amdgpu_crtc->cursor_addr);
 	amdgpu_bo_unreserve(aobj);
 	if (ret) {
 		DRM_ERROR("Failed to pin new cursor BO (%d)\n", ret);

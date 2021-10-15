@@ -32,6 +32,8 @@
 #endif
 #include "amdgpu.h"
 
+#include "drm/drm_legacy.h"	/* for drm_dma_handle_t */
+
 /*
  * GART
  * The GART (Graphics Aperture Remapping Table) is an aperture
@@ -159,7 +161,7 @@ int amdgpu_gart_table_vram_pin(struct amdgpu_device *adev)
 	if (unlikely(r != 0))
 		return r;
 	r = amdgpu_bo_pin(adev->gart.robj,
-				AMDGPU_GEM_DOMAIN_VRAM, &gpu_addr);
+				AMDGPU_GEM_DOMAIN_VRAM, (u64 *)&gpu_addr);
 	if (r) {
 		amdgpu_bo_unreserve(adev->gart.robj);
 		return r;

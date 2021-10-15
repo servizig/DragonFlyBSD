@@ -140,7 +140,7 @@ struct amdgpu_vm {
 	struct rb_root_cached	va;
 
 	/* protecting invalidated */
-	spinlock_t		status_lock;
+	struct lock		status_lock;
 
 	/* BOs who needs a validation */
 	struct list_head	evicted;
@@ -159,7 +159,7 @@ struct amdgpu_vm {
 	struct dma_fence	*last_update;
 
 	/* protecting freed */
-	spinlock_t		freed_lock;
+	struct spinlock		freed_lock;
 
 	/* Scheduler entity for page table updates */
 	struct amd_sched_entity	entity;
@@ -204,7 +204,7 @@ struct amdgpu_vm_id {
 };
 
 struct amdgpu_vm_id_manager {
-	struct mutex		lock;
+	struct lock		lock;
 	unsigned		num_ids;
 	struct list_head	ids_lru;
 	struct amdgpu_vm_id	ids[AMDGPU_NUM_VM];
@@ -248,7 +248,7 @@ struct amdgpu_vm_manager {
 	 * look up VM of a page fault
 	 */
 	struct idr				pasid_idr;
-	spinlock_t				pasid_lock;
+	struct lock				pasid_lock;
 };
 
 int amdgpu_vm_alloc_pasid(unsigned int bits);

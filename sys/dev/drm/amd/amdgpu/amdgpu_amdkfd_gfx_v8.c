@@ -74,7 +74,7 @@ static int kgd_hqd_destroy(struct kgd_dev *kgd, void *mqd,
 				uint32_t queue_id);
 static int kgd_hqd_sdma_destroy(struct kgd_dev *kgd, void *mqd,
 				unsigned int utimeout);
-static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid);
+/*static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid);*/
 static int kgd_address_watch_disable(struct kgd_dev *kgd);
 static int kgd_address_watch_execute(struct kgd_dev *kgd,
 					unsigned int watch_point_id,

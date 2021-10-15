@@ -168,7 +168,7 @@ int psp_v10_0_ring_init(struct psp_context *psp, enum psp_ring_type ring_type)
 	ret = amdgpu_bo_create_kernel(adev, ring->ring_size, PAGE_SIZE,
 				      AMDGPU_GEM_DOMAIN_VRAM,
 				      &adev->firmware.rbuf,
-				      &ring->ring_mem_mc_addr,
+				      (u64 *)&ring->ring_mem_mc_addr,
 				      (void **)&ring->ring_mem);
 	if (ret) {
 		ring->ring_size = 0;
@@ -243,7 +243,7 @@ int psp_v10_0_ring_destroy(struct psp_context *psp, enum psp_ring_type ring_type
 		DRM_ERROR("Fail to stop psp ring\n");
 
 	amdgpu_bo_free_kernel(&adev->firmware.rbuf,
-			      &ring->ring_mem_mc_addr,
+			      (u64 *)&ring->ring_mem_mc_addr,
 			      (void **)&ring->ring_mem);
 
 	return ret;

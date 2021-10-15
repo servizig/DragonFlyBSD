@@ -103,6 +103,8 @@ static uint32_t vega10_wait_for_response(struct pp_hwmgr *hwmgr)
  * @return   Always return 0.
  */
 int vega10_send_msg_to_smc_without_waiting(struct pp_hwmgr *hwmgr,
+		uint16_t msg);
+int vega10_send_msg_to_smc_without_waiting(struct pp_hwmgr *hwmgr,
 		uint16_t msg)
 {
 	uint32_t reg;
@@ -123,6 +125,7 @@ int vega10_send_msg_to_smc_without_waiting(struct pp_hwmgr *hwmgr,
  * @param    msg the message to send.
  * @return   Always return 0.
  */
+int vega10_send_msg_to_smc(struct pp_hwmgr *hwmgr, uint16_t msg);
 int vega10_send_msg_to_smc(struct pp_hwmgr *hwmgr, uint16_t msg)
 {
 	uint32_t reg;
@@ -151,6 +154,8 @@ int vega10_send_msg_to_smc(struct pp_hwmgr *hwmgr, uint16_t msg)
  * @param    parameter: the parameter to send
  * @return   Always return 0.
  */
+int vega10_send_msg_to_smc_with_parameter(struct pp_hwmgr *hwmgr,
+		uint16_t msg, uint32_t parameter);
 int vega10_send_msg_to_smc_with_parameter(struct pp_hwmgr *hwmgr,
 		uint16_t msg, uint32_t parameter)
 {
@@ -185,6 +190,8 @@ int vega10_send_msg_to_smc_with_parameter(struct pp_hwmgr *hwmgr,
  * @param    parameter: the parameter to send
  * @return   The response that came from the SMC.
  */
+int vega10_send_msg_to_smc_with_parameter_without_waiting(
+		struct pp_hwmgr *hwmgr, uint16_t msg, uint32_t parameter);
 int vega10_send_msg_to_smc_with_parameter_without_waiting(
 		struct pp_hwmgr *hwmgr, uint16_t msg, uint32_t parameter)
 {

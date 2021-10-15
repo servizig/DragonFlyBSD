@@ -38,7 +38,7 @@ static void amd_sched_process_job(struct dma_fence *f, struct dma_fence_cb *cb);
 /* Initialize a given run queue struct */
 static void amd_sched_rq_init(struct amd_sched_rq *rq)
 {
-	spin_lock_init(&rq->lock);
+	spin_init(&rq->lock, "asrl");
 	INIT_LIST_HEAD(&rq->entities);
 	rq->current_entity = NULL;
 }
@@ -133,8 +133,8 @@ int amd_sched_entity_init(struct amd_gpu_scheduler *sched,
 	entity->rq = rq;
 	entity->sched = sched;
 
-	spin_lock_init(&entity->rq_lock);
-	spin_lock_init(&entity->queue_lock);
+	spin_init(&entity->rq_lock, "aserl");
+	spin_init(&entity->queue_lock, "aseql");
 	r = kfifo_alloc(&entity->job_queue, jobs * sizeof(void *), GFP_KERNEL);
 	if (r)
 		return r;
@@ -209,6 +209,7 @@ void amd_sched_entity_fini(struct amd_gpu_scheduler *sched,
 
 	if (!amd_sched_entity_is_initialized(sched, entity))
 		return;
+#if 0
 	/**
 	 * The client will not queue more IBs during this fini, consume existing
 	 * queued IBs or discard them on SIGKILL
@@ -218,6 +219,10 @@ void amd_sched_entity_fini(struct amd_gpu_scheduler *sched,
 	else
 		r = wait_event_killable(sched->job_scheduled,
 					amd_sched_entity_is_idle(entity));
+#else
+	amd_sched_entity_is_idle(entity);
+	r = -ERESTARTSYS;
+#endif
 	amd_sched_entity_set_rq(entity, NULL);
 	if (r) {
 		struct amd_sched_job *job;
@@ -608,11 +613,15 @@ static bool amd_sched_blocked(struct amd_gpu_scheduler *sched)
 
 static int amd_sched_main(void *param)
 {
+#if 0
 	struct sched_param sparam = {.sched_priority = 1};
+#endif
 	struct amd_gpu_scheduler *sched = (struct amd_gpu_scheduler *)param;
 	int r, count;
 
+#if 0
 	sched_setscheduler(current, SCHED_FIFO, &sparam);
+#endif
 
 	while (!kthread_should_stop()) {
 		struct amd_sched_entity *entity = NULL;
@@ -688,7 +697,7 @@ int amd_sched_init(struct amd_gpu_scheduler *sched,
 	init_waitqueue_head(&sched->wake_up_worker);
 	init_waitqueue_head(&sched->job_scheduled);
 	INIT_LIST_HEAD(&sched->ring_mirror_list);
-	spin_lock_init(&sched->job_list_lock);
+	spin_init(&sched->job_list_lock, "assjll");
 	atomic_set(&sched->hw_rq_count, 0);
 	atomic64_set(&sched->job_id_count, 0);
 

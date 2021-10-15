@@ -7,9 +7,12 @@ KMOD=	amdgpu
 .PATH:	${.CURDIR}/../scheduler \
 	${.CURDIR}/../powerplay \
 	${.CURDIR}/../powerplay/hwmgr \
-	${.CURDIR}/../powerplay/smumgr
+	${.CURDIR}/../powerplay/smumgr \
+	${.CURDIR}/../lib
 
 SRCS=	amdgpu_drv.c
+
+SRCS+=	chash.c
 
 # add KMS driver
 

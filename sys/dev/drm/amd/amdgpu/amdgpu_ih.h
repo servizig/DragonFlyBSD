@@ -74,7 +74,7 @@ enum amdgpu_ih_clientid
 #define AMDGPU_PAGEFAULT_HASH_BITS 8
 struct amdgpu_retryfault_hashtable {
 	DECLARE_CHASH_TABLE(hash, AMDGPU_PAGEFAULT_HASH_BITS, 8, 0);
-	spinlock_t	lock;
+	struct lock	lock;
 	int		count;
 };
 

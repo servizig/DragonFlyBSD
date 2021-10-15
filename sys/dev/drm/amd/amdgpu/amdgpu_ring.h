@@ -187,6 +187,7 @@ struct amdgpu_ring {
 	uint64_t                eop_gpu_addr;
 	u32			doorbell_index;
 	bool			use_doorbell;
+	bool			use_pollmem;
 	unsigned		wptr_offs;
 	unsigned		fence_offs;
 	uint64_t		current_ctx;
@@ -198,7 +199,7 @@ struct amdgpu_ring {
 	bool			has_compute_vm_bug;
 
 	atomic_t		num_jobs[AMD_SCHED_PRIORITY_MAX];
-	struct mutex		priority_mutex;
+	struct lock		priority_mutex;
 	/* protected by priority_mutex */
 	int			priority;
 

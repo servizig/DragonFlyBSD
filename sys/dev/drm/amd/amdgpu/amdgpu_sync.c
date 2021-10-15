@@ -155,7 +155,11 @@ int amdgpu_sync_fence(struct amdgpu_device *adev, struct amdgpu_sync *sync,
 	if (amdgpu_sync_add_later(sync, f))
 		return 0;
 
-	e = kmem_cache_alloc(amdgpu_sync_slab, GFP_KERNEL);
+#ifndef __DragonFly__
+ 	e = kmem_cache_alloc(amdgpu_sync_slab, GFP_KERNEL);
+#else
+	e = kzalloc(sizeof(struct amdgpu_sync_entry), GFP_KERNEL);
+#endif
 	if (!e)
 		return -ENOMEM;
 
@@ -348,11 +352,13 @@ void amdgpu_sync_free(struct amdgpu_sync *sync)
  */
 int amdgpu_sync_init(void)
 {
+#if 0
 	amdgpu_sync_slab = kmem_cache_create(
 		"amdgpu_sync", sizeof(struct amdgpu_sync_entry), 0,
 		SLAB_HWCACHE_ALIGN, NULL);
 	if (!amdgpu_sync_slab)
 		return -ENOMEM;
+#endif
 
 	return 0;
 }
@@ -364,5 +370,7 @@ int amdgpu_sync_init(void)
  */
 void amdgpu_sync_fini(void)
 {
+#if 0
 	kmem_cache_destroy(amdgpu_sync_slab);
+#endif
 }

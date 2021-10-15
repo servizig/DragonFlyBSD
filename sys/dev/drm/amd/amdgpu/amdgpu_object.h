@@ -272,7 +272,7 @@ static inline uint64_t amdgpu_sa_bo_gpu_addr(struct amdgpu_sa_bo *sa_bo)
 
 static inline void * amdgpu_sa_bo_cpu_addr(struct amdgpu_sa_bo *sa_bo)
 {
-	return sa_bo->manager->cpu_ptr + sa_bo->soffset;
+	return (char *)sa_bo->manager->cpu_ptr + sa_bo->soffset;
 }
 
 int amdgpu_sa_bo_manager_init(struct amdgpu_device *adev,

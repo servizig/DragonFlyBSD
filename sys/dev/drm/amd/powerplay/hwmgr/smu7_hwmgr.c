@@ -1275,6 +1275,7 @@ static int smu7_enable_dpm_tasks(struct pp_hwmgr *hwmgr)
 	return 0;
 }
 
+int smu7_disable_dpm_tasks(struct pp_hwmgr *hwmgr);
 int smu7_disable_dpm_tasks(struct pp_hwmgr *hwmgr)
 {
 	int tmp_result, result = 0;
@@ -1341,11 +1342,13 @@ int smu7_disable_dpm_tasks(struct pp_hwmgr *hwmgr)
 	return result;
 }
 
+#if 0
 int smu7_reset_asic_tasks(struct pp_hwmgr *hwmgr)
 {
 
 	return 0;
 }
+#endif
 
 static void smu7_init_dpm_defaults(struct pp_hwmgr *hwmgr)
 {
@@ -3320,7 +3323,7 @@ static int smu7_get_gpu_power(struct pp_hwmgr *hwmgr,
 			"Failed to start pm status log!",
 			return -1);
 
-	msleep_interruptible(20);
+	msleep(20);
 
 	PP_ASSERT_WITH_CODE(!smum_send_msg_to_smc(hwmgr,
 			PPSMC_MSG_PmStatusLogSample),
@@ -4308,7 +4311,7 @@ static int smu7_print_clock_levels(struct pp_hwmgr *hwmgr,
 		now = i;
 
 		for (i = 0; i < sclk_table->count; i++)
-			size += sprintf(buf + size, "%d: %uMhz %s\n",
+			size += ksprintf(buf + size, "%d: %uMhz %s\n",
 					i, sclk_table->dpm_levels[i].value / 100,
 					(i == now) ? "*" : "");
 		break;
@@ -4324,7 +4327,7 @@ static int smu7_print_clock_levels(struct pp_hwmgr *hwmgr,
 		now = i;
 
 		for (i = 0; i < mclk_table->count; i++)
-			size += sprintf(buf + size, "%d: %uMhz %s\n",
+			size += ksprintf(buf + size, "%d: %uMhz %s\n",
 					i, mclk_table->dpm_levels[i].value / 100,
 					(i == now) ? "*" : "");
 		break;
@@ -4338,7 +4341,7 @@ static int smu7_print_clock_levels(struct pp_hwmgr *hwmgr,
 		now = i;
 
 		for (i = 0; i < pcie_table->count; i++)
-			size += sprintf(buf + size, "%d: %s %s\n", i,
+			size += ksprintf(buf + size, "%d: %s %s\n", i,
 					(pcie_table->dpm_levels[i].value == 0) ? "2.5GB, x8" :
 					(pcie_table->dpm_levels[i].value == 1) ? "5.0GB, x16" :
 					(pcie_table->dpm_levels[i].value == 2) ? "8.0GB, x16" : "",

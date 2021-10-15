@@ -230,7 +230,7 @@ out:
  *
  * Get the current rptr from the hardware (VEGA10+).
  */
-static uint64_t sdma_v4_0_ring_get_rptr(struct amdgpu_ring *ring)
+static u64 sdma_v4_0_ring_get_rptr(struct amdgpu_ring *ring)
 {
 	u64 *rptr;
 
@@ -248,7 +248,7 @@ static uint64_t sdma_v4_0_ring_get_rptr(struct amdgpu_ring *ring)
  *
  * Get the current wptr from the hardware (VEGA10+).
  */
-static uint64_t sdma_v4_0_ring_get_wptr(struct amdgpu_ring *ring)
+static u64 sdma_v4_0_ring_get_wptr(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 	u64 *wptr = NULL;
@@ -264,7 +264,7 @@ static uint64_t sdma_v4_0_ring_get_wptr(struct amdgpu_ring *ring)
 		u32 lowbit, highbit;
 		int me = (ring == &adev->sdma.instance[0].ring) ? 0 : 1;
 
-		wptr = &local_wptr;
+		wptr = (u64 *)&local_wptr;
 		lowbit = RREG32(sdma_v4_0_get_reg_offset(me, mmSDMA0_GFX_RB_WPTR)) >> 2;
 		highbit = RREG32(sdma_v4_0_get_reg_offset(me, mmSDMA0_GFX_RB_WPTR_HI)) >> 2;
 
@@ -412,7 +412,7 @@ static void sdma_v4_0_ring_emit_hdp_invalidate(struct amdgpu_ring *ring)
  * the fence seq number and DMA trap packet to generate
  * an interrupt if needed (VEGA10).
  */
-static void sdma_v4_0_ring_emit_fence(struct amdgpu_ring *ring, u64 addr, u64 seq,
+static void sdma_v4_0_ring_emit_fence(struct amdgpu_ring *ring, uint64_t addr, uint64_t seq,
 				      unsigned flags)
 {
 	bool write64bit = flags & AMDGPU_FENCE_FLAG_64BIT;

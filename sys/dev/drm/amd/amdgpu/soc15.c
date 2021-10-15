@@ -415,7 +415,7 @@ static int soc15_asic_reset(struct amdgpu_device *adev)
 	/* disable BM */
 	pci_clear_master(adev->pdev);
 
-	pci_save_state(adev->pdev);
+	pci_save_state(device_get_parent(adev->dev->bsddev));
 
 	for (i = 0; i < AMDGPU_MAX_IP_NUM; i++) {
 		if (adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_PSP){
@@ -424,7 +424,7 @@ static int soc15_asic_reset(struct amdgpu_device *adev)
 		}
 	}
 
-	pci_restore_state(adev->pdev);
+	pci_restore_state(device_get_parent(adev->dev->bsddev));
 
 	/* wait for asic to come out of reset */
 	for (i = 0; i < adev->usec_timeout; i++) {
@@ -469,8 +469,10 @@ static int soc15_set_vce_clocks(struct amdgpu_device *adev, u32 evclk, u32 ecclk
 
 static void soc15_pcie_gen3_enable(struct amdgpu_device *adev)
 {
+#if 0
 	if (pci_is_root_bus(adev->pdev->bus))
 		return;
+#endif
 
 	if (amdgpu_pcie_gen2 == 0)
 		return;
@@ -536,7 +538,9 @@ int soc15_set_ip_blocks(struct amdgpu_device *adev)
 		else if (amdgpu_device_has_dc_support(adev))
 			amdgpu_ip_block_add(adev, &dm_ip_block);
 #else
+#if 0
 #	warning "Enable CONFIG_DRM_AMD_DC for display support on SOC15."
+#endif
 #endif
 		amdgpu_ip_block_add(adev, &gfx_v9_0_ip_block);
 		amdgpu_ip_block_add(adev, &sdma_v4_0_ip_block);
@@ -555,7 +559,9 @@ int soc15_set_ip_blocks(struct amdgpu_device *adev)
 		else if (amdgpu_device_has_dc_support(adev))
 			amdgpu_ip_block_add(adev, &dm_ip_block);
 #else
+#if 0
 #	warning "Enable CONFIG_DRM_AMD_DC for display support on SOC15."
+#endif
 #endif
 		amdgpu_ip_block_add(adev, &gfx_v9_0_ip_block);
 		amdgpu_ip_block_add(adev, &sdma_v4_0_ip_block);

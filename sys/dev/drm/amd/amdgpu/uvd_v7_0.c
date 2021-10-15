@@ -54,7 +54,7 @@ static int uvd_v7_0_sriov_start(struct amdgpu_device *adev);
  *
  * Returns the current hardware read pointer
  */
-static uint64_t uvd_v7_0_ring_get_rptr(struct amdgpu_ring *ring)
+static u64 uvd_v7_0_ring_get_rptr(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 
@@ -68,7 +68,7 @@ static uint64_t uvd_v7_0_ring_get_rptr(struct amdgpu_ring *ring)
  *
  * Returns the current hardware enc read pointer
  */
-static uint64_t uvd_v7_0_enc_ring_get_rptr(struct amdgpu_ring *ring)
+static u64 uvd_v7_0_enc_ring_get_rptr(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 
@@ -85,7 +85,7 @@ static uint64_t uvd_v7_0_enc_ring_get_rptr(struct amdgpu_ring *ring)
  *
  * Returns the current hardware write pointer
  */
-static uint64_t uvd_v7_0_ring_get_wptr(struct amdgpu_ring *ring)
+static u64 uvd_v7_0_ring_get_wptr(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 
@@ -99,7 +99,7 @@ static uint64_t uvd_v7_0_ring_get_wptr(struct amdgpu_ring *ring)
  *
  * Returns the current hardware enc write pointer
  */
-static uint64_t uvd_v7_0_enc_ring_get_wptr(struct amdgpu_ring *ring)
+static u64 uvd_v7_0_enc_ring_get_wptr(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 
@@ -268,6 +268,8 @@ err:
  *
  * Close up a stream for HW test or if userspace failed to do so
  */
+int uvd_v7_0_enc_get_destroy_msg(struct amdgpu_ring *ring, uint32_t handle,
+				 bool direct, struct dma_fence **fence);
 int uvd_v7_0_enc_get_destroy_msg(struct amdgpu_ring *ring, uint32_t handle,
 				 bool direct, struct dma_fence **fence)
 {
@@ -616,7 +618,7 @@ static int uvd_v7_0_resume(void *handle)
  */
 static void uvd_v7_0_mc_resume(struct amdgpu_device *adev)
 {
-	uint32_t size = AMDGPU_GPU_PAGE_ALIGN(adev->uvd.fw->size + 4);
+	uint32_t size = AMDGPU_GPU_PAGE_ALIGN(adev->uvd.fw->datasize + 4);
 	uint32_t offset;
 
 	if (adev->firmware.load_type == AMDGPU_FW_LOAD_PSP) {
@@ -744,7 +746,7 @@ static int uvd_v7_0_sriov_start(struct amdgpu_device *adev)
 
 		ring = &adev->uvd.ring;
 		ring->wptr = 0;
-		size = AMDGPU_GPU_PAGE_ALIGN(adev->uvd.fw->size + 4);
+		size = AMDGPU_GPU_PAGE_ALIGN(adev->uvd.fw->datasize + 4);
 
 		MMSCH_V1_0_INSERT_DIRECT_RD_MOD_WT(SOC15_REG_OFFSET(UVD, 0, mmUVD_STATUS),
 						   0xFFFFFFFF, 0x00000004);
@@ -1083,7 +1085,7 @@ static void uvd_v7_0_stop(struct amdgpu_device *adev)
  *
  * Write a fence and a trap command to the ring.
  */
-static void uvd_v7_0_ring_emit_fence(struct amdgpu_ring *ring, u64 addr, u64 seq,
+static void uvd_v7_0_ring_emit_fence(struct amdgpu_ring *ring, uint64_t addr, uint64_t seq,
 				     unsigned flags)
 {
 	WARN_ON(flags & AMDGPU_FENCE_FLAG_64BIT);
@@ -1120,8 +1122,8 @@ static void uvd_v7_0_ring_emit_fence(struct amdgpu_ring *ring, u64 addr, u64 seq
  *
  * Write enc a fence and a trap command to the ring.
  */
-static void uvd_v7_0_enc_ring_emit_fence(struct amdgpu_ring *ring, u64 addr,
-			u64 seq, unsigned flags)
+static void uvd_v7_0_enc_ring_emit_fence(struct amdgpu_ring *ring, uint64_t addr,
+			uint64_t seq, unsigned flags)
 {
 	WARN_ON(flags & AMDGPU_FENCE_FLAG_64BIT);
 

@@ -74,7 +74,7 @@ static int vce_v3_0_set_clockgating_state(void *handle,
  *
  * Returns the current hardware read pointer
  */
-static uint64_t vce_v3_0_ring_get_rptr(struct amdgpu_ring *ring)
+static u64 vce_v3_0_ring_get_rptr(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 	u32 v;
@@ -106,7 +106,7 @@ static uint64_t vce_v3_0_ring_get_rptr(struct amdgpu_ring *ring)
  *
  * Returns the current hardware write pointer
  */
-static uint64_t vce_v3_0_ring_get_wptr(struct amdgpu_ring *ring)
+static u64 vce_v3_0_ring_get_wptr(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 	u32 v;
@@ -440,7 +440,7 @@ static int vce_v3_0_sw_init(void *handle)
 
 	for (i = 0; i < adev->vce.num_rings; i++) {
 		ring = &adev->vce.ring[i];
-		sprintf(ring->name, "vce%d", i);
+		ksprintf(ring->name, "vce%d", i);
 		r = amdgpu_ring_init(adev, ring, 512, &adev->vce.irq, 0);
 		if (r)
 			return r;

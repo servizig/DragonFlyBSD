@@ -69,7 +69,7 @@ static void amdgpu_do_test_moves(struct amdgpu_device *adev)
 	r = amdgpu_bo_reserve(vram_obj, false);
 	if (unlikely(r != 0))
 		goto out_unref;
-	r = amdgpu_bo_pin(vram_obj, AMDGPU_GEM_DOMAIN_VRAM, &vram_addr);
+	r = amdgpu_bo_pin(vram_obj, AMDGPU_GEM_DOMAIN_VRAM, (u64 *)&vram_addr);
 	if (r) {
 		DRM_ERROR("Failed to pin VRAM object\n");
 		goto out_unres;
@@ -91,7 +91,7 @@ static void amdgpu_do_test_moves(struct amdgpu_device *adev)
 		r = amdgpu_bo_reserve(gtt_obj[i], false);
 		if (unlikely(r != 0))
 			goto out_lclean_unref;
-		r = amdgpu_bo_pin(gtt_obj[i], AMDGPU_GEM_DOMAIN_GTT, &gart_addr);
+		r = amdgpu_bo_pin(gtt_obj[i], AMDGPU_GEM_DOMAIN_GTT, (u64 *)&gart_addr);
 		if (r) {
 			DRM_ERROR("Failed to pin GTT object %d\n", i);
 			goto out_lclean_unres;

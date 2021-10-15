@@ -223,7 +223,7 @@ int amdgpu_ucode_validate(const struct firmware *fw)
 	const struct common_firmware_header *hdr =
 		(const struct common_firmware_header *)fw->data;
 
-	if (fw->size == le32_to_cpu(hdr->size_bytes))
+	if (fw->datasize == le32_to_cpu(hdr->size_bytes))
 		return 0;
 
 	return -EINVAL;
@@ -387,7 +387,7 @@ int amdgpu_ucode_init_bo(struct amdgpu_device *adev)
 		}
 
 		err = amdgpu_bo_pin(*bo, amdgpu_sriov_vf(adev) ? AMDGPU_GEM_DOMAIN_VRAM : AMDGPU_GEM_DOMAIN_GTT,
-					&adev->firmware.fw_buf_mc);
+					(u64 *)&adev->firmware.fw_buf_mc);
 		if (err) {
 			dev_err(adev->dev, "(%d) Firmware buffer pin failed\n", err);
 			goto failed_pin;

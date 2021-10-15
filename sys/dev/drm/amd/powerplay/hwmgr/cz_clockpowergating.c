@@ -61,7 +61,7 @@ int cz_phm_set_asic_block_gating(struct pp_hwmgr *hwmgr, enum PHM_AsicBlock bloc
 	return ret;
 }
 
-
+#if 0
 bool cz_phm_is_safe_for_asic_block(struct pp_hwmgr *hwmgr, const struct pp_hw_power_state *state, enum PHM_AsicBlock block)
 {
 	return true;
@@ -102,6 +102,7 @@ int cz_phm_ungate_all_display_phys(struct pp_hwmgr *hwmgr)
 	/* TODO */
 	return 0;
 }
+#endif
 
 int cz_enable_disable_uvd_dpm(struct pp_hwmgr *hwmgr, bool enable)
 {

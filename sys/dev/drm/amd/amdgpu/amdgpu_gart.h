@@ -54,6 +54,9 @@ struct amdgpu_gart {
 	uint64_t			gart_pte_flags;
 
 	const struct amdgpu_gart_funcs *gart_funcs;
+#ifdef __DragonFly__
+       struct drm_dma_handle           *dmah;
+#endif
 };
 
 int amdgpu_gart_table_ram_alloc(struct amdgpu_device *adev);

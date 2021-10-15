@@ -28,6 +28,7 @@
 #include "amdgpu.h"
 
 #include "amdgpu_vm.h"
+#include "amdgpu_sched.h"
 
 enum amd_sched_priority amdgpu_to_sched_priority(int amdgpu_priority)
 {
@@ -53,6 +54,9 @@ static int amdgpu_sched_process_priority_override(struct amdgpu_device *adev,
 						  int fd,
 						  enum amd_sched_priority priority)
 {
+	STUB();
+	return -ENOSYS;
+#if 0
 	struct file *filp = fcheck(fd);
 	struct drm_file *file;
 	struct pid *pid;
@@ -79,6 +83,7 @@ static int amdgpu_sched_process_priority_override(struct amdgpu_device *adev,
 	put_pid(pid);
 
 	return 0;
+#endif
 }
 
 int amdgpu_sched_ioctl(struct drm_device *dev, void *data,

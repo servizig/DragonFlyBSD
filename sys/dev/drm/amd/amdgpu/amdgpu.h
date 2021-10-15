@@ -36,6 +36,8 @@
 #include <linux/hashtable.h>
 #include <linux/dma-fence.h>
 
+#include <asm/cpufeature.h>
+
 #include <drm/ttm/ttm_bo_api.h>
 #include <drm/ttm/ttm_bo_driver.h>
 #include <drm/ttm/ttm_placement.h>
@@ -71,6 +73,9 @@
 #include "gpu_scheduler.h"
 #include "amdgpu_virt.h"
 #include "amdgpu_gart.h"
+
+#include <contrib/dev/acpica/source/include/acpi.h>
+#include <dev/acpica/acpivar.h>
 
 /*
  * Modules parameters.
@@ -534,7 +539,7 @@ struct amdgpu_mc {
 	u64					private_aperture_start;
 	u64					private_aperture_end;
 	/* protects concurrent invalidation */
-	spinlock_t		invalidate_lock;
+	struct spinlock		invalidate_lock;
 };
 
 /*
@@ -702,7 +707,7 @@ int amdgpu_job_submit(struct amdgpu_job *job, struct amdgpu_ring *ring,
  */
 struct amdgpu_queue_mapper {
 	int 		hw_ip;
-	struct mutex	lock;
+	struct lock	lock;
 	/* protected by lock */
 	struct amdgpu_ring *queue_map[AMDGPU_MAX_RINGS];
 };
@@ -736,18 +741,18 @@ struct amdgpu_ctx {
 	struct amdgpu_queue_mgr queue_mgr;
 	unsigned		reset_counter;
 	uint32_t		vram_lost_counter;
-	spinlock_t		ring_lock;
+	struct spinlock		ring_lock;
 	struct dma_fence	**fences;
 	struct amdgpu_ctx_ring	rings[AMDGPU_MAX_RINGS];
 	bool			preamble_presented;
 	enum amd_sched_priority init_priority;
 	enum amd_sched_priority override_priority;
-	struct mutex            lock;
+	struct lock            lock;
 };
 
 struct amdgpu_ctx_mgr {
 	struct amdgpu_device	*adev;
-	struct mutex		lock;
+	struct lock		lock;
 	/* protected by lock */
 	struct idr		ctx_handles;
 };
@@ -779,7 +784,7 @@ struct amdgpu_fpriv {
 	struct amdgpu_vm	vm;
 	struct amdgpu_bo_va	*prt_va;
 	struct amdgpu_bo_va	*csa_va;
-	struct mutex		bo_list_lock;
+	struct lock		bo_list_lock;
 	struct idr		bo_list_handles;
 	struct amdgpu_ctx_mgr	ctx_mgr;
 };
@@ -797,7 +802,7 @@ struct amdgpu_bo_list_entry {
 };
 
 struct amdgpu_bo_list {
-	struct mutex lock;
+	struct lock lock;
 	struct rcu_head rhead;
 	struct kref refcount;
 	struct amdgpu_bo *gds_obj;
@@ -1001,7 +1006,7 @@ struct amdgpu_ngg {
 };
 
 struct amdgpu_gfx {
-	struct mutex			gpu_clock_mutex;
+	struct lock			gpu_clock_mutex;
 	struct amdgpu_gfx_config	config;
 	struct amdgpu_rlc		rlc;
 	struct amdgpu_mec		mec;
@@ -1048,7 +1053,7 @@ struct amdgpu_gfx {
 	struct amdgpu_ngg		ngg;
 
 	/* pipe reservation */
-	struct mutex			pipe_reserve_mutex;
+	struct lock			pipe_reserve_mutex;
 	DECLARE_BITMAP			(pipe_reserve_bitmap, AMDGPU_MAX_COMPUTE_QUEUES);
 };
 
@@ -1212,7 +1217,7 @@ struct amdgpu_firmware {
 	/* firmwares are loaded by psp instead of smu from vega10 */
 	const struct amdgpu_psp_funcs *funcs;
 	struct amdgpu_bo *rbuf;
-	struct mutex mutex;
+	struct lock mutex;
 
 	/* gpu info firmware data pointer */
 	const struct firmware *gpu_info_fw;
@@ -1268,7 +1273,7 @@ struct amdgpu_smumgr {
 	struct amdgpu_bo *smu_buf;
 	/* asic priv smu data */
 	void *priv;
-	spinlock_t smu_lock;
+	struct spinlock smu_lock;
 	/* smumgr functions */
 	const struct amdgpu_smumgr_funcs *smumgr_funcs;
 	/* ucode loading complete flag */
@@ -1294,6 +1299,8 @@ struct amdgpu_asic_funcs {
 			     u32 sh_num, u32 reg_offset, u32 *value);
 	void (*set_vga_state)(struct amdgpu_device *adev, bool state);
 	int (*reset)(struct amdgpu_device *adev);
+	/* wait for mc_idle */
+	int (*wait_for_mc_idle)(struct amdgpu_device *adev);
 	/* get the reference clock */
 	u32 (*get_xclk)(struct amdgpu_device *adev);
 	/* MM block clocks */
@@ -1452,10 +1459,12 @@ struct amdgpu_device {
 #endif
 	struct amdgpu_atif		atif;
 	struct amdgpu_atcs		atcs;
-	struct mutex			srbm_mutex;
+	struct lock			srbm_mutex;
 	/* GRBM index mutex. Protects concurrent access to GRBM index */
-	struct mutex                    grbm_idx_mutex;
+	struct lock			grbm_idx_mutex;
+#if 0
 	struct dev_pm_domain		vga_pm_domain;
+#endif
 	bool				have_disp_power_ref;
 
 	/* BIOS */
@@ -1469,11 +1478,14 @@ struct amdgpu_device {
 	/* Register/doorbell mmio */
 	resource_size_t			rmmio_base;
 	resource_size_t			rmmio_size;
-	void __iomem			*rmmio;
+#ifdef __DragonFly__
+	int				rmmio_rid;
+	struct resource			*rmmio;
+#endif
 	/* protects concurrent MM_INDEX/DATA based register access */
-	spinlock_t mmio_idx_lock;
+	struct lock mmio_idx_lock;
 	/* protects concurrent SMC based register access */
-	spinlock_t smc_idx_lock;
+	struct lock smc_idx_lock;
 	amdgpu_rreg_t			smc_rreg;
 	amdgpu_wreg_t			smc_wreg;
 	/* protects concurrent PCIE register access */
@@ -1483,26 +1495,29 @@ struct amdgpu_device {
 	amdgpu_rreg_t			pciep_rreg;
 	amdgpu_wreg_t			pciep_wreg;
 	/* protects concurrent UVD register access */
-	spinlock_t uvd_ctx_idx_lock;
+	struct lock uvd_ctx_idx_lock;
 	amdgpu_rreg_t			uvd_ctx_rreg;
 	amdgpu_wreg_t			uvd_ctx_wreg;
 	/* protects concurrent DIDT register access */
-	spinlock_t didt_idx_lock;
+	struct lock didt_idx_lock;
 	amdgpu_rreg_t			didt_rreg;
 	amdgpu_wreg_t			didt_wreg;
 	/* protects concurrent gc_cac register access */
-	spinlock_t gc_cac_idx_lock;
+	struct lock gc_cac_idx_lock;
 	amdgpu_rreg_t			gc_cac_rreg;
 	amdgpu_wreg_t			gc_cac_wreg;
 	/* protects concurrent se_cac register access */
-	spinlock_t se_cac_idx_lock;
+	struct lock se_cac_idx_lock;
 	amdgpu_rreg_t			se_cac_rreg;
 	amdgpu_wreg_t			se_cac_wreg;
 	/* protects concurrent ENDPOINT (audio) register access */
-	spinlock_t audio_endpt_idx_lock;
+	struct lock audio_endpt_idx_lock;
 	amdgpu_block_rreg_t		audio_endpt_rreg;
 	amdgpu_block_wreg_t		audio_endpt_wreg;
-	void __iomem                    *rio_mem;
+#ifdef __DragonFly__
+	int				rio_rid;
+	struct resource			*rio_mem;
+#endif
 	resource_size_t			rio_mem_size;
 	struct amdgpu_doorbell		doorbell;
 
@@ -1528,7 +1543,7 @@ struct amdgpu_device {
 
 	/* data for buffer migration throttling */
 	struct {
-		spinlock_t		lock;
+		struct spinlock		lock;
 		s64			last_update_us;
 		s64			accum_us; /* accumulated microseconds */
 		s64			accum_us_vis; /* for visible VRAM */
@@ -1595,7 +1610,7 @@ struct amdgpu_device {
 
 	struct amdgpu_ip_block          ip_blocks[AMDGPU_MAX_IP_NUM];
 	int				num_ip_blocks;
-	struct mutex	mn_lock;
+	struct lock	mn_lock;
 	DECLARE_HASHTABLE(mn_hash, 7);
 
 	/* tracking pinned memory */
@@ -1615,9 +1630,9 @@ struct amdgpu_device {
 
 	/* link all shadow bo */
 	struct list_head                shadow_list;
-	struct mutex                    shadow_list_lock;
+	struct lock                    shadow_list_lock;
 	/* link all gtt */
-	spinlock_t			gtt_list_lock;
+	struct spinlock			gtt_list_lock;
 	struct list_head                gtt_list;
 	/* keep an lru list of rings by HW IP */
 	struct list_head		ring_lru_list;
@@ -1630,6 +1645,14 @@ struct amdgpu_device {
 	/* record last mm index being written through WREG32*/
 	unsigned long last_mm_index;
 	bool                            in_sriov_reset;
+
+#ifdef __DragonFly__
+	struct {
+		ACPI_HANDLE		handle;
+		ACPI_NOTIFY_HANDLER	notifier_call;
+	} acpi;
+	bool				fictitious_range_registered;
+#endif
 };
 
 static inline struct amdgpu_device *amdgpu_ttm_adev(struct ttm_bo_device *bdev)
@@ -1761,6 +1784,7 @@ amdgpu_get_sdma_instance(struct amdgpu_ring *ring)
  */
 #define amdgpu_asic_set_vga_state(adev, state) (adev)->asic_funcs->set_vga_state((adev), (state))
 #define amdgpu_asic_reset(adev) (adev)->asic_funcs->reset((adev))
+#define amdgpu_asic_wait_for_mc_idle(adev) (adev)->asic_funcs->wait_for_mc_idle((adev))
 #define amdgpu_asic_get_xclk(adev) (adev)->asic_funcs->get_xclk((adev))
 #define amdgpu_asic_set_uvd_clocks(adev, v, d) (adev)->asic_funcs->set_uvd_clocks((adev), (v), (d))
 #define amdgpu_asic_set_vce_clocks(adev, ev, ec) (adev)->asic_funcs->set_vce_clocks((adev), (ev), (ec))

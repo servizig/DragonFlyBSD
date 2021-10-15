@@ -128,7 +128,7 @@ struct amdgpu_display_manager {
 	 * For example: amdgpu_dm_hpd_low_irq() calls into DAL *without*
 	 * DRM mode setting locks being acquired. This is where dal_mutex
 	 * is acquired before calling into DAL. */
-	struct mutex dal_mutex;
+	struct lock dal_mutex;
 
 	struct backlight_device *backlight_dev;
 
@@ -186,7 +186,7 @@ struct amdgpu_dm_connector {
 	/*freesync caps*/
 	struct mod_freesync_caps caps;
 
-	struct mutex hpd_lock;
+	struct lock hpd_lock;
 
 	bool fake_enable;
 
