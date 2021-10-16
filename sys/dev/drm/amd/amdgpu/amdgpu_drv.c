@@ -626,13 +626,15 @@ err_free:
 }
 
 #ifdef __DragonFly__
+const struct pci_device_id *ent;	/* XXX hack */
+
 static int
 amdgpu_pci_probe_dfly(device_t kdev)
 {
 	int device, i = 0;
-	const struct pci_device_id *ent;
-	static struct pci_dev *pdev = NULL;
-	static device_t bsddev;
+
+kprintf("amdgpu_pci_probe_dfly called\n");
+tsleep(&i, 0, "SDELAY", 1);
 
 	if (pci_get_class(kdev) != PCIC_DISPLAY)
 		return ENXIO;
@@ -651,6 +653,15 @@ amdgpu_pci_probe_dfly(device_t kdev)
 
 	return ENXIO;
 found:
+	return 0;
+}
+
+static int
+amdgpu_attach_dfly(device_t kdev)
+{
+	struct pci_dev *pdev = NULL;
+	static device_t bsddev;
+
 	if (!strcmp(device_get_name(kdev), "drmsub"))
 		bsddev = device_get_parent(kdev);
 	else
@@ -661,13 +672,12 @@ found:
 	/* Print the contents of pdev struct. */
 	drm_print_pdev(pdev);
 
+	/*
+	   The device_probe function can be called multiple times on DragonFly
+	   and amdgpu_pci_probe() is supposed to be called only once.
+	   Call it from the DragonFly device_attach function.
+	*/
 	return amdgpu_pci_probe(pdev, ent);
-}
-
-static int
-amdgpu_attach_dfly(device_t kdev)
-{
-	return 0;
 }
 #endif
 
@@ -945,7 +955,9 @@ static struct pci_driver amdgpu_kms_pci_driver = {
 #if 0
 	.name = DRIVER_NAME,
 	.id_table = pciidlist,
+#endif
 	.probe = amdgpu_pci_probe,
+#if 0
 	.remove = amdgpu_pci_remove,
 	.shutdown = amdgpu_pci_shutdown,
 	.driver.pm = &amdgpu_pm_ops,
