@@ -42,7 +42,7 @@
 #define VCN_IDLE_TIMEOUT	msecs_to_jiffies(1000)
 
 /* Firmware Names */
-#define FIRMWARE_RAVEN		"amdgpu/raven_vcn.bin"
+#define FIRMWARE_RAVEN		"amdgpufw_raven_vcn"
 
 MODULE_FIRMWARE(FIRMWARE_RAVEN);
 

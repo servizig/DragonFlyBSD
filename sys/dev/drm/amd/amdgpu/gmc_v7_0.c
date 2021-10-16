@@ -48,7 +48,7 @@ static int gmc_v7_0_wait_for_idle(void *handle);
 
 MODULE_FIRMWARE("radeon/bonaire_mc.bin");
 MODULE_FIRMWARE("radeon/hawaii_mc.bin");
-MODULE_FIRMWARE("amdgpu/topaz_mc.bin");
+MODULE_FIRMWARE("amdgpufw_topaz_mc");
 
 static const u32 golden_settings_iceland_a11[] =
 {
@@ -147,7 +147,7 @@ static int gmc_v7_0_init_microcode(struct amdgpu_device *adev)
 	}
 
 	if (adev->asic_type == CHIP_TOPAZ)
-		snprintf(fw_name, sizeof(fw_name), "amdgpu/%s_mc.bin", chip_name);
+		snprintf(fw_name, sizeof(fw_name), "amdgpufw_%s_mc", chip_name);
 	else
 		snprintf(fw_name, sizeof(fw_name), "radeon/%s_mc.bin", chip_name);
 

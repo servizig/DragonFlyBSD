@@ -59,15 +59,15 @@
 #define FIRMWARE_HAWAII	"radeon/hawaii_uvd.bin"
 #define FIRMWARE_MULLINS	"radeon/mullins_uvd.bin"
 #endif
-#define FIRMWARE_TONGA		"amdgpu/tonga_uvd.bin"
-#define FIRMWARE_CARRIZO	"amdgpu/carrizo_uvd.bin"
-#define FIRMWARE_FIJI		"amdgpu/fiji_uvd.bin"
-#define FIRMWARE_STONEY		"amdgpu/stoney_uvd.bin"
-#define FIRMWARE_POLARIS10	"amdgpu/polaris10_uvd.bin"
-#define FIRMWARE_POLARIS11	"amdgpu/polaris11_uvd.bin"
-#define FIRMWARE_POLARIS12	"amdgpu/polaris12_uvd.bin"
+#define FIRMWARE_TONGA		"amdgpufw_tonga_uvd"
+#define FIRMWARE_CARRIZO	"amdgpufw_carrizo_uvd"
+#define FIRMWARE_FIJI		"amdgpufw_fiji_uvd"
+#define FIRMWARE_STONEY		"amdgpufw_stoney_uvd"
+#define FIRMWARE_POLARIS10	"amdgpufw_polaris10_uvd"
+#define FIRMWARE_POLARIS11	"amdgpufw_polaris11_uvd"
+#define FIRMWARE_POLARIS12	"amdgpufw_polaris12_uvd"
 
-#define FIRMWARE_VEGA10		"amdgpu/vega10_uvd.bin"
+#define FIRMWARE_VEGA10		"amdgpufw_vega10_uvd"
 
 #define mmUVD_GPCOM_VCPU_DATA0_VEGA10 (0x03c4 + 0x7e00)
 #define mmUVD_GPCOM_VCPU_DATA1_VEGA10 (0x03c5 + 0x7e00)

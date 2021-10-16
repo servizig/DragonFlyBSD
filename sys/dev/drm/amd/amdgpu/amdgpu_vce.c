@@ -54,7 +54,7 @@
 #define FIRMWARE_POLARIS11         "amdgpufw_polaris11_vce"
 #define FIRMWARE_POLARIS12         "amdgpufw_polaris12_vce"
 
-#define FIRMWARE_VEGA10		"amdgpu/vega10_vce.bin"
+#define FIRMWARE_VEGA10		"amdgpufw_vega10_vce"
 
 #ifdef CONFIG_DRM_AMDGPU_CIK
 MODULE_FIRMWARE(FIRMWARE_BONAIRE);

@@ -30,20 +30,20 @@
 #include "smumgr.h"
 #include "cgs_common.h"
 
-MODULE_FIRMWARE("amdgpu/topaz_smc.bin");
-MODULE_FIRMWARE("amdgpu/topaz_k_smc.bin");
-MODULE_FIRMWARE("amdgpu/tonga_smc.bin");
-MODULE_FIRMWARE("amdgpu/tonga_k_smc.bin");
-MODULE_FIRMWARE("amdgpu/fiji_smc.bin");
-MODULE_FIRMWARE("amdgpu/polaris10_smc.bin");
-MODULE_FIRMWARE("amdgpu/polaris10_smc_sk.bin");
-MODULE_FIRMWARE("amdgpu/polaris10_k_smc.bin");
-MODULE_FIRMWARE("amdgpu/polaris11_smc.bin");
-MODULE_FIRMWARE("amdgpu/polaris11_smc_sk.bin");
-MODULE_FIRMWARE("amdgpu/polaris11_k_smc.bin");
-MODULE_FIRMWARE("amdgpu/polaris12_smc.bin");
-MODULE_FIRMWARE("amdgpu/vega10_smc.bin");
-MODULE_FIRMWARE("amdgpu/vega10_acg_smc.bin");
+MODULE_FIRMWARE("amdgpufw_topaz_smc");
+MODULE_FIRMWARE("amdgpufw_topaz_k_smc");
+MODULE_FIRMWARE("amdgpufw_tonga_smc");
+MODULE_FIRMWARE("amdgpufw_tonga_k_smc");
+MODULE_FIRMWARE("amdgpufw_fiji_smc");
+MODULE_FIRMWARE("amdgpufw_polaris10_smc");
+MODULE_FIRMWARE("amdgpufw_polaris10_smc_sk");
+MODULE_FIRMWARE("amdgpufw_polaris10_k_smc");
+MODULE_FIRMWARE("amdgpufw_polaris11_smc");
+MODULE_FIRMWARE("amdgpufw_polaris11_smc_sk");
+MODULE_FIRMWARE("amdgpufw_polaris11_k_smc");
+MODULE_FIRMWARE("amdgpufw_polaris12_smc");
+MODULE_FIRMWARE("amdgpufw_vega10_smc");
+MODULE_FIRMWARE("amdgpufw_vega10_acg_smc");
 
 int smum_thermal_avfs_enable(struct pp_hwmgr *hwmgr)
 {

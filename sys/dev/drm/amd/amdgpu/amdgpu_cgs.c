@@ -741,20 +741,20 @@ static int amdgpu_cgs_get_firmware_info(struct cgs_device *cgs_device,
 				    ((adev->pdev->device == 0x6900) && (adev->pdev->revision == 0x83)) ||
 				    ((adev->pdev->device == 0x6907) && (adev->pdev->revision == 0x87))) {
 					info->is_kicker = true;
-					strcpy(fw_name, "amdgpu/topaz_k_smc.bin");
+					strcpy(fw_name, "amdgpufw_topaz_k_smc");
 				} else
-					strcpy(fw_name, "amdgpu/topaz_smc.bin");
+					strcpy(fw_name, "amdgpufw_topaz_smc");
 				break;
 			case CHIP_TONGA:
 				if (((adev->pdev->device == 0x6939) && (adev->pdev->revision == 0xf1)) ||
 				    ((adev->pdev->device == 0x6938) && (adev->pdev->revision == 0xf1))) {
 					info->is_kicker = true;
-					strcpy(fw_name, "amdgpu/tonga_k_smc.bin");
+					strcpy(fw_name, "amdgpufw_tonga_k_smc");
 				} else
-					strcpy(fw_name, "amdgpu/tonga_smc.bin");
+					strcpy(fw_name, "amdgpufw_tonga_smc");
 				break;
 			case CHIP_FIJI:
-				strcpy(fw_name, "amdgpu/fiji_smc.bin");
+				strcpy(fw_name, "amdgpufw_fiji_smc");
 				break;
 			case CHIP_POLARIS11:
 				if (type == CGS_UCODE_ID_SMU) {
@@ -767,11 +767,11 @@ static int amdgpu_cgs_get_firmware_info(struct cgs_device *cgs_device,
 					      (adev->pdev->revision == 0xef) ||
 					      (adev->pdev->revision == 0xff)))) {
 						info->is_kicker = true;
-						strcpy(fw_name, "amdgpu/polaris11_k_smc.bin");
+						strcpy(fw_name, "amdgpufw_polaris11_k_smc");
 					} else
-						strcpy(fw_name, "amdgpu/polaris11_smc.bin");
+						strcpy(fw_name, "amdgpufw_polaris11_smc");
 				} else if (type == CGS_UCODE_ID_SMU_SK) {
-					strcpy(fw_name, "amdgpu/polaris11_smc_sk.bin");
+					strcpy(fw_name, "amdgpufw_polaris11_smc_sk");
 				}
 				break;
 			case CHIP_POLARIS10:
@@ -784,24 +784,24 @@ static int amdgpu_cgs_get_firmware_info(struct cgs_device *cgs_device,
 					     (adev->pdev->revision == 0xe7) ||
 					     (adev->pdev->revision == 0xef))) {
 						info->is_kicker = true;
-						strcpy(fw_name, "amdgpu/polaris10_k_smc.bin");
+						strcpy(fw_name, "amdgpufw_polaris10_k_smc");
 					} else
-						strcpy(fw_name, "amdgpu/polaris10_smc.bin");
+						strcpy(fw_name, "amdgpufw_polaris10_smc");
 				} else if (type == CGS_UCODE_ID_SMU_SK) {
-					strcpy(fw_name, "amdgpu/polaris10_smc_sk.bin");
+					strcpy(fw_name, "amdgpufw_polaris10_smc_sk");
 				}
 				break;
 			case CHIP_POLARIS12:
-				strcpy(fw_name, "amdgpu/polaris12_smc.bin");
+				strcpy(fw_name, "amdgpufw_polaris12_smc");
 				break;
 			case CHIP_VEGA10:
 				if ((adev->pdev->device == 0x687f) &&
 					((adev->pdev->revision == 0xc0) ||
 					(adev->pdev->revision == 0xc1) ||
 					(adev->pdev->revision == 0xc3)))
-					strcpy(fw_name, "amdgpu/vega10_acg_smc.bin");
+					strcpy(fw_name, "amdgpufw_vega10_acg_smc");
 				else
-					strcpy(fw_name, "amdgpu/vega10_smc.bin");
+					strcpy(fw_name, "amdgpufw_vega10_smc");
 				break;
 			default:
 				DRM_ERROR("SMC firmware not supported\n");

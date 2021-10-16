@@ -35,7 +35,7 @@
 #include "raven1/GC/gc_9_1_offset.h"
 #include "raven1/SDMA0/sdma0_4_1_offset.h"
 
-MODULE_FIRMWARE("amdgpu/raven_asd.bin");
+MODULE_FIRMWARE("amdgpufw_raven_asd");
 
 static int
 psp_v10_0_get_fw_type(struct amdgpu_firmware_info *ucode, enum psp_gfx_fw_type *type)
@@ -105,7 +105,7 @@ int psp_v10_0_init_microcode(struct psp_context *psp)
 	default: BUG();
 	}
 
-	snprintf(fw_name, sizeof(fw_name), "amdgpu/%s_asd.bin", chip_name);
+	snprintf(fw_name, sizeof(fw_name), "amdgpufw_%s_asd", chip_name);
 	err = request_firmware(&adev->psp.asd_fw, fw_name, adev->dev);
 	if (err)
 		goto out;
