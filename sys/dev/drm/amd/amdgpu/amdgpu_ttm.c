@@ -696,9 +696,6 @@ struct amdgpu_ttm_tt {
 
 int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 {
-	kprintf("amdgpu_ttm_tt_get_user_pages: not implemented\n");
-	return -EINVAL;
-#if 0
 	struct amdgpu_ttm_tt *gtt = (void *)ttm;
 	int write = !(gtt->userflags & AMDGPU_GEM_USERPTR_READONLY);
 	unsigned pinned = 0;
@@ -706,6 +703,8 @@ int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 
 	down_read(&current->mm->mmap_sem);
 
+#if 0
+	/* DRAGONFLY XXX */
 	if (gtt->userflags & AMDGPU_GEM_USERPTR_ANONONLY) {
 		/* check that we only use anonymous memory
 		   to prevent problems with writeback */
@@ -718,6 +717,7 @@ int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 			return -EPERM;
 		}
 	}
+#endif
 
 	do {
 		unsigned num_pages = ttm->num_pages - pinned;
@@ -750,7 +750,6 @@ release_pages:
 	release_pages(pages, pinned);
 	up_read(&current->mm->mmap_sem);
 	return r;
-#endif
 }
 
 void amdgpu_ttm_tt_set_user_pages(struct ttm_tt *ttm, struct page **pages)
@@ -1087,7 +1086,11 @@ int amdgpu_ttm_tt_set_userptr(struct ttm_tt *ttm, uint64_t addr,
 		return -EINVAL;
 
 	gtt->userptr = addr;
-	gtt->usermm = current->mm;
+#ifdef __DragonFly__
+	gtt->usermm = NULL;		/* XXX DRAGONFLY */
+#else
+ 	gtt->usermm = current->mm;
+#endif
 	gtt->userflags = flags;
 	spin_init(&gtt->guptasklock, "agggtl");
 	INIT_LIST_HEAD(&gtt->guptasks);
@@ -1103,12 +1106,7 @@ struct mm_struct *amdgpu_ttm_tt_get_usermm(struct ttm_tt *ttm)
 
 	if (gtt == NULL)
 		return NULL;
-#if 0
 	return gtt->usermm;
-#else
-	kprintf("amdgpu_ttm_tt_get_user_pages: not implemented\n");
-	return NULL;
-#endif
 }
 
 bool amdgpu_ttm_tt_affect_userptr(struct ttm_tt *ttm, unsigned long start,
@@ -1836,7 +1834,7 @@ static ssize_t amdgpu_ttm_gtt_read(struct file *f, char __user *buf,
 
 	while (size) {
 		loff_t p = *pos / PAGE_SIZE;
-		unsigned off = *pos & ~LINUX_PAGE_MASK;
+		unsigned off = *pos & LINUX_PAGE_MASK;
 		size_t cur_size = min_t(size_t, size, PAGE_SIZE - off);
 		struct page *page;
 		void *ptr;
