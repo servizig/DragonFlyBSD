@@ -400,6 +400,21 @@ pci_pcie_cap(struct pci_dev *pdev)
 #include <uapi/linux/pci_regs.h>
 
 /* From FreeBSD */
+static inline int
+pci_enable_device(struct pci_dev *pdev)
+{
+
+	pci_enable_io(pdev->dev.bsddev, SYS_RES_IOPORT);
+	pci_enable_io(pdev->dev.bsddev, SYS_RES_MEMORY);
+	return (0);
+}
+
+static inline void
+pci_disable_device(struct pci_dev *pdev)
+{
+	pci_disable_busmaster(pdev->dev.bsddev);
+}
+
 static inline bool pcie_cap_has_devctl(const struct pci_dev *dev)
 {
 		return true;
