@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 Francois Tigeot <ftigeot@wolfpond.org>
+ * Copyright (c) 2019 François Tigeot <ftigeot@wolfpond.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
