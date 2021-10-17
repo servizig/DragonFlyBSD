@@ -513,10 +513,24 @@ pci_resource_flags(struct pci_dev *pdev, int bar)
 }
 
 enum pci_bus_speed {
-	PCIE_SPEED_2_5GT	= 0x14,
-	PCIE_SPEED_5_0GT	= 0x15,
-	PCIE_SPEED_8_0GT	= 0x16,
-	PCI_SPEED_UNKNOWN	= 0xff,
+	PCIE_SPEED_2_5GT		= 0x14,
+	PCIE_SPEED_5_0GT		= 0x15,
+	PCIE_SPEED_8_0GT		= 0x16,
+	PCIE_SPEED_16_0GT		= 0x17,
+	PCI_SPEED_UNKNOWN		= 0xff,
+};
+
+/* Values from Link Status register, PCIe r3.1, sec 7.8.8 */
+enum pcie_link_width {
+	PCIE_LNK_WIDTH_RESRV	= 0x00,
+	PCIE_LNK_X1		= 0x01,
+	PCIE_LNK_X2		= 0x02,
+	PCIE_LNK_X4		= 0x04,
+	PCIE_LNK_X8		= 0x08,
+	PCIE_LNK_X12		= 0x0c,
+	PCIE_LNK_X16		= 0x10,
+	PCIE_LNK_X32		= 0x20,
+	PCIE_LNK_WIDTH_UNKNOWN	= 0xff,
 };
 
 int pcie_capability_read_dword(struct pci_dev *dev, int pos, u32 *val);

@@ -30,3 +30,8 @@
 #pragma GCC diagnostic ignored "-Wpointer-arith"
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Wdiscarded-qualifiers"
+#pragma GCC diagnostic ignored "-Wint-conversion"
+/*
+   XXX never ignore -Wincompatible-pointer-types, it can cause spinlock and lockmgr locking
+   code to silently use the wrong type of locks
+*/
