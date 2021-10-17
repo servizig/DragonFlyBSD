@@ -84,7 +84,7 @@ int amdgpu_benchmarking = 0;
 int amdgpu_testing = 0;
 int amdgpu_audio = -1;
 int amdgpu_disp_priority = 0;
-int amdgpu_hw_i2c = 0;
+int amdgpu_hw_i2c = 1;
 int amdgpu_pcie_gen2 = -1;
 int amdgpu_msi = -1;
 int amdgpu_lockup_timeout = 10000;
@@ -795,6 +795,7 @@ static struct drm_driver kms_driver;
 
 static int amdgpu_kick_out_firmware_fb(struct pci_dev *pdev)
 {
+#if 0
 	struct apertures_struct *ap;
 	bool primary = false;
 
@@ -810,6 +811,7 @@ static int amdgpu_kick_out_firmware_fb(struct pci_dev *pdev)
 #endif
 	drm_fb_helper_remove_conflicting_framebuffers(ap, "amdgpudrmfb", primary);
 	kfree(ap);
+#endif
 
 	return 0;
 }
@@ -837,9 +839,11 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 	 * Initialize amdkfd before starting radeon. If it was not loaded yet,
 	 * defer radeon probing
 	 */
+#if 0
 	ret = amdgpu_amdkfd_init();
 	if (ret == -EPROBE_DEFER)
 		return ret;
+#endif
 
 #ifdef CONFIG_DRM_AMDGPU_SI
 	if (!amdgpu_si_support) {
@@ -892,9 +896,11 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 	if (IS_ERR(dev))
 		return PTR_ERR(dev);
 
+#if 0
 	ret = pci_enable_device(pdev);
 	if (ret)
 		goto err_free;
+#endif
 
 	dev->pdev = pdev;
 
@@ -913,12 +919,61 @@ retry_init:
 	return 0;
 
 err_pci:
+#if 0
 	pci_disable_device(pdev);
 err_free:
+#endif
 	drm_dev_put(dev);
 	return ret;
 }
 
+#ifdef __DragonFly__
+static int
+amdgpu_pci_probe_dfly(device_t kdev)
+{
+	int device, i = 0;
+	const struct pci_device_id *ent;
+	static struct pci_dev *pdev = NULL;
+	static device_t bsddev;
+
+	if (pci_get_class(kdev) != PCIC_DISPLAY)
+		return ENXIO;
+
+	if (pci_get_vendor(kdev) != PCI_VENDOR_ID_ATI)
+		return ENXIO;
+
+	device = pci_get_device(kdev);
+
+	for (i = 0; pciidlist[i].device != 0; i++) {
+		if (pciidlist[i].device == device) {
+			ent = &pciidlist[i];
+			goto found;
+		}
+	}
+
+	return ENXIO;
+found:
+	if (!strcmp(device_get_name(kdev), "drmsub"))
+		bsddev = device_get_parent(kdev);
+	else
+		bsddev = kdev;
+
+	drm_init_pdev(bsddev, &pdev);
+
+	/* Print the contents of pdev struct. */
+	drm_print_pdev(pdev);
+
+	return amdgpu_pci_probe(pdev, ent);
+}
+
+static int
+amdgpu_attach_dfly(device_t kdev)
+{
+	return 0;
+}
+#endif
+
+#if 0
 static void
 amdgpu_pci_remove(struct pci_dev *pdev)
 {
@@ -1106,7 +1161,9 @@ static const struct dev_pm_ops amdgpu_pm_ops = {
 	.runtime_resume = amdgpu_pmops_runtime_resume,
 	.runtime_idle = amdgpu_pmops_runtime_idle,
 };
+#endif
 
+#if 0
 static int amdgpu_flush(struct file *f, fl_owner_t id)
 {
 	struct drm_file *file_priv = f->private_data;
@@ -1116,10 +1173,12 @@ static int amdgpu_flush(struct file *f, fl_owner_t id)
 
 	return 0;
 }
+#endif
 
 
 static const struct file_operations amdgpu_driver_kms_fops = {
 	.owner = THIS_MODULE,
+#if 0
 	.open = drm_open,
 	.flush = amdgpu_flush,
 	.release = drm_release,
@@ -1127,6 +1186,7 @@ static const struct file_operations amdgpu_driver_kms_fops = {
 	.mmap = amdgpu_mmap,
 	.poll = drm_poll,
 	.read = drm_read,
+#endif
 #ifdef CONFIG_COMPAT
 	.compat_ioctl = amdgpu_kms_compat_ioctl,
 #endif
@@ -1189,12 +1249,16 @@ static struct drm_driver *driver;
 static struct pci_driver *pdriver;
 
 static struct pci_driver amdgpu_kms_pci_driver = {
+#if 0 
 	.name = DRIVER_NAME,
 	.id_table = pciidlist,
+#endif
 	.probe = amdgpu_pci_probe,
+#if 0
 	.remove = amdgpu_pci_remove,
 	.shutdown = amdgpu_pci_shutdown,
 	.driver.pm = &amdgpu_pm_ops,
+#endif
 };
 
 
@@ -1246,3 +1310,30 @@ module_exit(amdgpu_exit);
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL and additional rights");
+
+#ifdef __DragonFly__
+static device_method_t amdgpu_methods[] = {
+	/* Device interface */
+	DEVMETHOD(device_probe,		amdgpu_pci_probe_dfly),
+	DEVMETHOD(device_attach,	amdgpu_attach_dfly),
+#if 0
+	DEVMETHOD(device_suspend,	amdgpu_suspend_switcheroo),
+	DEVMETHOD(device_resume,	amdgpu_resume_switcheroo),
+#endif
+	DEVMETHOD(device_detach,	drm_release),
+	DEVMETHOD_END
+};
+
+static driver_t amdgpu_driver = {
+	"drm",
+	amdgpu_methods,
+	sizeof(struct drm_device)
+};
+
+extern devclass_t drm_devclass;
+DRIVER_MODULE_ORDERED(amdgpu, vgapci, amdgpu_driver, drm_devclass, NULL, NULL, SI_ORDER_ANY);
+MODULE_DEPEND(amdgpu, drm, 1, 1, 1);
+#ifdef CONFIG_ACPI
+MODULE_DEPEND(amdgpu, acpi, 1, 1, 1);
+#endif
+#endif
