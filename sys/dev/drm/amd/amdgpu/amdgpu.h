@@ -1480,7 +1480,7 @@ struct amdgpu_device {
 	resource_size_t			rmmio_size;
 #ifdef __DragonFly__
 	int				rmmio_rid;
-	struct resource			*rmmio;
+	void __iomem			*rmmio;
 #endif
 	/* protects concurrent MM_INDEX/DATA based register access */
 	struct lock mmio_idx_lock;
