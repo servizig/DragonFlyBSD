@@ -35,6 +35,8 @@
 #include <linux/string.h>
 #include <linux/types.h>
 
+#define	__compiler_membar()	__asm __volatile(" " : : : "memory")
+
 #undef readb
 static inline u8
 readb(const volatile void __iomem *addr)
@@ -53,7 +55,11 @@ readw(const volatile void __iomem *addr)
 static inline u32
 readl(const volatile void __iomem *addr)
 {
-	return *(const volatile u32*)addr;
+	u32 v;
+	__compiler_membar();
+	v = (*(const volatile u32*)addr);
+	__compiler_membar();
+	return v;
 }
 
 #undef writeb
