@@ -2677,6 +2677,15 @@ failed:
  */
 void amdgpu_device_fini(struct amdgpu_device *adev)
 {
+#ifdef __DragonFly__
+	static bool unloaded = false;
+	if (unloaded) {
+		kprintf("amdgpu_device_fini: attempt second unload\n");
+		return;
+	}
+	unloaded = true;
+#endif
+
 	int r;
 
 	DRM_INFO("amdgpu: finishing device.\n");

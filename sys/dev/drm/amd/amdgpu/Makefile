@@ -114,6 +114,8 @@ SRCS+= \
 
 SRCS+= amdgpu_acpi.c
 
+SRCS+= amd_powerplay.c
+
 # powerplay/hwmgr
 SRCS+= hwmgr.c processpptables.c \
 		hardwaremanager.c smu8_hwmgr.c \

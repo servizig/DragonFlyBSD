@@ -31,6 +31,7 @@ SRCS	= \
 	drm_fourcc.c \
 	drm_framebuffer.c \
 	drm_gem.c \
+	drm_gem_framebuffer_helper.c \
 	drm_global.c \
 	drm_hashtab.c \
 	drm_ioctl.c \
