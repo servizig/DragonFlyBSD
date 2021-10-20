@@ -644,7 +644,7 @@ struct amdgpu_ctx {
 	unsigned		reset_counter;
 	unsigned        reset_counter_query;
 	uint32_t		vram_lost_counter;
-	spinlock_t		ring_lock;
+	struct spinlock		ring_lock;
 	struct dma_fence	**fences;
 	struct amdgpu_ctx_ring	rings[AMDGPU_MAX_RINGS];
 	bool			preamble_presented;
@@ -1461,7 +1461,7 @@ struct amdgpu_device {
 
 	/* data for buffer migration throttling */
 	struct {
-		spinlock_t		lock;
+		struct spinlock		lock;
 		s64			last_update_us;
 		s64			accum_us; /* accumulated microseconds */
 		s64			accum_us_vis; /* for visible VRAM */
@@ -1557,7 +1557,7 @@ struct amdgpu_device {
 	struct lock                    shadow_list_lock;
 	/* keep an lru list of rings by HW IP */
 	struct list_head		ring_lru_list;
-	spinlock_t			ring_lru_list_lock;
+	struct spinlock			ring_lru_list_lock;
 
 	/* record hw reset is performed */
 	bool has_hw_reset;

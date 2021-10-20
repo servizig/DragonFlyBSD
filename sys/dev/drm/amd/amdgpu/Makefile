@@ -15,6 +15,7 @@ SRCS=	amdgpu_drv.c
 SRCS+=	chash.c
 
 # add KMS driver
+# XXX: enable amdgpu_prime.c 
 SRCS+= amdgpu_device.c amdgpu_kms.c \
 	amdgpu_atombios.c atombios_crtc.c amdgpu_connectors.c \
 	atom.c amdgpu_fence.c amdgpu_ttm.c amdgpu_object.c amdgpu_gart.c \
@@ -23,7 +24,7 @@ SRCS+= amdgpu_device.c amdgpu_kms.c \
 	amdgpu_cs.c amdgpu_bios.c amdgpu_benchmark.c amdgpu_test.c \
 	amdgpu_pm.c atombios_dp.c amdgpu_afmt.c amdgpu_trace_points.c \
 	atombios_encoders.c amdgpu_sa.c atombios_i2c.c \
-	amdgpu_prime.c amdgpu_vm.c amdgpu_ib.c amdgpu_pll.c \
+	amdgpu_vm.c amdgpu_ib.c amdgpu_pll.c \
 	amdgpu_ucode.c amdgpu_bo_list.c amdgpu_ctx.c amdgpu_sync.c \
 	amdgpu_gtt_mgr.c amdgpu_vram_mgr.c amdgpu_virt.c amdgpu_atomfirmware.c \
 	amdgpu_queue_mgr.c amdgpu_vf_error.c amdgpu_sched.c amdgpu_debugfs.c \
@@ -106,7 +107,10 @@ SRCS+= amdgpu_amdkfd.c
 SRCS+= amdgpu_cgs.c
 
 # GPU scheduler
-SRCS+= amdgpu_job.c
+SRCS+= \
+	gpu_scheduler.c \
+	sched_fence.c \
+	amdgpu_job.c
 
 SRCS+= amdgpu_acpi.c
 

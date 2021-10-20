@@ -58,4 +58,7 @@ trace_amdgpu_ttm_bo_move(struct amdgpu_bo *bo, u8 new_memtype, u8 old_memtype)
 
 #define trace_amdgpu_cs_bo_status(entries, size)
 
+#define trace_amdgpu_bo_create(bo)
+#define trace_amdgpu_bo_move(bo, new_mem_type, old_mem_type)
+
 #endif	/* _AMDGPU_TRACE_H_ */

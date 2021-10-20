@@ -896,11 +896,9 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 	if (IS_ERR(dev))
 		return PTR_ERR(dev);
 
-#if 0
 	ret = pci_enable_device(pdev);
 	if (ret)
 		goto err_free;
-#endif
 
 	dev->pdev = pdev;
 
@@ -919,10 +917,8 @@ retry_init:
 	return 0;
 
 err_pci:
-#if 0
 	pci_disable_device(pdev);
 err_free:
-#endif
 	drm_dev_put(dev);
 	return ret;
 }
