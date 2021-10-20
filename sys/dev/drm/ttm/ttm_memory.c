@@ -426,6 +426,39 @@ void ttm_mem_global_free(struct ttm_mem_global *glob,
 }
 EXPORT_SYMBOL(ttm_mem_global_free);
 
+/*
+ * check if the available mem is under lower memory limit
+ *
+ * a. if no swap disk at all or free swap space is under swap_mem_limit
+ * but available system mem is bigger than sys_mem_limit, allow TTM
+ * allocation;
+ *
+ * b. if the available system mem is less than sys_mem_limit but free
+ * swap disk is bigger than swap_mem_limit, allow TTM allocation.
+ */
+bool
+ttm_check_under_lowerlimit(struct ttm_mem_global *glob,
+			uint64_t num_pages,
+			struct ttm_operation_ctx *ctx)
+{
+	STUB();
+	return false;
+#if 0
+	int64_t available;
+
+	if (ctx->flags & TTM_OPT_FLAG_FORCE_ALLOC)
+		return false;
+
+	available = get_nr_swap_pages() + si_mem_available();
+	available -= num_pages;
+	if (available < glob->lower_mem_limit)
+		return true;
+
+	return false;
+#endif
+}
+EXPORT_SYMBOL(ttm_check_under_lowerlimit);
+
 static int ttm_mem_global_reserve(struct ttm_mem_global *glob,
 				  struct ttm_mem_zone *single_zone,
 				  uint64_t amount, bool reserve)
