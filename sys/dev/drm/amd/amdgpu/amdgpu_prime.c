@@ -106,6 +106,9 @@ void amdgpu_gem_prime_vunmap(struct drm_gem_object *obj, void *vaddr)
  */
 int amdgpu_gem_prime_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 {
+	return -ENODEV;
+
+#if 0
 	struct amdgpu_bo *bo = gem_to_amdgpu_bo(obj);
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
 	unsigned asize = amdgpu_bo_size(bo);
@@ -136,6 +139,7 @@ int amdgpu_gem_prime_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma
 	drm_vma_node_revoke(&obj->vma_node, vma->vm_file->private_data);
 
 	return ret;
+#endif
 }
 
 /**

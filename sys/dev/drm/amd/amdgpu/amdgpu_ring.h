@@ -118,8 +118,8 @@ struct amdgpu_ring_funcs {
 	unsigned		extra_dw;
 
 	/* ring read/write ptr handling */
-	u64 (*get_rptr)(struct amdgpu_ring *ring);
-	u64 (*get_wptr)(struct amdgpu_ring *ring);
+	uint64_t (*get_rptr)(struct amdgpu_ring *ring);
+	uint64_t (*get_wptr)(struct amdgpu_ring *ring);
 	void (*set_wptr)(struct amdgpu_ring *ring);
 	/* validating and patching of IBs */
 	int (*parse_cs)(struct amdgpu_cs_parser *p, uint32_t ib_idx);

@@ -2376,34 +2376,34 @@ kprintf("amdgpu_device_init: start\n");
 	/* mutex initialization are all done here so we
 	 * can recall function without having locking issues */
 	atomic_set(&adev->irq.ih.lock, 0);
-	mutex_init(&adev->firmware.mutex);
-	mutex_init(&adev->pm.mutex);
-	mutex_init(&adev->gfx.gpu_clock_mutex);
-	mutex_init(&adev->srbm_mutex);
-	mutex_init(&adev->gfx.pipe_reserve_mutex);
-	mutex_init(&adev->grbm_idx_mutex);
-	mutex_init(&adev->mn_lock);
-	mutex_init(&adev->virt.vf_errors.lock);
+	lockinit(&adev->firmware.mutex, "agfwm", 0, LK_CANRECURSE);
+	lockinit(&adev->pm.mutex, "agpmm", 0, LK_CANRECURSE);
+	lockinit(&adev->gfx.gpu_clock_mutex, "agggcm", 0, LK_CANRECURSE);
+	lockinit(&adev->srbm_mutex, "agsm", 0, LK_CANRECURSE);
+	lockinit(&adev->gfx.pipe_reserve_mutex, "aggprm", 0, LK_CANRECURSE);
+	lockinit(&adev->grbm_idx_mutex, "aggim", 0, LK_CANRECURSE);
+	lockinit(&adev->mn_lock, "agaml", 0, LK_CANRECURSE);
+	lockinit(&adev->virt.vf_errors.lock, "agvfel", 0, LK_CANRECURSE);
 	hash_init(adev->mn_hash);
-	mutex_init(&adev->lock_reset);
+	lockinit(&adev->lock_reset, "aglr", 0, LK_CANRECURSE);
 
 	amdgpu_device_check_arguments(adev);
 
-	spin_lock_init(&adev->mmio_idx_lock);
-	spin_lock_init(&adev->smc_idx_lock);
-	spin_lock_init(&adev->pcie_idx_lock);
-	spin_lock_init(&adev->uvd_ctx_idx_lock);
-	spin_lock_init(&adev->didt_idx_lock);
-	spin_lock_init(&adev->gc_cac_idx_lock);
-	spin_lock_init(&adev->se_cac_idx_lock);
-	spin_lock_init(&adev->audio_endpt_idx_lock);
-	spin_lock_init(&adev->mm_stats.lock);
+	lockinit(&adev->mmio_idx_lock, "agmil", 0, LK_CANRECURSE);
+	lockinit(&adev->smc_idx_lock, "agsil", 0, LK_CANRECURSE);
+	lockinit(&adev->pcie_idx_lock, "agpil", 0, LK_CANRECURSE);
+	lockinit(&adev->uvd_ctx_idx_lock, "agucil", 0, LK_CANRECURSE);
+	lockinit(&adev->didt_idx_lock, "agdil", 0, LK_CANRECURSE);
+	lockinit(&adev->gc_cac_idx_lock, "aggcil", 0, LK_CANRECURSE);
+	lockinit(&adev->se_cac_idx_lock, "agscil", 0, LK_CANRECURSE);
+	lockinit(&adev->audio_endpt_idx_lock, "agaeil", 0, LK_CANRECURSE);
+	spin_init(&adev->mm_stats.lock, "agammsl");
 
 	INIT_LIST_HEAD(&adev->shadow_list);
-	mutex_init(&adev->shadow_list_lock);
+	lockinit(&adev->shadow_list_lock, "agasll", 0, LK_CANRECURSE);
 
 	INIT_LIST_HEAD(&adev->ring_lru_list);
-	spin_lock_init(&adev->ring_lru_list_lock);
+	spin_init(&adev->ring_lru_list_lock, "agrlll");
 
 	INIT_DELAYED_WORK(&adev->late_init_work,
 			  amdgpu_device_ip_late_init_func_handler);
