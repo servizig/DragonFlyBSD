@@ -68,6 +68,7 @@ SRCS	= \
 	linux_dma-buf.c \
 	linux_dmi.c \
 	linux_fence.c \
+	linux_fence-array.c \
 	linux_hdmi.c \
 	linux_hrtimer.c \
 	linux_i2c.c \
@@ -91,18 +92,22 @@ SRCS	= \
 	linux_wait.c \
 	linux_workqueue.c \
 	linux_wwmutex.c \
-	ttm_tt.c \
-	ttm_bo_util.c \
-	ttm_bo.c \
-	ttm_bo_manager.c \
-	ttm_execbuf_util.c \
-	ttm_memory.c \
-	ttm_page_alloc.c \
-	ttm_bo_vm.c \
-	ttm_module.c
+	ttm_memory.o \
+	ttm_tt.o \
+	ttm_bo.o \
+	ttm_bo_util.o \
+	ttm_bo_vm.o \
+	ttm_module.o \
+	ttm_object.o \
+	ttm_lock.o \
+	ttm_execbuf_util.o \
+	ttm_page_alloc.o \
+	ttm_bo_manager.o \
+	ttm_page_alloc_dma.o
 
 # if CONFIG_AGP is set
 #SRCS+=	drm_agpsupport.c \
+#SRCS+=	ttm_agp_backend.c \
 
 SRCS	+= \
 	opt_ddb.h \

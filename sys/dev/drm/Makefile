@@ -1,4 +1,4 @@
-SUBDIR = drm radeon radeonfw
+SUBDIR = drm
 
 .if ${MACHINE_ARCH} == "x86_64"
 SUBDIR+= i915

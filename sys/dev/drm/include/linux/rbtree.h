@@ -97,6 +97,12 @@ RB_PROTOTYPE(linux_root, rb_node, __entry, panic_cmp);
 #define	rb_first(root)	RB_MIN(linux_root, (struct linux_root *)(root))
 #define	rb_last(root)	RB_MAX(linux_root, (struct linux_root *)(root))
 
+#define	rb_insert_color_cached(node, root, leftmost)			\
+	linux_root_RB_INSERT_COLOR((struct linux_root *)(&(root)->rb_root), (node))
+#define	rb_erase_cached(node, root)						\
+	linux_root_RB_REMOVE((struct linux_root *)(&(root)->rb_root), (node))
+#define	rb_first_cached(root)	RB_MIN(linux_root, (struct linux_root *)(&(root)->rb_root))
+
 static inline struct rb_node *
 __rb_deepest_left(struct rb_node *node)
 {
@@ -163,5 +169,7 @@ rb_replace_node(struct rb_node *victim, struct rb_node *new,
 }
 
 #define LINUX_RB_ROOT		(struct rb_root) { NULL }
+
+#define LINUX_RB_ROOT_CACHED (struct rb_root_cached) { {NULL, }, NULL }
 
 #endif	/* _LINUX_RBTREE_H_ */
