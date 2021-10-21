@@ -144,6 +144,7 @@ SRCS+= \
 	device_if.h	\
 	pci_if.h
 
+KCFLAGS=-g -Og
 # From linux
 #TODO: remove when Timing Sync feature is complete
 KCFLAGS+= -DBUILD_FEATURE_TIMING_SYNC=0

@@ -858,11 +858,11 @@ static void gfx_v9_0_enable_lbpw(struct amdgpu_device *adev, bool enable)
 
 static void rv_init_cp_jump_table(struct amdgpu_device *adev)
 {
-	const __le32 *fw_data;
+	const __le32 *fw_data = NULL;
 	volatile u32 *dst_ptr;
 	int me, i, max_me = 5;
 	u32 bo_offset = 0;
-	u32 table_offset, table_size;
+	u32 table_offset = 0, table_size = 0;
 
 	/* write the cp table buffer */
 	dst_ptr = adev->gfx.rlc.cp_table_ptr;

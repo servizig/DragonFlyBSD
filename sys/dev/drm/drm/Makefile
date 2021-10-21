@@ -118,6 +118,7 @@ SRCS	+= \
 	device_if.h \
 	pci_if.h
 
+KCFLAGS=-g -Og
 KCFLAGS+= -I${SYSDIR}/dev/drm/include
 KCFLAGS+= -I${SYSDIR}/dev/drm/include/drm
 KCFLAGS+= -I${SYSDIR}/dev/drm/include/uapi
