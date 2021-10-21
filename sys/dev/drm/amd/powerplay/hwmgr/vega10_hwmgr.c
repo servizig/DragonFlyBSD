@@ -644,7 +644,7 @@ static int vega10_patch_voltage_dependency_tables_with_lookup_table(
 			table_info->vdd_dep_on_mclk;
 
 	for (i = 0; i < 6; i++) {
-		struct phm_ppt_v1_clock_voltage_dependency_table *vdt;
+		struct phm_ppt_v1_clock_voltage_dependency_table *vdt = NULL;
 		switch (i) {
 			case 0: vdt = table_info->vdd_dep_on_socclk; break;
 			case 1: vdt = table_info->vdd_dep_on_sclk; break;
