@@ -157,11 +157,7 @@ static void ttm_bo_release_list(struct kref *list_kref)
 	dma_fence_put(bo->moving);
 	reservation_object_fini(&bo->ttm_resv);
 	mutex_destroy(&bo->wu_mutex);
-	if (bo->destroy)
-		bo->destroy(bo);
-	else {
-		kfree(bo);
-	}
+	bo->destroy(bo);
 	ttm_mem_global_free(bdev->glob->mem_glob, acc_size);
 }
 
@@ -351,8 +347,6 @@ static void ttm_bo_cleanup_memtype_use(struct ttm_buffer_object *bo)
 	ttm_tt_destroy(bo->ttm);
 	bo->ttm = NULL;
 	ttm_bo_mem_put(bo, &bo->mem);
-
-	ww_mutex_unlock (&bo->resv->lock);
 }
 
 static int ttm_bo_individualize_resv(struct ttm_buffer_object *bo)
@@ -653,14 +647,23 @@ static int ttm_bo_evict(struct ttm_buffer_object *bo,
 
 	lockdep_assert_held(&bo->resv->lock.base);
 
+	placement.num_placement = 0;
+	placement.num_busy_placement = 0;
+	bdev->driver->evict_flags(bo, &placement);
+
+	if (!placement.num_placement && !placement.num_busy_placement) {
+		ret = ttm_bo_pipeline_gutting(bo);
+		if (ret)
+			return ret;
+
+		return ttm_tt_create(bo, false);
+	}
+
 	evict_mem = bo->mem;
 	evict_mem.mm_node = NULL;
 	evict_mem.bus.io_reserved_vm = false;
 	evict_mem.bus.io_reserved_count = 0;
 
-	placement.num_placement = 0;
-	placement.num_busy_placement = 0;
-	bdev->driver->evict_flags(bo, &placement);
 	ret = ttm_bo_mem_space(bo, &placement, &evict_mem, ctx);
 	if (ret) {
 		if (ret != -ERESTARTSYS) {
@@ -689,7 +692,7 @@ bool ttm_bo_eviction_valuable(struct ttm_buffer_object *bo,
 	/* Don't evict this BO if it's outside of the
 	 * requested placement range
 	 */
-	if (place->fpfn >= (bo->mem.start + bo->mem.size) ||
+	if (place->fpfn >= (bo->mem.start + bo->mem.num_pages) ||
 	    (place->lpfn && place->lpfn <= bo->mem.start))
 		return false;
 
