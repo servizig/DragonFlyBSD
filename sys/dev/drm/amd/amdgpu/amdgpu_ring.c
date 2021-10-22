@@ -79,6 +79,7 @@ int amdgpu_ring_alloc(struct amdgpu_ring *ring, unsigned ndw)
 	if (ring->funcs->begin_use)
 		ring->funcs->begin_use(ring);
 
+kprintf("amdgpu_ring_alloc: count_dw=%d\n", ring->count_dw);
 	return 0;
 }
 
