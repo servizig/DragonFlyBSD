@@ -677,8 +677,8 @@ out:
 static void ttm_put_pages(struct page **pages, unsigned npages, int flags,
 			  enum ttm_caching_state cstate)
 {
-	unsigned long irq_flags;
 	struct ttm_page_pool *pool = ttm_get_pool(flags, false, cstate);
+	unsigned long irq_flags;
 	unsigned i;
 	struct vm_page *page;
 
