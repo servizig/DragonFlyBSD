@@ -432,9 +432,11 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 	struct ttm_operation_ctx ctx = {
 		.interruptible = (bp->type != ttm_bo_type_kernel),
 		.no_wait_gpu = false,
+#if 0
 		.resv = bp->resv,
 		.flags = bp->type != ttm_bo_type_kernel ?
 			TTM_OPT_FLAG_ALLOW_RES_EVICT : 0
+#endif
 	};
 	struct amdgpu_bo *bo;
 	unsigned long page_align, size = bp->size;
@@ -501,11 +503,13 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 		bo->tbo.priority = 1;
 
 	r = ttm_bo_init_reserved(&adev->mman.bdev, &bo->tbo, size, bp->type,
-				 &bo->placement, page_align, &ctx, acc_size,
+				 &bo->placement, page_align, ctx.interruptible,
+				 NULL, acc_size,
 				 NULL, bp->resv, &amdgpu_bo_destroy);
 	if (unlikely(r != 0))
 		return r;
 
+#if 0
 	if (!amdgpu_gmc_vram_full_visible(&adev->gmc) &&
 	    bo->tbo.mem.mem_type == TTM_PL_VRAM &&
 	    bo->tbo.mem.start < adev->gmc.visible_vram_size >> PAGE_SHIFT)
@@ -513,6 +517,8 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 					     ctx.bytes_moved);
 	else
 		amdgpu_cs_report_moved_bytes(adev, ctx.bytes_moved, 0);
+#endif
+	amdgpu_cs_report_moved_bytes(adev, 0, 0);
 
 	if (bp->flags & AMDGPU_GEM_CREATE_VRAM_CLEARED &&
 	    bo->tbo.mem.placement & TTM_PL_FLAG_VRAM) {
@@ -691,7 +697,7 @@ int amdgpu_bo_validate(struct amdgpu_bo *bo)
 
 retry:
 	amdgpu_bo_placement_from_domain(bo, domain);
-	r = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
+	r = ttm_bo_validate(&bo->tbo, &bo->placement, ctx.interruptible, ctx.no_wait_gpu);
 	if (unlikely(r == -ENOMEM) && domain != bo->allowed_domains) {
 		domain = bo->allowed_domains;
 		goto retry;
@@ -831,8 +837,15 @@ struct amdgpu_bo *amdgpu_bo_ref(struct amdgpu_bo *bo)
 	if (bo == NULL)
 		return NULL;
 
+	ttm_bo_reference(&bo->tbo);
+	return bo;
+#if 0
+	if (bo == NULL)
+		return NULL;
+
 	ttm_bo_get(&bo->tbo);
 	return bo;
+#endif
 }
 
 /**
@@ -849,8 +862,19 @@ void amdgpu_bo_unref(struct amdgpu_bo **bo)
 		return;
 
 	tbo = &((*bo)->tbo);
+	ttm_bo_unref(&tbo);
+	if (tbo == NULL)
+		*bo = NULL;
+#if 0
+	struct ttm_buffer_object *tbo;
+
+	if ((*bo) == NULL)
+		return;
+
+	tbo = &((*bo)->tbo);
 	ttm_bo_put(tbo);
 	*bo = NULL;
+#endif
 }
 
 /**
@@ -937,7 +961,7 @@ int amdgpu_bo_pin_restricted(struct amdgpu_bo *bo, u32 domain,
 		bo->placements[i].flags |= TTM_PL_FLAG_NO_EVICT;
 	}
 
-	r = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
+	r = ttm_bo_validate(&bo->tbo, &bo->placement, ctx.interruptible, ctx.no_wait_gpu);
 	if (unlikely(r)) {
 		dev_err(adev->dev, "%p pin failed\n", bo);
 		goto error;
@@ -1005,7 +1029,7 @@ int amdgpu_bo_unpin(struct amdgpu_bo *bo)
 		bo->placements[i].lpfn = 0;
 		bo->placements[i].flags &= ~TTM_PL_FLAG_NO_EVICT;
 	}
-	r = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
+	r = ttm_bo_validate(&bo->tbo, &bo->placement, ctx.interruptible, ctx.no_wait_gpu);
 	if (unlikely(r))
 		dev_err(adev->dev, "%p validate failed for unpin\n", bo);
 
@@ -1323,7 +1347,7 @@ int amdgpu_bo_fault_reserve_notify(struct ttm_buffer_object *bo)
 	abo->placement.num_busy_placement = 1;
 	abo->placement.busy_placement = &abo->placements[1];
 
-	r = ttm_bo_validate(bo, &abo->placement, &ctx);
+	r = ttm_bo_validate(bo, &abo->placement, ctx.interruptible, ctx.no_wait_gpu);
 	if (unlikely(r != 0))
 		return r;
 

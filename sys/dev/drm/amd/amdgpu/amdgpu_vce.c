@@ -606,7 +606,7 @@ static int amdgpu_vce_validate_bo(struct amdgpu_cs_parser *p, uint32_t ib_idx,
 		bo->placements[i].lpfn = bo->placements[i].lpfn ?
 			min(bo->placements[i].lpfn, lpfn) : lpfn;
 	}
-	return ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
+	return ttm_bo_validate(&bo->tbo, &bo->placement, ctx.interruptible, ctx.no_wait_gpu);
 }
 
 

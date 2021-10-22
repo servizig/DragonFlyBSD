@@ -99,12 +99,9 @@ SRCS	= \
 	ttm_bo_util.o \
 	ttm_bo_vm.o \
 	ttm_module.o \
-	ttm_object.o \
-	ttm_lock.o \
 	ttm_execbuf_util.o \
 	ttm_page_alloc.o \
-	ttm_bo_manager.o \
-	ttm_page_alloc_dma.o
+	ttm_bo_manager.o
 
 # if CONFIG_AGP is set
 #SRCS+=	drm_agpsupport.c \

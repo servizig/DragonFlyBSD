@@ -458,7 +458,7 @@ static int amdgpu_vm_clear_bo(struct amdgpu_device *adev,
 	if (r)
 		return r;
 
-	r = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
+	r = ttm_bo_validate(&bo->tbo, &bo->placement, ctx.interruptible, ctx.no_wait_gpu);
 	if (r)
 		goto error;
 

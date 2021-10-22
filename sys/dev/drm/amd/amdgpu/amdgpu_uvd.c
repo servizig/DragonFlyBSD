@@ -497,7 +497,7 @@ static int amdgpu_uvd_cs_pass1(struct amdgpu_uvd_cs_ctx *ctx)
 		}
 		amdgpu_uvd_force_into_uvd_segment(bo);
 
-		r = ttm_bo_validate(&bo->tbo, &bo->placement, &tctx);
+		r = ttm_bo_validate(&bo->tbo, &bo->placement, tctx.interruptible, tctx.no_wait_gpu);
 	}
 
 	return r;
@@ -1036,7 +1036,7 @@ static int amdgpu_uvd_send_msg(struct amdgpu_ring *ring, struct amdgpu_bo *bo,
 
 		amdgpu_bo_placement_from_domain(bo, AMDGPU_GEM_DOMAIN_VRAM);
 		amdgpu_uvd_force_into_uvd_segment(bo);
-		r = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
+		r = ttm_bo_validate(&bo->tbo, &bo->placement, ctx.interruptible, ctx.no_wait_gpu);
 		if (r)
 			goto err;
 	}

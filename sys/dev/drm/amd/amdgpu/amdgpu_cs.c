@@ -395,8 +395,10 @@ static int amdgpu_cs_bo_validate(struct amdgpu_cs_parser *p,
 	struct ttm_operation_ctx ctx = {
 		.interruptible = true,
 		.no_wait_gpu = false,
+#if 0
 		.resv = bo->tbo.resv,
 		.flags = 0
+#endif
 	};
 	uint32_t domain;
 	int r;
@@ -427,12 +429,14 @@ static int amdgpu_cs_bo_validate(struct amdgpu_cs_parser *p,
 
 retry:
 	amdgpu_bo_placement_from_domain(bo, domain);
-	r = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
+	r = ttm_bo_validate(&bo->tbo, &bo->placement, ctx.interruptible, ctx.no_wait_gpu);
 
+#if 0
 	p->bytes_moved += ctx.bytes_moved;
 	if (!amdgpu_gmc_vram_full_visible(&adev->gmc) &&
 	    amdgpu_bo_in_cpu_visible_vram(bo))
 		p->bytes_moved_vis += ctx.bytes_moved;
+#endif
 
 	if (unlikely(r == -ENOMEM) && domain != bo->allowed_domains) {
 		domain = bo->allowed_domains;
@@ -486,10 +490,12 @@ static bool amdgpu_cs_try_evict(struct amdgpu_cs_parser *p,
 				!amdgpu_gmc_vram_full_visible(&adev->gmc) &&
 				amdgpu_bo_in_cpu_visible_vram(bo);
 		amdgpu_bo_placement_from_domain(bo, other);
-		r = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
+		r = ttm_bo_validate(&bo->tbo, &bo->placement, ctx.interruptible, ctx.no_wait_gpu);
+#if 0
 		p->bytes_moved += ctx.bytes_moved;
 		if (update_bytes_moved_vis)
 			p->bytes_moved_vis += ctx.bytes_moved;
+#endif
 
 		if (unlikely(r))
 			break;
@@ -543,7 +549,7 @@ static int amdgpu_cs_list_validate(struct amdgpu_cs_parser *p,
 		    lobj->user_pages) {
 			amdgpu_bo_placement_from_domain(bo,
 							AMDGPU_GEM_DOMAIN_CPU);
-			r = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
+			r = ttm_bo_validate(&bo->tbo, &bo->placement, ctx.interruptible, ctx.no_wait_gpu);
 			if (r)
 				return r;
 			amdgpu_ttm_tt_set_user_pages(bo->tbo.ttm,
@@ -1667,7 +1673,7 @@ int amdgpu_cs_find_mapping(struct amdgpu_cs_parser *parser,
 	if (!((*bo)->flags & AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS)) {
 		(*bo)->flags |= AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS;
 		amdgpu_bo_placement_from_domain(*bo, (*bo)->allowed_domains);
-		r = ttm_bo_validate(&(*bo)->tbo, &(*bo)->placement, &ctx);
+		r = ttm_bo_validate(&(*bo)->tbo, &(*bo)->placement, ctx.interruptible, ctx.no_wait_gpu);
 		if (r)
 			return r;
 	}
