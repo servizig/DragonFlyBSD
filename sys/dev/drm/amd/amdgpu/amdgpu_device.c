@@ -2345,6 +2345,9 @@ kprintf("amdgpu_device_init: start\n");
 		adev->usec_timeout *= 2;
 	adev->gmc.gart_size = 512 * 1024 * 1024;
 	adev->accel_working = false;
+#ifdef __DragonFly__
+	adev->fictitious_range_registered = false;
+#endif
 	adev->num_rings = 0;
 	adev->mman.buffer_funcs = NULL;
 	adev->mman.buffer_funcs_ring = NULL;
