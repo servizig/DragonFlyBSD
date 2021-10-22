@@ -395,6 +395,7 @@ static void ttm_check_swapping(struct ttm_mem_global *glob)
 			break;
 		}
 	}
+
 	lockmgr(&glob->lock, LK_RELEASE);
 
 	if (unlikely(needs_swapping))
