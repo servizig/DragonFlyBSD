@@ -88,6 +88,7 @@ long
 dma_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 {
 	long ret = timeout ? timeout : 1;
+	unsigned long end;
 	int err;
 	struct default_wait_cb cb;
 	bool was_set;
@@ -119,14 +120,13 @@ dma_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 	cb.task = current;
 	list_add(&cb.base.node, &fence->cb_list);
 
-	while (!test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
-		/* wake_up_process() directly uses task_struct pointers as sleep identifiers */
+	end = jiffies + timeout;
+	for (ret = timeout; ret > 0; ret = MAX(0, end - jiffies)) {
+		if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags))
+			break;
 		err = lksleep(current, fence->lock, intr ? PCATCH : 0, "dmafence", timeout);
 		if (err == EINTR || err == ERESTART) {
 			ret = -ERESTARTSYS;
-			break;
-		} else if (err == EWOULDBLOCK) {
-			ret = 0;
 			break;
 		}
 	}
