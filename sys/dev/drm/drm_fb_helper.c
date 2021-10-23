@@ -2401,7 +2401,7 @@ static void drm_setup_crtcs(struct drm_fb_helper *fb_helper,
 	struct drm_fb_offset *offsets;
 	bool *enabled;
 	int i;
-
+kprintf("drm_setup_crtcs: 1\n");
 	DRM_DEBUG_KMS("\n");
 	/* prevent concurrent modification of connector_count by hotplug */
 	lockdep_assert_held(&fb_helper->lock);
@@ -2625,8 +2625,10 @@ int drm_fb_helper_initial_config(struct drm_fb_helper *fb_helper, int bpp_sel)
 	struct fb_info *info;
 	int ret;
 
+kprintf("drm_fb_helper_initial_config: 1\n");
 	if (!drm_fbdev_emulation)
 		return 0;
+kprintf("drm_fb_helper_initial_config: 2\n");
 
 	mutex_lock(&fb_helper->lock);
 	drm_setup_crtcs(fb_helper,
@@ -2641,6 +2643,7 @@ int drm_fb_helper_initial_config(struct drm_fb_helper *fb_helper, int bpp_sel)
 #if 0
 	info->var.pixclock = 0;
 #endif
+kprintf("drm_fb_helper_initial_config: 3\n");
 	ret = register_framebuffer(info);
 	if (ret < 0)
 		return ret;
