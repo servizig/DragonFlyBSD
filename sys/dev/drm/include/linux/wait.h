@@ -136,7 +136,8 @@ void finish_wait(wait_queue_head_t *q, wait_queue_entry_t *wait);
 			if (ret == EWOULDBLOCK) {			\
 				kprintf("F");				\
 				print_backtrace(-1);			\
-				ret = 0;				\
+				timeout_expired = true;			\
+				break; 					\
 			}						\
 		}							\
 									\
