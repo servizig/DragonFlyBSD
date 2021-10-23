@@ -547,8 +547,10 @@ int drm_read(struct dev_read_args *ap)
 			}
 
 			mutex_unlock(&file_priv->event_read_lock);
+			kprintf("#15#begin#: drm_read.wait_event_interruptible\n");
 			ret = wait_event_interruptible(file_priv->event_wait,
 						       !list_empty(&file_priv->event_list));
+			kprintf("#15#end#: drm_read.wait_event_interruptible\n");
 			if (ret >= 0)
 				ret = mutex_lock_interruptible(&file_priv->event_read_lock);
 			if (ret)
