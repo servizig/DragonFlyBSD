@@ -903,7 +903,7 @@ int drm_dev_register(struct drm_device *dev, unsigned long flags)
 {
 	struct drm_driver *driver = dev->driver;
 	int ret;
-
+kprintf("drm_dev_register: CALLED\n");
 	mutex_lock(&drm_global_mutex);
 
 	ret = drm_minor_register(dev, DRM_MINOR_CONTROL);
