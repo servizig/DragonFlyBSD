@@ -1066,9 +1066,11 @@ void drm_wait_one_vblank(struct drm_device *dev, unsigned int pipe)
 
 	last = drm_vblank_count(dev, pipe);
 
+	kprintf("#13#begin#: drm_wait_one_vblank.wait_event_timeout\n");
 	ret = wait_event_timeout(vblank->queue,
 				 last != drm_vblank_count(dev, pipe),
 				 msecs_to_jiffies(100));
+	kprintf("#13#end#: drm_wait_one_vblank.wait_event_timeout\n");
 
 	WARN(ret == 0, "vblank wait timed out on crtc %i\n", pipe);
 

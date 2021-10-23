@@ -804,9 +804,11 @@ static int drm_dp_mst_wait_tx_reply(struct drm_dp_mst_branch *mstb,
 	struct drm_dp_mst_topology_mgr *mgr = mstb->mgr;
 	int ret;
 
+	kprintf("#12#begin#: drm_dp_mst_wait_tx_reply.wait_event_timeout\n");
 	ret = wait_event_timeout(mgr->tx_waitq,
 				 check_txmsg_state(mgr, txmsg),
 				 (4 * HZ));
+	kprintf("#12#end#: drm_dp_mst_wait_tx_reply.wait_event_timeout\n");
 	mutex_lock(&mstb->mgr->qlock);
 	if (ret > 0) {
 		if (txmsg->state == DRM_DP_SIDEBAND_TX_TIMEOUT) {
