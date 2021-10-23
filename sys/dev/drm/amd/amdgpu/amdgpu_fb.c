@@ -73,22 +73,18 @@ amdgpufb_release(struct fb_info *info, int user)
 }
 #endif
 
-#if 0
 static struct fb_ops amdgpufb_ops = {
+#if 0
 	.owner = THIS_MODULE,
+#endif
 	DRM_FB_HELPER_DEFAULT_OPS,
+#if 0
 	.fb_open = amdgpufb_open,
 	.fb_release = amdgpufb_release,
 	.fb_fillrect = drm_fb_helper_cfb_fillrect,
 	.fb_copyarea = drm_fb_helper_cfb_copyarea,
 	.fb_imageblit = drm_fb_helper_cfb_imageblit,
-};
 #endif
-
-static struct fb_ops amdgpufb_ops = {
-	.fb_set_par = drm_fb_helper_set_par,
-	.fb_blank = drm_fb_helper_blank,
-	.fb_debug_enter = drm_fb_helper_debug_enter,
 };
 
 
