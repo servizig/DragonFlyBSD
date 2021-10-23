@@ -2545,8 +2545,10 @@ static void dce_v11_0_crtc_dpms(struct drm_crtc *crtc, int mode)
 	struct amdgpu_crtc *amdgpu_crtc = to_amdgpu_crtc(crtc);
 	unsigned type;
 
+kprintf("dce_v11_0_crtc_dpms: 1\n");
 	switch (mode) {
 	case DRM_MODE_DPMS_ON:
+		kprintf("dce_v11_0_crtc_dpms: DRM_MODE_DPMS_ON-1\n");
 		amdgpu_crtc->enabled = true;
 		amdgpu_atombios_crtc_enable(crtc, ATOM_ENABLE);
 		dce_v11_0_vga_enable(crtc, true);
@@ -2559,18 +2561,22 @@ static void dce_v11_0_crtc_dpms(struct drm_crtc *crtc, int mode)
 		amdgpu_irq_update(adev, &adev->pageflip_irq, type);
 		drm_crtc_vblank_on(crtc);
 		dce_v11_0_crtc_load_lut(crtc);
+kprintf("dce_v11_0_crtc_dpms: DRM_MODE_DPMS_ON-2\n");
 		break;
 	case DRM_MODE_DPMS_STANDBY:
 	case DRM_MODE_DPMS_SUSPEND:
 	case DRM_MODE_DPMS_OFF:
+kprintf("dce_v11_0_crtc_dpms: DRM_MODE_DPMS_OFF-1\n");
 		drm_crtc_vblank_off(crtc);
 		if (amdgpu_crtc->enabled) {
 			dce_v11_0_vga_enable(crtc, true);
 			amdgpu_atombios_crtc_blank(crtc, ATOM_ENABLE);
 			dce_v11_0_vga_enable(crtc, false);
+kprintf("dce_v11_0_crtc_dpms: DRM_MODE_DPMS_OFF-inside-if\n");
 		}
 		amdgpu_atombios_crtc_enable(crtc, ATOM_DISABLE);
 		amdgpu_crtc->enabled = false;
+kprintf("dce_v11_0_crtc_dpms: DRM_MODE_DPMS_OFF-2\n");
 		break;
 	}
 	/* adjust pm to dpms */
@@ -2579,16 +2585,20 @@ static void dce_v11_0_crtc_dpms(struct drm_crtc *crtc, int mode)
 
 static void dce_v11_0_crtc_prepare(struct drm_crtc *crtc)
 {
+kprintf("dce_v11_0_crtc_prepare: 1\n");
 	/* disable crtc pair power gating before programming */
 	amdgpu_atombios_crtc_powergate(crtc, ATOM_DISABLE);
 	amdgpu_atombios_crtc_lock(crtc, ATOM_ENABLE);
 	dce_v11_0_crtc_dpms(crtc, DRM_MODE_DPMS_OFF);
+kprintf("dce_v11_0_crtc_prepare: 2\n");
 }
 
 static void dce_v11_0_crtc_commit(struct drm_crtc *crtc)
 {
+kprintf("dce_v11_0_crtc_commit: 1\n");
 	dce_v11_0_crtc_dpms(crtc, DRM_MODE_DPMS_ON);
 	amdgpu_atombios_crtc_lock(crtc, ATOM_DISABLE);
+kprintf("dce_v11_0_crtc_commit: 2\n");
 }
 
 static void dce_v11_0_crtc_disable(struct drm_crtc *crtc)
@@ -2599,6 +2609,7 @@ static void dce_v11_0_crtc_disable(struct drm_crtc *crtc)
 	struct amdgpu_atom_ss ss;
 	int i;
 
+kprintf("dce_v11_0_crtc_disable: 1\n");
 	dce_v11_0_crtc_dpms(crtc, DRM_MODE_DPMS_OFF);
 	if (crtc->primary->fb) {
 		int r;
@@ -2667,9 +2678,10 @@ static int dce_v11_0_crtc_mode_set(struct drm_crtc *crtc,
 	struct drm_device *dev = crtc->dev;
 	struct amdgpu_device *adev = dev->dev_private;
 
+kprintf("dce_v11_0_crtc_mode_set: 1\n");
 	if (!amdgpu_crtc->adjusted_clock)
 		return -EINVAL;
-
+kprintf("dce_v11_0_crtc_mode_set: 2\n");
 	if ((adev->asic_type == CHIP_POLARIS10) ||
 	    (adev->asic_type == CHIP_POLARIS11) ||
 	    (adev->asic_type == CHIP_POLARIS12) ||
@@ -2678,7 +2690,7 @@ static int dce_v11_0_crtc_mode_set(struct drm_crtc *crtc,
 			to_amdgpu_encoder(amdgpu_crtc->encoder);
 		int encoder_mode =
 			amdgpu_atombios_encoder_get_encoder_mode(amdgpu_crtc->encoder);
-
+kprintf("dce_v11_0_crtc_mode_set: x=%d,y=%d, name=%s\n", x, y, mode->name);
 		/* SetPixelClock calculates the plls and ss values now */
 		amdgpu_atombios_crtc_program_pll(crtc, amdgpu_crtc->crtc_id,
 						 amdgpu_crtc->pll_id,
@@ -2706,7 +2718,7 @@ static bool dce_v11_0_crtc_mode_fixup(struct drm_crtc *crtc,
 	struct amdgpu_crtc *amdgpu_crtc = to_amdgpu_crtc(crtc);
 	struct drm_device *dev = crtc->dev;
 	struct drm_encoder *encoder;
-
+kprintf("dce_v11_0_crtc_mode_fixup: 1\n");
 	/* assign the encoder to the amdgpu crtc to avoid repeated lookups later */
 	list_for_each_entry(encoder, &dev->mode_config.encoder_list, head) {
 		if (encoder->crtc == crtc) {
@@ -2715,17 +2727,21 @@ static bool dce_v11_0_crtc_mode_fixup(struct drm_crtc *crtc,
 			break;
 		}
 	}
+kprintf("dce_v11_0_crtc_mode_fixup: 2\n");
 	if ((amdgpu_crtc->encoder == NULL) || (amdgpu_crtc->connector == NULL)) {
 		amdgpu_crtc->encoder = NULL;
 		amdgpu_crtc->connector = NULL;
 		return false;
 	}
+kprintf("dce_v11_0_crtc_mode_fixup: 3\n");
 	if (!amdgpu_display_crtc_scaling_mode_fixup(crtc, mode, adjusted_mode))
 		return false;
+kprintf("dce_v11_0_crtc_mode_fixup: 4\n");
 	if (amdgpu_atombios_crtc_prepare_pll(crtc, adjusted_mode))
 		return false;
 	/* pick pll */
 	amdgpu_crtc->pll_id = dce_v11_0_pick_pll(crtc);
+kprintf("dce_v11_0_crtc_mode_fixup: 5\n");
 	/* if we can't get a PPLL for a non-DP encoder, fail */
 	if ((amdgpu_crtc->pll_id == ATOM_PPLL_INVALID) &&
 	    !ENCODER_MODE_IS_DP(amdgpu_atombios_encoder_get_encoder_mode(amdgpu_crtc->encoder)))
@@ -2737,6 +2753,7 @@ static bool dce_v11_0_crtc_mode_fixup(struct drm_crtc *crtc,
 static int dce_v11_0_crtc_set_base(struct drm_crtc *crtc, int x, int y,
 				  struct drm_framebuffer *old_fb)
 {
+kprintf("dce_v11_0_crtc_set_base: 1\n");
 	return dce_v11_0_crtc_do_set_base(crtc, old_fb, x, y, 0);
 }
 
@@ -2744,6 +2761,7 @@ static int dce_v11_0_crtc_set_base_atomic(struct drm_crtc *crtc,
 					 struct drm_framebuffer *fb,
 					 int x, int y, enum mode_set_atomic state)
 {
+kprintf("dce_v11_0_crtc_set_base: 2\n");
        return dce_v11_0_crtc_do_set_base(crtc, fb, x, y, 1);
 }
 
