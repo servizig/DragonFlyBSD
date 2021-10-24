@@ -156,7 +156,7 @@ struct drm_sched_fence *drm_sched_fence_create(struct drm_sched_entity *entity,
 	struct drm_sched_fence *fence = NULL;
 	unsigned seq;
 
-	fence = kmem_cache_zalloc(sched_fence_slab, GFP_KERNEL);
+	fence = kzalloc(sizeof(struct drm_sched_fence), GFP_KERNEL);
 	if (fence == NULL)
 		return NULL;
 

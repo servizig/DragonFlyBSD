@@ -15,7 +15,6 @@ SRCS=	amdgpu_drv.c
 SRCS+=	chash.c
 
 # add KMS driver
-# XXX: enable amdgpu_prime.c 
 SRCS+= amdgpu_device.c amdgpu_kms.c \
 	amdgpu_atombios.c atombios_crtc.c amdgpu_connectors.c \
 	atom.c amdgpu_fence.c amdgpu_ttm.c amdgpu_object.c amdgpu_gart.c \
