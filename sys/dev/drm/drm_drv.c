@@ -52,7 +52,7 @@
 #elif DRM_DEBUG_DEFAULT_ON == 2
 #define DRM_DEBUGBITS_ON (DRM_UT_CORE | DRM_UT_DRIVER | DRM_UT_KMS |	\
 			  DRM_UT_PRIME| DRM_UT_ATOMIC | DRM_UT_FIOCTL |	\
-			  DRM_UT_PID  | DRM_UT_IOCTL  | DRM_UT_VBLANK)
+			  DRM_UT_PID  | DRM_UT_IOCTL  )
 #else
 #define DRM_DEBUGBITS_ON (0x0)
 #endif
@@ -903,7 +903,7 @@ int drm_dev_register(struct drm_device *dev, unsigned long flags)
 {
 	struct drm_driver *driver = dev->driver;
 	int ret;
-
+kprintf("drm_dev_register: CALLED\n");
 	mutex_lock(&drm_global_mutex);
 
 	ret = drm_minor_register(dev, DRM_MINOR_CONTROL);

@@ -1865,7 +1865,7 @@ static int drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
 	if (ret < 0)
 		return ret;
 
-#ifdef __DragonFly__
+#ifdef 0
 	TUNABLE_INT_FETCH("kern.kms_console", &kms_console);
 	if (kms_console) {
 		if (register_framebuffer(fb_helper->fbdev) < 0)
@@ -2401,7 +2401,7 @@ static void drm_setup_crtcs(struct drm_fb_helper *fb_helper,
 	struct drm_fb_offset *offsets;
 	bool *enabled;
 	int i;
-
+kprintf("drm_setup_crtcs: 1\n");
 	DRM_DEBUG_KMS("\n");
 	/* prevent concurrent modification of connector_count by hotplug */
 	lockdep_assert_held(&fb_helper->lock);
@@ -2527,11 +2527,14 @@ __drm_fb_helper_initial_config_and_unlock(struct drm_fb_helper *fb_helper,
 	unsigned int width, height;
 	int ret;
 
+kprintf("__drm_fb_helper_initial_config_and_unlock: 1\n");
 	width = dev->mode_config.max_width;
 	height = dev->mode_config.max_height;
 
 	drm_setup_crtcs(fb_helper, width, height);
+kprintf("__drm_fb_helper_initial_config_and_unlock: 2\n");
 	ret = drm_fb_helper_single_fb_probe(fb_helper, bpp_sel);
+kprintf("__drm_fb_helper_initial_config_and_unlock: 3\n");
 	if (ret < 0) {
 		if (ret == -EAGAIN) {
 			fb_helper->preferred_bpp = bpp_sel;
@@ -2542,8 +2545,9 @@ __drm_fb_helper_initial_config_and_unlock(struct drm_fb_helper *fb_helper,
 
 		return ret;
 	}
+kprintf("__drm_fb_helper_initial_config_and_unlock: 4\n");
 	drm_setup_crtcs_fb(fb_helper);
-
+kprintf("__drm_fb_helper_initial_config_and_unlock: 5\n");
 	fb_helper->deferred_setup = false;
 
 	info = fb_helper->fbdev;
@@ -2559,7 +2563,6 @@ __drm_fb_helper_initial_config_and_unlock(struct drm_fb_helper *fb_helper,
 	ret = register_framebuffer(info);
 	if (ret < 0)
 		return ret;
-
 #if 0
 	dev_info(dev->dev, "fb%d: %s frame buffer device\n",
 		 info->node, info->fix.id);
@@ -2621,45 +2624,15 @@ __drm_fb_helper_initial_config_and_unlock(struct drm_fb_helper *fb_helper,
  */
 int drm_fb_helper_initial_config(struct drm_fb_helper *fb_helper, int bpp_sel)
 {
-	struct drm_device *dev = fb_helper->dev;
-	struct fb_info *info;
 	int ret;
 
 	if (!drm_fbdev_emulation)
 		return 0;
 
 	mutex_lock(&fb_helper->lock);
-	drm_setup_crtcs(fb_helper,
-			dev->mode_config.max_width,
-			dev->mode_config.max_height);
-	ret = drm_fb_helper_single_fb_probe(fb_helper, bpp_sel);
-	mutex_unlock(&fb_helper->lock);
-	if (ret)
-		return ret;
+	ret = __drm_fb_helper_initial_config_and_unlock(fb_helper, bpp_sel);
 
-	info = fb_helper->fbdev;
-#if 0
-	info->var.pixclock = 0;
-#endif
-	ret = register_framebuffer(info);
-	if (ret < 0)
-		return ret;
-
-#if 0
-	dev_info(dev->dev, "fb%d: %s frame buffer device\n",
-		 info->node, info->fix.id);
-#endif
-
-	mutex_lock(&kernel_fb_helper_lock);
-#if 0
-	if (list_empty(&kernel_fb_helper_list))
-		register_sysrq_key('v', &sysrq_drm_fb_helper_restore_op);
-#endif
-
-	list_add(&fb_helper->kernel_fb_list, &kernel_fb_helper_list);
-	mutex_unlock(&kernel_fb_helper_lock);
-
-	return 0;
+	return ret;
 }
 EXPORT_SYMBOL(drm_fb_helper_initial_config);
 

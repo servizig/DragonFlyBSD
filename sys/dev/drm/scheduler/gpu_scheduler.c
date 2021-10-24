@@ -271,11 +271,14 @@ long drm_sched_entity_flush(struct drm_sched_entity *entity, long timeout)
 	 * queued IBs or discard them on SIGKILL
 	*/
 	if (current->dfly_td->td_flags & TDF_EXITING) {
-		if (timeout)
+		if (timeout) {
+			kprintf("#14#begin#: drm_sched_entity_flush.wait_event_timeout\n");
 			ret = wait_event_timeout(
 					sched->job_scheduled,
 					drm_sched_entity_is_idle(entity),
 					timeout);
+			kprintf("#14#end#: drm_sched_entity_flush.wait_event_timeout\n");
+		}
 	} else {
 		kprintf("drm_sched_entity_flush: wait_event_killable is not implemented\n");
 #if 0
@@ -876,10 +879,12 @@ static int drm_sched_main(void *param)
 		struct drm_sched_job *sched_job;
 		struct dma_fence *fence;
 
+		kprintf("#16#begin#: drm_sched_main.wait_event_interruptible\n");
 		wait_event_interruptible(sched->wake_up_worker,
 					 (!drm_sched_blocked(sched) &&
 					  (entity = drm_sched_select_entity(sched))) ||
 					 kthread_should_stop());
+		kprintf("#16#end#: drm_sched_main.wait_event_interruptible\n");
 
 		if (!entity)
 			continue;

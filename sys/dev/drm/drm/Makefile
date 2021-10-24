@@ -121,5 +121,6 @@ KCFLAGS+= -I${SYSDIR}/dev/drm/include/drm
 KCFLAGS+= -I${SYSDIR}/dev/drm/include/uapi
 KCFLAGS+= -include ${SYSDIR}/dev/drm/kconfig.h
 KCFLAGS+= -DKBUILD_MODNAME=\"${KMOD}\"
+KCFLAGS+= -DDRM_DEBUG=2
 
 .include <bsd.kmod.mk>

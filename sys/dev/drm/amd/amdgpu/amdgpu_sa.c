@@ -329,10 +329,12 @@ int amdgpu_sa_bo_new(struct amdgpu_sa_manager *sa_manager,
 			lockmgr(&sa_manager->wq.lock, LK_EXCLUSIVE);
 		} else {
 			/* if we have nothing to wait for block */
+			kprintf("#17#begin#: amdgpu_sa_bo_new.wait_event_interruptible_locked\n");
 			r = wait_event_interruptible_locked(
 				sa_manager->wq,
 				amdgpu_sa_event(sa_manager, size, align)
 			);
+			kprintf("#17#end#: amdgpu_sa_bo_new.wait_event_interruptible_locked\n");
 		}
 
 	} while (!r);
