@@ -107,6 +107,68 @@ const struct dma_fence_ops dma_fence_array_ops = {
 	.release = dma_fence_array_release,
 };
 
+// struct dma_fence_array *dma_fence_array_create(int num_fences,
+// 					       struct dma_fence **fences,
+// 					       u64 context, unsigned seqno,
+// 					       bool signal_on_any)
+// {
+// 	struct dma_fence_array *array;
+// 	size_t size = sizeof(*array);
+
+// 	/* Allocate the callback structures behind the array. */
+// 	size += num_fences * sizeof(struct dma_fence_array_cb);
+// 	array = kzalloc(size, GFP_KERNEL);
+// 	if (!array)
+// 		return NULL;
+
+// 	lockinit(&array->lock, "ldmbfal", 0, 0);
+// 	dma_fence_init(&array->base, &dma_fence_array_ops, &array->lock,
+// 		       context, seqno);
+
+// 	array->num_fences = num_fences;
+// 	atomic_set(&array->num_pending, signal_on_any ? 1 : num_fences);
+// 	array->fences = fences;
+
+// 	return array;
+// }
+
+#define PENDING_ERROR 1
+
+static void dma_fence_array_clear_pending_error(struct dma_fence_array *array)
+{
+	/* Clear the error flag if not actually set. */
+	cmpxchg(&array->base.error, PENDING_ERROR, 0);
+}
+
+static void irq_dma_fence_array_work(struct irq_work *wrk)
+{
+	struct dma_fence_array *array = container_of(wrk, typeof(*array), work);
+
+	dma_fence_array_clear_pending_error(array);
+
+	dma_fence_signal(&array->base);
+	dma_fence_put(&array->base);
+}
+
+/**
+ * dma_fence_array_create - Create a custom fence array
+ * @num_fences:		[in]	number of fences to add in the array
+ * @fences:		[in]	array containing the fences
+ * @context:		[in]	fence context to use
+ * @seqno:		[in]	sequence number to use
+ * @signal_on_any:	[in]	signal on any fence in the array
+ *
+ * Allocate a dma_fence_array object and initialize the base fence with
+ * dma_fence_init().
+ * In case of error it returns NULL.
+ *
+ * The caller should allocate the fences array with num_fences size
+ * and fill it with the fences it wants to add to the object. Ownership of this
+ * array is taken and dma_fence_put() is used on each fence on release.
+ *
+ * If @signal_on_any is true the fence array signals if any fence in the array
+ * signals, otherwise it signals when all fences in the array signal.
+ */
 struct dma_fence_array *dma_fence_array_create(int num_fences,
 					       struct dma_fence **fences,
 					       u64 context, unsigned seqno,
@@ -124,10 +186,13 @@ struct dma_fence_array *dma_fence_array_create(int num_fences,
 	lockinit(&array->lock, "ldmbfal", 0, 0);
 	dma_fence_init(&array->base, &dma_fence_array_ops, &array->lock,
 		       context, seqno);
+	init_irq_work(&array->work, irq_dma_fence_array_work);
 
 	array->num_fences = num_fences;
 	atomic_set(&array->num_pending, signal_on_any ? 1 : num_fences);
 	array->fences = fences;
+
+	array->base.error = PENDING_ERROR;
 
 	return array;
 }
