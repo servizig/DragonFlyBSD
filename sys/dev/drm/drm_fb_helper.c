@@ -1865,7 +1865,7 @@ static int drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
 	if (ret < 0)
 		return ret;
 
-#ifdef __DragonFly__
+#ifdef 0
 	TUNABLE_INT_FETCH("kern.kms_console", &kms_console);
 	if (kms_console) {
 		if (register_framebuffer(fb_helper->fbdev) < 0)
