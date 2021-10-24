@@ -1757,7 +1757,7 @@ static int drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
 	int i;
 	struct drm_fb_helper_surface_size sizes;
 	int gamma_size = 0;
-#ifdef __DragonFly__
+#if 0
 	int kms_console = 1;
 #endif
 
@@ -1865,7 +1865,7 @@ static int drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
 	if (ret < 0)
 		return ret;
 
-#ifdef 0
+#if 0
 	TUNABLE_INT_FETCH("kern.kms_console", &kms_console);
 	if (kms_console) {
 		if (register_framebuffer(fb_helper->fbdev) < 0)
