@@ -139,6 +139,76 @@ out:
 	return ret;
 }
 
+static bool
+dma_fence_test_signaled_any(struct dma_fence **fences, uint32_t count,
+    uint32_t *idx)
+{
+	int i;
+
+	for (i = 0; i < count; ++i) {
+		struct dma_fence *fence = fences[i];
+		if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
+			if (idx)
+				*idx = i;
+			return true;
+		}
+	}
+	return false;
+}
+
+long
+dma_fence_wait_any_timeout(struct dma_fence **fences, uint32_t count,
+    bool intr, long timeout, uint32_t *idx)
+{
+	struct default_wait_cb *cb;
+	long ret = timeout;
+	unsigned long end;
+	int i, err;
+
+	if (timeout == 0) {
+		for (i = 0; i < count; i++) {
+			if (dma_fence_is_signaled(fences[i])) {
+				if (idx)
+					*idx = i;
+				return 1;
+			}
+		}
+		return 0;
+	}
+
+	cb = kcalloc(count, sizeof(struct default_wait_cb), GFP_KERNEL);
+	if (cb == NULL)
+		return -ENOMEM;
+
+	for (i = 0; i < count; i++) {
+		struct dma_fence *fence = fences[i];
+		cb[i].task = current;
+		if (dma_fence_add_callback(fence, &cb[i].base,
+		    dma_fence_default_wait_cb)) {
+			if (idx)
+				*idx = i;
+			goto cb_cleanup;
+		}
+	}
+
+	end = jiffies + timeout;
+	for (ret = timeout; ret > 0; ret = MAX(0, end - jiffies)) {
+		if (dma_fence_test_signaled_any(fences, count, idx))
+			break;
+		err = tsleep(current, intr ? PCATCH : 0, "dfwat", ret);
+		if (err == EINTR || err == ERESTART) {
+			ret = -ERESTARTSYS;
+			break;
+		}
+	}
+
+cb_cleanup:
+	while (i-- > 0)
+		dma_fence_remove_callback(fences[i], &cb[i].base);
+	kfree(cb);
+	return ret;
+}
+
 int
 dma_fence_signal_locked(struct dma_fence *fence)
 {
