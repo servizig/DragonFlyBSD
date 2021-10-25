@@ -88,7 +88,6 @@ long
 dma_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 {
 	long ret = timeout ? timeout : 1;
-	unsigned long end;
 	int err;
 	struct default_wait_cb cb;
 	bool was_set;
@@ -120,13 +119,14 @@ dma_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 	cb.task = current;
 	list_add(&cb.base.node, &fence->cb_list);
 
-	end = jiffies + timeout;
-	for (ret = timeout; ret > 0; ret = MAX(0, end - jiffies)) {
-		if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags))
-			break;
+	while (!test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
+		/* wake_up_process() directly uses task_struct pointers as sleep identifiers */
 		err = lksleep(current, fence->lock, intr ? PCATCH : 0, "dmafence", timeout);
 		if (err == EINTR || err == ERESTART) {
 			ret = -ERESTARTSYS;
+			break;
+		} else if (err == EWOULDBLOCK) {
+			ret = 0;
 			break;
 		}
 	}
@@ -250,95 +250,4 @@ void
 dma_fence_free(struct dma_fence *fence)
 {
 	kfree(fence);
-}
-
-static bool
-dma_fence_test_signaled_any(struct dma_fence **fences, uint32_t count,
-			    uint32_t *idx)
-{
-	int i;
-
-	for (i = 0; i < count; ++i) {
-		struct dma_fence *fence = fences[i];
-		if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
-			if (idx)
-				*idx = i;
-			return true;
-		}
-	}
-	return false;
-}
-
-/* This code from Linux, GPL2 */
-signed long
-dma_fence_wait_any_timeout(struct dma_fence **fences, uint32_t count,
-			   bool intr, signed long timeout, uint32_t *idx)
-{
-	struct default_wait_cb *cb;
-	signed long ret = timeout;
-	unsigned i;
-
-	if (WARN_ON(!fences || !count || timeout < 0))
-		return -EINVAL;
-
-	if (timeout == 0) {
-		for (i = 0; i < count; ++i)
-			if (dma_fence_is_signaled(fences[i])) {
-				if (idx)
-					*idx = i;
-				return 1;
-			}
-
-		return 0;
-	}
-
-	cb = kcalloc(count, sizeof(struct default_wait_cb), GFP_KERNEL);
-	if (cb == NULL) {
-		ret = -ENOMEM;
-		goto err_free_cb;
-	}
-
-	for (i = 0; i < count; ++i) {
-		struct dma_fence *fence = fences[i];
-
-		if (fence->ops->wait != dma_fence_default_wait) {
-			ret = -EINVAL;
-			goto fence_rm_cb;
-		}
-
-		cb[i].task = current;
-		if (dma_fence_add_callback(fence, &cb[i].base,
-					   dma_fence_default_wait_cb)) {
-			/* This fence is already signaled */
-			if (idx)
-				*idx = i;
-			goto fence_rm_cb;
-		}
-	}
-
-	while (ret > 0) {
-		if (intr)
-			set_current_state(TASK_INTERRUPTIBLE);
-		else
-			set_current_state(TASK_UNINTERRUPTIBLE);
-
-		if (dma_fence_test_signaled_any(fences, count, idx))
-			break;
-
-		ret = schedule_timeout(ret);
-
-		if (ret > 0 && intr && signal_pending(current))
-			ret = -ERESTARTSYS;
-	}
-
-	__set_current_state(TASK_RUNNING);
-
-fence_rm_cb:
-	while (i-- > 0)
-		dma_fence_remove_callback(fences[i], &cb[i].base);
-
-err_free_cb:
-	kfree(cb);
-
-	return ret;
 }
