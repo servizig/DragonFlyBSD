@@ -28,7 +28,8 @@
 #include <linux/slab.h>
 #include <linux/dma-fence-array.h>
 
-/* From Linux */
+#define PENDING_ERROR 1
+
 static const char *dma_fence_array_get_driver_name(struct dma_fence *fence)
 {
 	return "dma_fence_array";
@@ -37,6 +38,52 @@ static const char *dma_fence_array_get_driver_name(struct dma_fence *fence)
 static const char *dma_fence_array_get_timeline_name(struct dma_fence *fence)
 {
 	return "unbound";
+}
+
+static bool dma_fence_array_signaled(struct dma_fence *fence)
+{
+	struct dma_fence_array *array = to_dma_fence_array(fence);
+
+	return atomic_read(&array->num_pending) <= 0;
+}
+
+static void dma_fence_array_set_pending_error(struct dma_fence_array *array,
+					      int error)
+{
+	/*
+	 * Propagate the first error reported by any of our fences, but only
+	 * before we ourselves are signaled.
+	 */
+	if (error)
+		cmpxchg(&array->base.error, PENDING_ERROR, error);
+}
+
+static void dma_fence_array_clear_pending_error(struct dma_fence_array *array)
+{
+	/* Clear the error flag if not actually set. */
+	cmpxchg(&array->base.error, PENDING_ERROR, 0);
+}
+
+static void irq_dma_fence_array_work(struct irq_work *wrk)
+{
+	struct dma_fence_array *array = container_of(wrk, typeof(*array), work);
+
+	dma_fence_array_clear_pending_error(array);
+
+	dma_fence_signal(&array->base);
+	dma_fence_put(&array->base);
+}
+
+static void dma_fence_array_release(struct dma_fence *fence)
+{
+	struct dma_fence_array *array = to_dma_fence_array(fence);
+	unsigned i;
+
+	for (i = 0; i < array->num_fences; ++i)
+		dma_fence_put(array->fences[i]);
+
+	kfree(array->fences);
+	dma_fence_free(fence);
 }
 
 static void
@@ -70,32 +117,18 @@ static bool dma_fence_array_enable_signaling(struct dma_fence *fence)
 		dma_fence_get(&array->base);
 		if (dma_fence_add_callback(array->fences[i], &cb[i].cb,
 					   dma_fence_array_cb_func)) {
+			int error = array->fences[i]->error;
+
+			dma_fence_array_set_pending_error(array, error);
 			dma_fence_put(&array->base);
-			if (atomic_dec_and_test(&array->num_pending))
+			if (atomic_dec_and_test(&array->num_pending)) {
+				dma_fence_array_clear_pending_error(array);
 				return false;
+			}
 		}
 	}
 
 	return true;
-}
-
-static bool dma_fence_array_signaled(struct dma_fence *fence)
-{
-	struct dma_fence_array *array = to_dma_fence_array(fence);
-
-	return atomic_read(&array->num_pending) <= 0;
-}
-
-static void dma_fence_array_release(struct dma_fence *fence)
-{
-	struct dma_fence_array *array = to_dma_fence_array(fence);
-	unsigned i;
-
-	for (i = 0; i < array->num_fences; ++i)
-		dma_fence_put(array->fences[i]);
-
-	kfree(array->fences);
-	dma_fence_free(fence);
 }
 
 const struct dma_fence_ops dma_fence_array_ops = {
@@ -106,49 +139,6 @@ const struct dma_fence_ops dma_fence_array_ops = {
 	.wait = dma_fence_default_wait,
 	.release = dma_fence_array_release,
 };
-
-// struct dma_fence_array *dma_fence_array_create(int num_fences,
-// 					       struct dma_fence **fences,
-// 					       u64 context, unsigned seqno,
-// 					       bool signal_on_any)
-// {
-// 	struct dma_fence_array *array;
-// 	size_t size = sizeof(*array);
-
-// 	/* Allocate the callback structures behind the array. */
-// 	size += num_fences * sizeof(struct dma_fence_array_cb);
-// 	array = kzalloc(size, GFP_KERNEL);
-// 	if (!array)
-// 		return NULL;
-
-// 	lockinit(&array->lock, "ldmbfal", 0, 0);
-// 	dma_fence_init(&array->base, &dma_fence_array_ops, &array->lock,
-// 		       context, seqno);
-
-// 	array->num_fences = num_fences;
-// 	atomic_set(&array->num_pending, signal_on_any ? 1 : num_fences);
-// 	array->fences = fences;
-
-// 	return array;
-// }
-
-#define PENDING_ERROR 1
-
-static void dma_fence_array_clear_pending_error(struct dma_fence_array *array)
-{
-	/* Clear the error flag if not actually set. */
-	cmpxchg(&array->base.error, PENDING_ERROR, 0);
-}
-
-static void irq_dma_fence_array_work(struct irq_work *wrk)
-{
-	struct dma_fence_array *array = container_of(wrk, typeof(*array), work);
-
-	dma_fence_array_clear_pending_error(array);
-
-	dma_fence_signal(&array->base);
-	dma_fence_put(&array->base);
-}
 
 /**
  * dma_fence_array_create - Create a custom fence array
