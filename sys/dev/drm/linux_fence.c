@@ -93,25 +93,32 @@ dma_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 	struct default_wait_cb cb;
 	bool was_set;
 
+kprintf("dma_fence_default_wait: 1, fence=%p, timeout=%lu\n", fence, timeout);
 	if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags))
 		return ret;
-
+kprintf("dma_fence_default_wait: 2, fence=%p\n", fence);
 	lockmgr(fence->lock, LK_EXCLUSIVE);
 
 	was_set = test_and_set_bit(DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT,
 	    &fence->flags);
+kprintf("dma_fence_default_wait: 3, fence=%p\n", fence);
 
-	if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags))
+	if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
+kprintf("dma_fence_default_wait: --signaled-- 4, fence=%p\n", fence);
 		goto out;
+	}
 
 	if (!was_set && fence->ops->enable_signaling) {
+kprintf("dma_fence_default_wait: 5, fence=%p\n", fence);
 		if (!fence->ops->enable_signaling(fence)) {
+kprintf("dma_fence_default_wait: 6, fence=%p\n", fence);
 			dma_fence_signal_locked(fence);
 			goto out;
 		}
 	}
 
 	if (timeout == 0) {
+kprintf("dma_fence_default_wait: 7, fence=%p\n", fence);
 		ret = 0;
 		goto out;
 	}
@@ -122,11 +129,17 @@ dma_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 
 	end = jiffies + timeout;
 	for (ret = timeout; ret > 0; ret = MAX(0, end - jiffies)) {
-		if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags))
+kprintf("dma_fence_default_wait.forloop: 7.1: ret=%lu, timeout=%lu, end=%lu, fence=%p\n", 
+	ret, timeout, end, fence);
+		if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
+kprintf("dma_fence_default_wait.forloop: --signaled-- 7.2, fence=%p\n", fence);
 			break;
+		}
+kprintf("dma_fence_default_wait.forloop: 7.3, fence=%p\n", fence);
 		/* wake_up_process() directly uses task_struct pointers as sleep identifiers */
 		err = lksleep(current, fence->lock, intr ? PCATCH : 0, "dmafence", ret);
 		if (err == EINTR || err == ERESTART) {
+kprintf("dma_fence_default_wait.forloop: 7.4, fence=%p\n", fence);
 			ret = -ERESTARTSYS;
 			break;
 		}
@@ -136,7 +149,7 @@ dma_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 		list_del(&cb.base.node);
 out:
 	lockmgr(fence->lock, LK_RELEASE);
-	
+kprintf("dma_fence_default_wait: 8: ret=%lu, fence=%p\n", ret, fence);
 	return ret;
 }
 

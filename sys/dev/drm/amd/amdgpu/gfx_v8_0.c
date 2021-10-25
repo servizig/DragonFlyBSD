@@ -905,11 +905,12 @@ static int gfx_v8_0_ring_test_ib(struct amdgpu_ring *ring, long timeout)
 	ib.ptr[3] = upper_32_bits(gpu_addr);
 	ib.ptr[4] = 0xDEADBEEF;
 	ib.length_dw = 5;
-
+kprintf("gfx_v8_0_ring_test_ib: 1\n");
 	r = amdgpu_ib_schedule(ring, 1, &ib, NULL, &f);
 	if (r)
 		goto err2;
 
+kprintf("gfx_v8_0_ring_test_ib: 2, timeout=%lu fence=%p\n", timeout, f);
 	r = dma_fence_wait_timeout(f, false, timeout);
 	if (r == 0) {
 		DRM_ERROR("amdgpu: IB test timed out.\n");
@@ -6947,7 +6948,7 @@ static int gfx_v8_0_eop_irq(struct amdgpu_device *adev,
 	me_id = (entry->ring_id & 0x0c) >> 2;
 	pipe_id = (entry->ring_id & 0x03) >> 0;
 	queue_id = (entry->ring_id & 0x70) >> 4;
-
+kprintf("me_id=%d\n", me_id);
 	switch (me_id) {
 	case 0:
 		amdgpu_fence_process(&adev->gfx.gfx_ring[0]);
