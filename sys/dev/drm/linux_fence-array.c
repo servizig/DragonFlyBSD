@@ -30,6 +30,7 @@
 
 #define PENDING_ERROR 1
 
+
 static const char *dma_fence_array_get_driver_name(struct dma_fence *fence)
 {
 	return "dma_fence_array";
@@ -38,13 +39,6 @@ static const char *dma_fence_array_get_driver_name(struct dma_fence *fence)
 static const char *dma_fence_array_get_timeline_name(struct dma_fence *fence)
 {
 	return "unbound";
-}
-
-static bool dma_fence_array_signaled(struct dma_fence *fence)
-{
-	struct dma_fence_array *array = to_dma_fence_array(fence);
-
-	return atomic_read(&array->num_pending) <= 0;
 }
 
 static void dma_fence_array_set_pending_error(struct dma_fence_array *array,
@@ -74,28 +68,19 @@ static void irq_dma_fence_array_work(struct irq_work *wrk)
 	dma_fence_put(&array->base);
 }
 
-static void dma_fence_array_release(struct dma_fence *fence)
-{
-	struct dma_fence_array *array = to_dma_fence_array(fence);
-	unsigned i;
-
-	for (i = 0; i < array->num_fences; ++i)
-		dma_fence_put(array->fences[i]);
-
-	kfree(array->fences);
-	dma_fence_free(fence);
-}
-
-static void
-dma_fence_array_cb_func(struct dma_fence *f, struct dma_fence_cb *cb)
+static void dma_fence_array_cb_func(struct dma_fence *f,
+				    struct dma_fence_cb *cb)
 {
 	struct dma_fence_array_cb *array_cb =
 		container_of(cb, struct dma_fence_array_cb, cb);
 	struct dma_fence_array *array = array_cb->array;
 
+	dma_fence_array_set_pending_error(array, f->error);
+
 	if (atomic_dec_and_test(&array->num_pending))
-		dma_fence_signal(&array->base);
-	dma_fence_put(&array->base);
+		irq_work_queue(&array->work);
+	else
+		dma_fence_put(&array->base);
 }
 
 static bool dma_fence_array_enable_signaling(struct dma_fence *fence)
@@ -131,6 +116,25 @@ static bool dma_fence_array_enable_signaling(struct dma_fence *fence)
 	return true;
 }
 
+static bool dma_fence_array_signaled(struct dma_fence *fence)
+{
+	struct dma_fence_array *array = to_dma_fence_array(fence);
+
+	return atomic_read(&array->num_pending) <= 0;
+}
+
+static void dma_fence_array_release(struct dma_fence *fence)
+{
+	struct dma_fence_array *array = to_dma_fence_array(fence);
+	unsigned i;
+
+	for (i = 0; i < array->num_fences; ++i)
+		dma_fence_put(array->fences[i]);
+
+	kfree(array->fences);
+	dma_fence_free(fence);
+}
+
 const struct dma_fence_ops dma_fence_array_ops = {
 	.get_driver_name = dma_fence_array_get_driver_name,
 	.get_timeline_name = dma_fence_array_get_timeline_name,
@@ -139,6 +143,7 @@ const struct dma_fence_ops dma_fence_array_ops = {
 	.wait = dma_fence_default_wait,
 	.release = dma_fence_array_release,
 };
+EXPORT_SYMBOL(dma_fence_array_ops);
 
 /**
  * dma_fence_array_create - Create a custom fence array
