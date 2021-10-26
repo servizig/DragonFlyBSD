@@ -232,25 +232,18 @@ void amdgpu_fence_process(struct amdgpu_ring *ring)
 	struct amdgpu_fence_driver *drv = &ring->fence_drv;
 	uint32_t seq, last_seq;
 	int r;
-kprintf("amdgpu_fence_process: 1\n");
 	do {
 		last_seq = atomic_read(&ring->fence_drv.last_seq);
 		seq = amdgpu_fence_read(ring);
-kprintf("amdgpu_fence_process: 2, last_seq=%d, seq=%d\n", last_seq, seq);
 	} while (atomic_cmpxchg(&drv->last_seq, last_seq, seq) != last_seq);
-kprintf("amdgpu_fence_process: 3, seq=%d, ring->fence_drv.sync_seq=%d\n",
-	seq, ring->fence_drv.sync_seq);
 	if (seq != ring->fence_drv.sync_seq)
 		amdgpu_fence_schedule_fallback(ring);
-kprintf("amdgpu_fence_process: 4, last_seq=%d, seq=%d\n", last_seq, seq);
 	if (unlikely(seq == last_seq))
 		return;
 
 	last_seq &= drv->num_fences_mask;
 	seq &= drv->num_fences_mask;
-kprintf("amdgpu_fence_process: 5, last_seq=%d, seq=%d\n", last_seq, seq);
 	do {
-kprintf("amdgpu_fence_process: 6, last_seq=%d, seq=%d\n", last_seq, seq);
 		struct dma_fence *fence, **ptr;
 
 		++last_seq;
@@ -259,20 +252,16 @@ kprintf("amdgpu_fence_process: 6, last_seq=%d, seq=%d\n", last_seq, seq);
 
 		/* There is always exactly one thread signaling this fence slot */
 		fence = rcu_dereference_protected(*ptr, 1);
-kprintf("amdgpu_fence_process: 7, fence=%p\n", fence);
 		RCU_INIT_POINTER(*ptr, NULL);
 
 		if (!fence)
 			continue;
-kprintf("amdgpu_fence_process: 8, fence=%p\n", fence);
 		r = dma_fence_signal(fence);
 		if (!r)
 			DMA_FENCE_TRACE(fence, "signaled from irq context\n");
 		else
 			BUG();
-kprintf("amdgpu_fence_process: 9, fence=%p, r=%d\n", fence, r);
 		dma_fence_put(fence);
-kprintf("amdgpu_fence_process: 10, last_seq=%d, seq=%d\n", last_seq, seq);
 	} while (last_seq != seq);
 }
 
