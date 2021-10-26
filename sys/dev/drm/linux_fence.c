@@ -129,17 +129,18 @@ kprintf("dma_fence_default_wait: 7, fence=%p\n", fence);
 
 	end = jiffies + timeout;
 	for (ret = timeout; ret > 0; ret = MAX(0, end - jiffies)) {
-kprintf("dma_fence_default_wait.forloop: 7.1: ret=%lu, timeout=%lu, end=%lu, fence=%p\n", 
-	ret, timeout, end, fence);
 		if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
-kprintf("dma_fence_default_wait.forloop: --signaled-- 7.2, fence=%p\n", fence);
 			break;
 		}
-kprintf("dma_fence_default_wait.forloop: 7.3, fence=%p\n", fence);
+		if (intr) {
+			__set_current_state(TASK_INTERRUPTIBLE);
+		}
+		else {
+			__set_current_state(TASK_UNINTERRUPTIBLE);
+		}
 		/* wake_up_process() directly uses task_struct pointers as sleep identifiers */
 		err = lksleep(current, fence->lock, intr ? PCATCH : 0, "dmafence", ret);
 		if (err == EINTR || err == ERESTART) {
-kprintf("dma_fence_default_wait.forloop: 7.4, fence=%p\n", fence);
 			ret = -ERESTARTSYS;
 			break;
 		}
@@ -147,6 +148,7 @@ kprintf("dma_fence_default_wait.forloop: 7.4, fence=%p\n", fence);
 
 	if (!list_empty(&cb.base.node))
 		list_del(&cb.base.node);
+	__set_current_state(TASK_RUNNING);
 out:
 	lockmgr(fence->lock, LK_RELEASE);
 kprintf("dma_fence_default_wait: 8: ret=%lu, fence=%p\n", ret, fence);
