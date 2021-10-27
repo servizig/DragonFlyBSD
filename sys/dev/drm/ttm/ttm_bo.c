@@ -529,58 +529,44 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
  * Traverse the delayed list, and call ttm_bo_cleanup_refs on all
  * encountered buffers.
  */
-static int ttm_bo_delayed_delete(struct ttm_bo_device *bdev, bool remove_all)
+static bool ttm_bo_delayed_delete(struct ttm_bo_device *bdev, bool remove_all)
 {
 	struct ttm_bo_global *glob = bdev->glob;
-	struct ttm_buffer_object *entry = NULL;
-	int ret = 0;
+	struct list_head removed;
+	bool empty;
+
+	INIT_LIST_HEAD(&removed);
 
 	lockmgr(&glob->lru_lock, LK_EXCLUSIVE);
-	if (list_empty(&bdev->ddestroy))
-		goto out_unlock;
+	while (!list_empty(&bdev->ddestroy)) {
+		struct ttm_buffer_object *bo;
 
-	entry = list_first_entry(&bdev->ddestroy,
-		struct ttm_buffer_object, ddestroy);
-	kref_get(&entry->list_kref);
+		bo = list_first_entry(&bdev->ddestroy, struct ttm_buffer_object,
+				      ddestroy);
+		kref_get(&bo->list_kref);
+		list_move_tail(&bo->ddestroy, &removed);
 
-	for (;;) {
-		struct ttm_buffer_object *nentry = NULL;
-
-		if (entry->ddestroy.next != &bdev->ddestroy) {
-			nentry = list_first_entry(&entry->ddestroy,
-				struct ttm_buffer_object, ddestroy);
-			kref_get(&nentry->list_kref);
-		}
-
-		ret = __ttm_bo_reserve(entry, false, true, NULL);
-		if (remove_all && ret) {
+		if (remove_all || bo->resv != &bo->ttm_resv) {
 			lockmgr(&glob->lru_lock, LK_RELEASE);
-			ret = __ttm_bo_reserve(entry, false, false, NULL);
+			reservation_object_lock(bo->resv, NULL);
+
 			lockmgr(&glob->lru_lock, LK_EXCLUSIVE);
+			ttm_bo_cleanup_refs(bo, false, !remove_all, true);
+
+		} else if (reservation_object_trylock(bo->resv)) {
+			ttm_bo_cleanup_refs(bo, false, !remove_all, true);
+		} else {
+			lockmgr(&glob->lru_lock, LK_RELEASE);
 		}
 
-		if (!ret)
-			ret = ttm_bo_cleanup_refs(nentry, false, !remove_all, true);
-		else
-			lockmgr(&glob->lru_lock, LK_RELEASE);
-
-		kref_put(&entry->list_kref, ttm_bo_release_list);
-		entry = nentry;
-
-		if (ret || !entry)
-			goto out;
-
+		kref_put(&bo->list_kref, ttm_bo_release_list);
 		lockmgr(&glob->lru_lock, LK_EXCLUSIVE);
-		if (list_empty(&entry->ddestroy))
-			break;
 	}
-
-out_unlock:
+	list_splice_tail(&removed, &bdev->ddestroy);
+	empty = list_empty(&bdev->ddestroy);
 	lockmgr(&glob->lru_lock, LK_RELEASE);
-out:
-	if (entry)
-		kref_put(&entry->list_kref, ttm_bo_release_list);
-	return ret;
+
+	return empty;
 }
 
 static void ttm_bo_delayed_workqueue(struct work_struct *work)
