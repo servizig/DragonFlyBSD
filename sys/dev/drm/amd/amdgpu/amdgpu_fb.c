@@ -263,6 +263,10 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
 	info->depth = sizes->surface_bpp;
 	info->is_vga_boot_display = vga_pci_is_boot_display(vga_dev);
 	info->fbops = amdgpufb_ops;
+
+	unsigned long tmp = amdgpu_bo_gpu_offset(abo) - adev->gmc.vram_start;
+	info->vaddr = (vm_offset_t)amdgpu_bo_kptr(abo);
+	info->paddr = adev->gmc.aper_base + tmp;
 #else
 
 	strcpy(info->fix.id, "amdgpudrmfb");
