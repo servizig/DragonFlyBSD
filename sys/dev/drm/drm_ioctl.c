@@ -348,16 +348,18 @@ static int drm_setversion(struct drm_device *dev, void *data, struct drm_file *f
 {
 	struct drm_set_version *sv = data;
 	int if_version, retcode = 0;
-
+kprintf("drm_setversion: 1\n");
 	mutex_lock(&dev->master_mutex);
 	if (sv->drm_di_major != -1) {
 		if (sv->drm_di_major != DRM_IF_MAJOR ||
 		    sv->drm_di_minor < 0 || sv->drm_di_minor > DRM_IF_MINOR) {
+kprintf("drm_setversion: 2\n");
 			retcode = -EINVAL;
 			goto done;
 		}
 		if_version = DRM_IF_VERSION(sv->drm_di_major,
 					    sv->drm_di_minor);
+kprintf("drm_setversion: 3, if_version=%d, dev->if_version=%d\n", if_version, dev->if_version);
 		dev->if_version = max(if_version, dev->if_version);
 		if (sv->drm_di_minor >= 1) {
 			/*
@@ -365,27 +367,29 @@ static int drm_setversion(struct drm_device *dev, void *data, struct drm_file *f
 			 * Version 1.4 has proper PCI domain support
 			 */
 			retcode = drm_set_busid(dev, file_priv);
+kprintf("drm_setversion: 4, retcode=%d\n", retcode);
 			if (retcode)
 				goto done;
 		}
 	}
-
+kprintf("drm_setversion: 5\n");
 	if (sv->drm_dd_major != -1) {
 		if (sv->drm_dd_major != dev->driver->major ||
 		    sv->drm_dd_minor < 0 || sv->drm_dd_minor >
 		    dev->driver->minor) {
+kprintf("drm_setversion: 5.1\n");
 			retcode = -EINVAL;
 			goto done;
 		}
 	}
-
+kprintf("drm_setversion: 6\n");
 done:
 	sv->drm_di_major = DRM_IF_MAJOR;
 	sv->drm_di_minor = DRM_IF_MINOR;
 	sv->drm_dd_major = dev->driver->major;
 	sv->drm_dd_minor = dev->driver->minor;
 	mutex_unlock(&dev->master_mutex);
-
+kprintf("drm_setversion: 7\n");
 	return retcode;
 }
 
@@ -508,31 +512,32 @@ int drm_version(struct drm_device *dev, void *data,
  */
 int drm_ioctl_permit(u32 flags, struct drm_file *file_priv)
 {
+kprintf("drm_ioctl_permit: 1\n");
 	/* ROOT_ONLY is only for CAP_SYS_ADMIN */
 	if (unlikely((flags & DRM_ROOT_ONLY) && !capable(CAP_SYS_ADMIN)))
 		return -EACCES;
-
+kprintf("drm_ioctl_permit: 2\n");
 	/* AUTH is only for authenticated or render client */
 	if (unlikely((flags & DRM_AUTH) && !drm_is_render_client(file_priv) &&
 		     !file_priv->authenticated))
 		return -EACCES;
-
+kprintf("drm_ioctl_permit: 3\n");
 	/* MASTER is only for master or control clients */
 	if (unlikely((flags & DRM_MASTER) && 
 		     !drm_is_current_master(file_priv) &&
 		     !drm_is_control_client(file_priv)))
 		return -EACCES;
-
+kprintf("drm_ioctl_permit: 4\n");
 	/* Control clients must be explicitly allowed */
 	if (unlikely(!(flags & DRM_CONTROL_ALLOW) &&
 		     drm_is_control_client(file_priv)))
 		return -EACCES;
-
+kprintf("drm_ioctl_permit: 5\n");
 	/* Render clients must be explicitly allowed */
 	if (unlikely(!(flags & DRM_RENDER_ALLOW) &&
 		     drm_is_render_client(file_priv)))
 		return -EACCES;
-
+kprintf("drm_ioctl_permit: 6\n");
 	return 0;
 }
 EXPORT_SYMBOL(drm_ioctl_permit);
@@ -817,25 +822,28 @@ int drm_ioctl(struct dev_ioctl_args *ap)
 
 	/* Do not trust userspace, use our own definition */
 	func = ioctl->func;
-
+kprintf("drm_ioctl: 1\n");
 	if (unlikely(!func)) {
 		DRM_DEBUG("no function\n");
 		retcode = -EINVAL;
 		goto err_i1;
 	}
-
+kprintf("drm_ioctl: 2\n");
 	retcode = drm_ioctl_permit(ioctl->flags, file_priv);
 	if (unlikely(retcode))
 		goto err_i1;
-
+kprintf("drm_ioctl: 3\n");
 	/* Enforce sane locking for modern driver ioctls. */
 	if (!drm_core_check_feature(dev, DRIVER_LEGACY) ||
-	    (ioctl->flags & DRM_UNLOCKED))
+	    (ioctl->flags & DRM_UNLOCKED)) {
 		retcode = -func(dev, data, file_priv);
+kprintf("drm_ioctl: 4.1\n");
+	}
 	else {
 		mutex_lock(&drm_global_mutex);
 		retcode = -func(dev, data, file_priv);
 		mutex_unlock(&drm_global_mutex);
+kprintf("drm_ioctl: 4.2\n");
 	}
 
 	if (retcode == ERESTARTSYS)
