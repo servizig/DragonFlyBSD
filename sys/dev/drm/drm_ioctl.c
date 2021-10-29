@@ -241,6 +241,7 @@ static int drm_getcap(struct drm_device *dev, void *data, struct drm_file *file_
 		return 0;
 	case DRM_CAP_PRIME:
 #ifdef __DragonFly__
+kprintf("drm_getcap.DRM_CAP_PRIME\n");
 		return -EINVAL;
 #else
 		req->value |= dev->driver->prime_fd_to_handle ? DRM_PRIME_CAP_IMPORT : 0;

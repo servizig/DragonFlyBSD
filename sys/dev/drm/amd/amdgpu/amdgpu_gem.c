@@ -571,6 +571,8 @@ int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
 	int r = 0;
 
 	if (args->va_address < AMDGPU_VA_RESERVED_SIZE) {
+		kprintf("va_address 0x%LX is in reserved area 0x%LX\n",
+			args->va_address, AMDGPU_VA_RESERVED_SIZE);
 		dev_dbg(&dev->pdev->dev,
 			"va_address 0x%LX is in reserved area 0x%LX\n",
 			args->va_address, AMDGPU_VA_RESERVED_SIZE);
@@ -579,6 +581,9 @@ int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
 
 	if (args->va_address >= AMDGPU_VA_HOLE_START &&
 	    args->va_address < AMDGPU_VA_HOLE_END) {
+		kprintf("va_address 0x%LX is in VA hole 0x%LX-0x%LX\n",
+			args->va_address, AMDGPU_VA_HOLE_START,
+			AMDGPU_VA_HOLE_END);
 		dev_dbg(&dev->pdev->dev,
 			"va_address 0x%LX is in VA hole 0x%LX-0x%LX\n",
 			args->va_address, AMDGPU_VA_HOLE_START,
@@ -591,6 +596,8 @@ int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
 	vm_size = adev->vm_manager.max_pfn * AMDGPU_GPU_PAGE_SIZE;
 	vm_size -= AMDGPU_VA_RESERVED_SIZE;
 	if (args->va_address + args->map_size > vm_size) {
+		kprintf("va_address 0x%llx is in top reserved area 0x%lx\n",
+			args->va_address + args->map_size, vm_size);
 		dev_dbg(&dev->pdev->dev,
 			"va_address 0x%llx is in top reserved area 0x%lx\n",
 			args->va_address + args->map_size, vm_size);
@@ -598,6 +605,8 @@ int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
 	}
 
 	if ((args->flags & ~valid_flags) && (args->flags & ~prt_flags)) {
+		kprintf("invalid flags combination 0x%08X\n",
+			args->flags);
 		dev_dbg(&dev->pdev->dev, "invalid flags combination 0x%08X\n",
 			args->flags);
 		return -EINVAL;
@@ -610,6 +619,8 @@ int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
 	case AMDGPU_VA_OP_REPLACE:
 		break;
 	default:
+		kprintf("unsupported operation %d\n",
+			args->operation);
 		dev_dbg(&dev->pdev->dev, "unsupported operation %d\n",
 			args->operation);
 		return -EINVAL;
@@ -653,6 +664,7 @@ int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
 	case AMDGPU_VA_OP_MAP:
 		r = amdgpu_vm_alloc_pts(adev, bo_va->base.vm, args->va_address,
 					args->map_size);
+kprintf("amdgpu_gem_va_ioctl.AMDGPU_VA_OP_MAP 1: r=%d\n", r);
 		if (r)
 			goto error_backoff;
 
@@ -660,19 +672,23 @@ int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
 		r = amdgpu_vm_bo_map(adev, bo_va, args->va_address,
 				     args->offset_in_bo, args->map_size,
 				     va_flags);
+kprintf("amdgpu_gem_va_ioctl.AMDGPU_VA_OP_MAP 2: r=%d\n", r);
 		break;
 	case AMDGPU_VA_OP_UNMAP:
 		r = amdgpu_vm_bo_unmap(adev, bo_va, args->va_address);
+kprintf("amdgpu_gem_va_ioctl.AMDGPU_VA_OP_UNMAP: r=%d\n", r);
 		break;
 
 	case AMDGPU_VA_OP_CLEAR:
 		r = amdgpu_vm_bo_clear_mappings(adev, &fpriv->vm,
 						args->va_address,
 						args->map_size);
+kprintf("amdgpu_gem_va_ioctl.AMDGPU_VA_OP_CLEAR: r=%d\n", r);
 		break;
 	case AMDGPU_VA_OP_REPLACE:
 		r = amdgpu_vm_alloc_pts(adev, bo_va->base.vm, args->va_address,
 					args->map_size);
+kprintf("amdgpu_gem_va_ioctl.AMDGPU_VA_OP_REPLACE 1: r=%d\n", r);
 		if (r)
 			goto error_backoff;
 
@@ -680,6 +696,7 @@ int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
 		r = amdgpu_vm_bo_replace_map(adev, bo_va, args->va_address,
 					     args->offset_in_bo, args->map_size,
 					     va_flags);
+kprintf("amdgpu_gem_va_ioctl.AMDGPU_VA_OP_REPLACE 2: r=%d\n", r);
 		break;
 	default:
 		break;
