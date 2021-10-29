@@ -153,6 +153,7 @@ int drm_pci_set_busid(struct drm_device *dev, struct drm_master *master)
 					PCI_FUNC(dev->pdev->devfn));
 	if (!master->unique)
 		return -ENOMEM;
+kprintf("drm_pci_set_busid: master->unique=%s\n", master->unique);
 
 	master->unique_len = strlen(master->unique);
 	return 0;

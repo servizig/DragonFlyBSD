@@ -112,10 +112,12 @@ int drm_getunique(struct drm_device *dev, void *data,
 {
 	struct drm_unique *u = data;
 	struct drm_master *master = file_priv->master;
-
+kprintf("drm_getunique: master->unique=%s\n", master->unique);
 	mutex_lock(&master->dev->master_mutex);
+kprintf("drm_getunique: u->unique_len=%ld, master->unique_len=%d\n", u->unique_len, master->unique_len);
 	if (u->unique_len >= master->unique_len) {
 		if (copy_to_user(u->unique, master->unique, master->unique_len)) {
+kprintf("drm_getunique: copy_to_user failed\n");
 			mutex_unlock(&master->dev->master_mutex);
 			return -EFAULT;
 		}
