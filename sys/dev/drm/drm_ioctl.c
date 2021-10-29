@@ -524,32 +524,31 @@ kprintf("drm_version: err=%d\n", err);
  */
 int drm_ioctl_permit(u32 flags, struct drm_file *file_priv)
 {
-kprintf("drm_ioctl_permit: 1\n");
 	/* ROOT_ONLY is only for CAP_SYS_ADMIN */
 	if (unlikely((flags & DRM_ROOT_ONLY) && !capable(CAP_SYS_ADMIN)))
 		return -EACCES;
-kprintf("drm_ioctl_permit: 2\n");
+
 	/* AUTH is only for authenticated or render client */
 	if (unlikely((flags & DRM_AUTH) && !drm_is_render_client(file_priv) &&
 		     !file_priv->authenticated))
 		return -EACCES;
-kprintf("drm_ioctl_permit: 3\n");
+
 	/* MASTER is only for master or control clients */
 	if (unlikely((flags & DRM_MASTER) && 
 		     !drm_is_current_master(file_priv) &&
 		     !drm_is_control_client(file_priv)))
 		return -EACCES;
-kprintf("drm_ioctl_permit: 4\n");
+
 	/* Control clients must be explicitly allowed */
 	if (unlikely(!(flags & DRM_CONTROL_ALLOW) &&
 		     drm_is_control_client(file_priv)))
 		return -EACCES;
-kprintf("drm_ioctl_permit: 5\n");
+
 	/* Render clients must be explicitly allowed */
 	if (unlikely(!(flags & DRM_RENDER_ALLOW) &&
 		     drm_is_render_client(file_priv)))
 		return -EACCES;
-kprintf("drm_ioctl_permit: 6\n");
+
 	return 0;
 }
 EXPORT_SYMBOL(drm_ioctl_permit);
@@ -834,28 +833,24 @@ int drm_ioctl(struct dev_ioctl_args *ap)
 
 	/* Do not trust userspace, use our own definition */
 	func = ioctl->func;
-kprintf("drm_ioctl: 1\n");
 	if (unlikely(!func)) {
 		DRM_DEBUG("no function\n");
 		retcode = -EINVAL;
 		goto err_i1;
 	}
-kprintf("drm_ioctl: 2\n");
+
 	retcode = drm_ioctl_permit(ioctl->flags, file_priv);
 	if (unlikely(retcode))
 		goto err_i1;
-kprintf("drm_ioctl: 3\n");
 	/* Enforce sane locking for modern driver ioctls. */
 	if (!drm_core_check_feature(dev, DRIVER_LEGACY) ||
 	    (ioctl->flags & DRM_UNLOCKED)) {
 		retcode = -func(dev, data, file_priv);
-kprintf("drm_ioctl: 4.1\n");
 	}
 	else {
 		mutex_lock(&drm_global_mutex);
 		retcode = -func(dev, data, file_priv);
 		mutex_unlock(&drm_global_mutex);
-kprintf("drm_ioctl: 4.2\n");
 	}
 
 	if (retcode == ERESTARTSYS)
