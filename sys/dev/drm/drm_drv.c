@@ -1217,14 +1217,6 @@ drm_create_cdevs(device_t kdev)
 
 devclass_t drm_devclass;
 
-/*
- * Stub is needed for devfs
- */
-int drm_close(struct dev_close_args *ap)
-{
-	return 0;
-}
-
 /* XXX: this is supposed to be drm_release() */
 void drm_cdevpriv_dtor(void *cd)
 {

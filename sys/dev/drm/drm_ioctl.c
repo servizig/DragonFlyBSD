@@ -112,12 +112,10 @@ int drm_getunique(struct drm_device *dev, void *data,
 {
 	struct drm_unique *u = data;
 	struct drm_master *master = file_priv->master;
-kprintf("drm_getunique: master->unique=%s\n", master->unique);
+
 	mutex_lock(&master->dev->master_mutex);
-kprintf("drm_getunique: u->unique_len=%ld, master->unique_len=%d\n", u->unique_len, master->unique_len);
 	if (u->unique_len >= master->unique_len) {
 		if (copy_to_user(u->unique, master->unique, master->unique_len)) {
-kprintf("drm_getunique: copy_to_user failed\n");
 			mutex_unlock(&master->dev->master_mutex);
 			return -EFAULT;
 		}
@@ -351,18 +349,16 @@ static int drm_setversion(struct drm_device *dev, void *data, struct drm_file *f
 {
 	struct drm_set_version *sv = data;
 	int if_version, retcode = 0;
-kprintf("drm_setversion: 1\n");
+
 	mutex_lock(&dev->master_mutex);
 	if (sv->drm_di_major != -1) {
 		if (sv->drm_di_major != DRM_IF_MAJOR ||
 		    sv->drm_di_minor < 0 || sv->drm_di_minor > DRM_IF_MINOR) {
-kprintf("drm_setversion: 2\n");
 			retcode = -EINVAL;
 			goto done;
 		}
 		if_version = DRM_IF_VERSION(sv->drm_di_major,
 					    sv->drm_di_minor);
-kprintf("drm_setversion: 3, if_version=%d, dev->if_version=%d\n", if_version, dev->if_version);
 		dev->if_version = max(if_version, dev->if_version);
 		if (sv->drm_di_minor >= 1) {
 			/*
@@ -370,29 +366,24 @@ kprintf("drm_setversion: 3, if_version=%d, dev->if_version=%d\n", if_version, de
 			 * Version 1.4 has proper PCI domain support
 			 */
 			retcode = drm_set_busid(dev, file_priv);
-kprintf("drm_setversion: 4, retcode=%d\n", retcode);
 			if (retcode)
 				goto done;
 		}
 	}
-kprintf("drm_setversion: 5\n");
 	if (sv->drm_dd_major != -1) {
 		if (sv->drm_dd_major != dev->driver->major ||
 		    sv->drm_dd_minor < 0 || sv->drm_dd_minor >
 		    dev->driver->minor) {
-kprintf("drm_setversion: 5.1\n");
 			retcode = -EINVAL;
 			goto done;
 		}
 	}
-kprintf("drm_setversion: 6\n");
 done:
 	sv->drm_di_major = DRM_IF_MAJOR;
 	sv->drm_di_minor = DRM_IF_MINOR;
 	sv->drm_dd_major = dev->driver->major;
 	sv->drm_dd_minor = dev->driver->minor;
 	mutex_unlock(&dev->master_mutex);
-kprintf("drm_setversion: 7\n");
 	return retcode;
 }
 
