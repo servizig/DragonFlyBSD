@@ -257,7 +257,7 @@ uint32_t generic_reg_wait(const struct dc_context *ctx,
 	const char *func_name, int line)
 {
 	uint32_t field_value;
-	uint32_t reg_val;
+	uint32_t reg_val = 0;
 	int i;
 
 	/* something is terribly wrong if time out is > 200ms. (5Hz) */
