@@ -132,7 +132,10 @@ SRCS+= hwmgr.c processpptables.c \
 SRCS+= smumgr.c smu8_smumgr.c tonga_smumgr.c fiji_smumgr.c \
 	  polaris10_smumgr.c iceland_smumgr.c \
 	  smu7_smumgr.c vega10_smumgr.c smu10_smumgr.c ci_smumgr.c \
-	  vega12_smumgr.c vegam_smumgr.c smu9_smumgr.c 
+	  vega12_smumgr.c vegam_smumgr.c smu9_smumgr.c
+
+# display core component (CONFIG_DRM_AMD_DC)
+SUBDIR = ../display
 
 SRCS+= \
 	opt_ddb.h 	\
@@ -159,6 +162,9 @@ KCFLAGS+= -I${SYSDIR}/contrib/dev/acpica/source/include
 KCFLAGS+= -I${SYSDIR}/dev/drm/amd/amdgpu
 KCFLAGS+= -I${SYSDIR}/dev/drm/amd/display
 KCFLAGS+= -I${SYSDIR}/dev/drm/amd/display/dc
+KCFLAGS+= -I${SYSDIR}/dev/drm/amd/display/dc/inc
+KCFLAGS+= -I${SYSDIR}/dev/drm/amd/display/dc/inc/hw
+KCFLAGS+= -I${SYSDIR}/dev/drm/amd/display/modules/inc
 KCFLAGS+= -I${SYSDIR}/dev/drm/amd/display/amdgpu_dm
 KCFLAGS+= -I${SYSDIR}/dev/drm/amd/display/include
 KCFLAGS+= -I${SYSDIR}/dev/drm/amd/include
