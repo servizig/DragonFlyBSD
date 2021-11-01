@@ -365,22 +365,22 @@ KCFLAGS+= -include ${SYSDIR}/dev/drm/kconfig.h
 .include <bsd.kmod.mk>
 
 dcn_calcs.o:
-	${CC} ${CFLAGS} ${KCFLAGS} -msse -mpreferred-stack-boundary=4 -c ${.IMPSRC}
+	${CC} ${CFLAGS} ${KCFLAGS} -mhard-float -msse -mpreferred-stack-boundary=4 -c ${.IMPSRC}
 
 dcn_calc_auto.o:
-	${CC} ${CFLAGS} ${KCFLAGS} -msse -mpreferred-stack-boundary=4 -c ${.IMPSRC}
+	${CC} ${CFLAGS} ${KCFLAGS} -mhard-float -msse -mpreferred-stack-boundary=4 -c ${.IMPSRC}
 
 dcn_calc_math.o:
-	${CC} ${CFLAGS} ${KCFLAGS} -msse -mpreferred-stack-boundary=4 -c ${.IMPSRC}
+	${CC} ${CFLAGS} ${KCFLAGS} -mhard-float -msse -mpreferred-stack-boundary=4 -c ${.IMPSRC}
 
 dcn20_resource.o:
-	${CC} ${CFLAGS} ${KCFLAGS} -msse -mpreferred-stack-boundary=4 -c ${.IMPSRC}
+	${CC} ${CFLAGS} ${KCFLAGS} -mhard-float -msse -mpreferred-stack-boundary=4 -c ${.IMPSRC}
 
 dcn21_resource.o:
-	${CC} ${CFLAGS} ${KCFLAGS} -msse -mpreferred-stack-boundary=4 -c ${.IMPSRC}
+	${CC} ${CFLAGS} ${KCFLAGS} -mhard-float -msse -mpreferred-stack-boundary=4 -c ${.IMPSRC}
 
 dml1_display_rq_dlg_calc.o:
-	${CC} ${CFLAGS} ${KCFLAGS} -msse -mpreferred-stack-boundary=4 -c ${.IMPSRC}
+	${CC} ${CFLAGS} ${KCFLAGS} -mhard-float -msse -mpreferred-stack-boundary=4 -c ${.IMPSRC}
 
 dml_common_defs.o:
-	${CC} ${CFLAGS} ${KCFLAGS} -msse -mpreferred-stack-boundary=4 -c ${.IMPSRC}
+	${CC} ${CFLAGS} ${KCFLAGS} -mhard-float -msse -mpreferred-stack-boundary=4 -c ${.IMPSRC}
