@@ -9,6 +9,7 @@ KMOD=	amdgpu
 	${.CURDIR}/../powerplay/hwmgr \
 	${.CURDIR}/../powerplay/smumgr \
 	${.CURDIR}/../lib \
+	${.CURDIR}/../display/amdgpu_dm \
 	${.CURDIR}/../display/dc \
 	${.CURDIR}/../display/dc/basics \
 	${.CURDIR}/../display/dc/bios \
@@ -179,6 +180,9 @@ SRC+= amdgpu_dm.c amdgpu_dm_irq.c amdgpu_dm_mst_types.c amdgpu_dm_color.c
 SRC+= amdgpu_dm_services.c amdgpu_dm_helpers.c amdgpu_dm_pp_smu.c
 
 # dc
+SRCS+= amdgpu_dm.c amdgpu_dm_irq.c amdgpu_dm_mst_types.c amdgpu_dm_color.c
+SRCS+= amdgpu_dm_services.c amdgpu_dm_helpers.c amdgpu_dm_pp_smu.c
+
 # dc/basics
 SRCS+= conversion.c fixpt31_32.c \
 	log_helpers.c vector.c
@@ -359,3 +363,24 @@ KCFLAGS+= -I${SYSDIR}/dev/drm/scheduler
 KCFLAGS+= -include ${SYSDIR}/dev/drm/kconfig.h
 
 .include <bsd.kmod.mk>
+
+dcn_calcs.o:
+	${CC} ${CFLAGS} ${KCFLAGS} -msse -mpreferred-stack-boundary=4 -c ${.IMPSRC}
+
+dcn_calc_auto.o:
+	${CC} ${CFLAGS} ${KCFLAGS} -msse -mpreferred-stack-boundary=4 -c ${.IMPSRC}
+
+dcn_calc_math.o:
+	${CC} ${CFLAGS} ${KCFLAGS} -msse -mpreferred-stack-boundary=4 -c ${.IMPSRC}
+
+dcn20_resource.o:
+	${CC} ${CFLAGS} ${KCFLAGS} -msse -mpreferred-stack-boundary=4 -c ${.IMPSRC}
+
+dcn21_resource.o:
+	${CC} ${CFLAGS} ${KCFLAGS} -msse -mpreferred-stack-boundary=4 -c ${.IMPSRC}
+
+dml1_display_rq_dlg_calc.o:
+	${CC} ${CFLAGS} ${KCFLAGS} -msse -mpreferred-stack-boundary=4 -c ${.IMPSRC}
+
+dml_common_defs.o:
+	${CC} ${CFLAGS} ${KCFLAGS} -msse -mpreferred-stack-boundary=4 -c ${.IMPSRC}
