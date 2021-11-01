@@ -762,8 +762,9 @@ static struct cdev_pager_ops ttm_pager_ops = {
  * ttm_bo_mmap() are not currently used.
  */
 int
-ttm_bo_mmap_single(struct drm_device *dev, vm_ooffset_t *offset,
-		   vm_size_t size, struct vm_object **obj_res, int nprot)
+ttm_bo_mmap_single(struct file *fp, struct drm_device *dev,
+		   vm_ooffset_t *offset, vm_size_t size,
+		   struct vm_object **obj_res, int nprot)
 {
 	struct ttm_bo_device *bdev = dev->drm_ttm_bdev;
 	struct ttm_buffer_object *bo;
@@ -785,7 +786,7 @@ ttm_bo_mmap_single(struct drm_device *dev, vm_ooffset_t *offset,
 	 * setup our own VM object and ignore what the linux code did other
 	 * then supplying us the 'bo'.
 	 */
-	ret = ttm_bo_mmap(NULL, &vma, bdev);
+	ret = ttm_bo_mmap(fp, &vma, bdev);
 
 	if (ret == 0) {
 		bo = vma.vm_private_data;
