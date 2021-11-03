@@ -280,10 +280,7 @@ long drm_sched_entity_flush(struct drm_sched_entity *entity, long timeout)
 			kprintf("#14#end#: drm_sched_entity_flush.wait_event_timeout\n");
 		}
 	} else {
-		kprintf("drm_sched_entity_flush: wait_event_killable is not implemented\n");
-#if 0
-		wait_event_killable(sched->job_scheduled, drm_sched_entity_is_idle(entity));
-#endif
+		wait_event_interruptible(sched->job_scheduled, drm_sched_entity_is_idle(entity));
 	}
 
 
