@@ -47,6 +47,14 @@
 	0x030000, 0xff0000,			\
 	(unsigned long) info }
 
+#define INTEL_I810_IDS(info)					\
+	INTEL_VGA_DEVICE(0x7121, info), /* I810 */		\
+	INTEL_VGA_DEVICE(0x7123, info), /* I810_DC100 */	\
+	INTEL_VGA_DEVICE(0x7125, info)  /* I810_E */
+
+#define INTEL_I815_IDS(info)					\
+	INTEL_VGA_DEVICE(0x1132, info)  /* I815*/
+
 #define INTEL_I830_IDS(info)				\
 	INTEL_VGA_DEVICE(0x3577, info)
 
@@ -396,7 +404,8 @@
 	INTEL_KBL_GT1_IDS(info), \
 	INTEL_KBL_GT2_IDS(info), \
 	INTEL_KBL_GT3_IDS(info), \
-	INTEL_KBL_GT4_IDS(info)
+	INTEL_KBL_GT4_IDS(info), \
+	INTEL_AML_GT2_IDS(info)
 
 /* CFL S */
 #define INTEL_CFL_S_GT1_IDS(info) \

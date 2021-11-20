@@ -619,11 +619,11 @@ void intel_audio_codec_enable(struct intel_encoder *intel_encoder,
 	dev_priv->av_enc_map[pipe] = intel_encoder;
 	mutex_unlock(&dev_priv->av_mutex);
 
-	if (acomp && acomp->audio_ops && acomp->audio_ops->pin_eld_notify) {
+	if (acomp && acomp->base.audio_ops && acomp->base.audio_ops->pin_eld_notify) {
 		/* audio drivers expect pipe = -1 to indicate Non-MST cases */
 		if (intel_encoder->type != INTEL_OUTPUT_DP_MST)
 			pipe = -1;
-		acomp->audio_ops->pin_eld_notify(acomp->audio_ops->audio_ptr,
+		acomp->base.audio_ops->pin_eld_notify(acomp->base.audio_ops->audio_ptr,
 						 (int) port, (int) pipe);
 	}
 
@@ -656,11 +656,11 @@ void intel_audio_codec_disable(struct intel_encoder *intel_encoder)
 	dev_priv->av_enc_map[pipe] = NULL;
 	mutex_unlock(&dev_priv->av_mutex);
 
-	if (acomp && acomp->audio_ops && acomp->audio_ops->pin_eld_notify) {
+	if (acomp && acomp->base.audio_ops && acomp->base.audio_ops->pin_eld_notify) {
 		/* audio drivers expect pipe = -1 to indicate Non-MST cases */
 		if (intel_encoder->type != INTEL_OUTPUT_DP_MST)
 			pipe = -1;
-		acomp->audio_ops->pin_eld_notify(acomp->audio_ops->audio_ptr,
+		acomp->base.audio_ops->pin_eld_notify(acomp->base.audio_ops->audio_ptr,
 						 (int) port, (int) pipe);
 	}
 

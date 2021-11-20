@@ -133,10 +133,10 @@ static int drm_map_handle(struct drm_device *dev, struct drm_hash_item *hash,
  * type.  Adds the map to the map list drm_device::maplist. Adds MTRR's where
  * applicable and if supported by the kernel.
  */
-static int drm_addmap_core(struct drm_device * dev, resource_size_t offset,
+static int drm_addmap_core(struct drm_device *dev, resource_size_t offset,
 			   unsigned int size, enum drm_map_type type,
 			   enum drm_map_flags flags,
-			   struct drm_map_list ** maplist)
+			   struct drm_map_list **maplist)
 {
 	struct drm_local_map *map;
 	struct drm_map_list *list;
@@ -228,7 +228,7 @@ static int drm_addmap_core(struct drm_device * dev, resource_size_t offset,
 	case _DRM_SHM:
 		list = drm_find_matching_map(dev, map);
 		if (list != NULL) {
-			if(list->map->size != map->size) {
+			if (list->map->size != map->size) {
 				DRM_DEBUG("Matching maps of type %d with "
 					  "mismatched sizes, (%ld vs %ld)\n",
 					  map->type, map->size, list->map->size);
@@ -369,7 +369,7 @@ static int drm_addmap_core(struct drm_device * dev, resource_size_t offset,
 	return 0;
 }
 
-int drm_legacy_addmap(struct drm_device * dev, resource_size_t offset,
+int drm_legacy_addmap(struct drm_device *dev, resource_size_t offset,
 		      unsigned int size, enum drm_map_type type,
 		      enum drm_map_flags flags, struct drm_local_map **map_ptr)
 {
@@ -645,8 +645,8 @@ int drm_legacy_rmmap_ioctl(struct drm_device *dev, void *data,
  *
  * Frees any pages and buffers associated with the given entry.
  */
-static void drm_cleanup_buf_error(struct drm_device * dev,
-				  struct drm_buf_entry * entry)
+static void drm_cleanup_buf_error(struct drm_device *dev,
+				  struct drm_buf_entry *entry)
 {
 	int i;
 
@@ -1326,7 +1326,10 @@ static int copy_one_buf(void *data, int count, struct drm_buf_entry *from)
 				 .size = from->buf_size,
 				 .low_mark = from->low_mark,
 				 .high_mark = from->high_mark};
-	return copy_to_user(to, &v, offsetof(struct drm_buf_desc, flags));
+
+	if (copy_to_user(to, &v, offsetof(struct drm_buf_desc, flags)))
+		return -EFAULT;
+	return 0;
 }
 
 int drm_legacy_infobufs(struct drm_device *dev, void *data,
@@ -1453,8 +1456,8 @@ int drm_legacy_freebufs(struct drm_device *dev, void *data,
 int __drm_legacy_mapbufs(struct drm_device *dev, void *data, int *p,
 			 void __user **v,
 			 int (*f)(void *, int, unsigned long,
-				  struct drm_buf *),
-		         struct drm_file *file_priv)
+				 struct drm_buf *),
+				 struct drm_file *file_priv)
 {
 #ifndef __DragonFly__
 	struct drm_device_dma *dma = dev->dma;

@@ -868,7 +868,9 @@ intel_check_sprite_plane(struct intel_plane *plane,
 	uint32_t src_x, src_y, src_w, src_h;
 	struct drm_rect *src = &state->base.src;
 	struct drm_rect *dst = &state->base.dst;
+#if 0 /* TODO: sync with 4.19 */
 	const struct drm_rect *clip = &state->clip;
+#endif
 	int hscale, vscale;
 	int max_scale, min_scale;
 	bool can_scale;
@@ -926,7 +928,9 @@ intel_check_sprite_plane(struct intel_plane *plane,
 	vscale = drm_rect_calc_vscale_relaxed(src, dst, min_scale, max_scale);
 	BUG_ON(vscale < 0);
 
+#if 0 /* TODO: sync with 4.19 */
 	state->base.visible = drm_rect_clip_scaled(src, dst, clip, hscale, vscale);
+#endif
 
 	crtc_x = dst->x1;
 	crtc_y = dst->y1;

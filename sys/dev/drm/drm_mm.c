@@ -93,7 +93,7 @@ extern int drm_vma_debug;
  * some basic allocator dumpers for debugging.
  *
  * Note that this range allocator is not thread-safe, drivers need to protect
- * modifications with their on locking. The idea behind this is that for a full
+ * modifications with their own locking. The idea behind this is that for a full
  * memory manager additional data needs to be protected anyway, hence internal
  * locking would be fully redundant.
  */

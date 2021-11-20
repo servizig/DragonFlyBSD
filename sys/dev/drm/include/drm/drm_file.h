@@ -38,6 +38,12 @@
 
 #include <drm/drm_prime.h>
 
+#ifdef __DragonFly__ /* needs review */
+#include <sys/device.h>
+#include <sys/event.h>
+#include <linux/poll.h>
+#endif
+
 struct dma_fence;
 struct drm_file;
 struct drm_device;
@@ -48,6 +54,9 @@ struct device;
  * header include loops we need it here for now.
  */
 
+/* Note that the order of this enum is ABI (it determines
+ * /dev/dri/renderD* numbers).
+ */
 enum drm_minor_type {
 	DRM_MINOR_PRIMARY,
 	DRM_MINOR_CONTROL,
@@ -181,6 +190,21 @@ struct drm_file {
 
 	/** @atomic: True if client understands atomic properties. */
 	unsigned atomic:1;
+
+	/**
+	 * @aspect_ratio_allowed:
+	 *
+	 * True, if client can handle picture aspect ratios, and has requested
+	 * to pass this information along with the mode.
+	 */
+	unsigned aspect_ratio_allowed:1;
+
+	/**
+	 * @writeback_connectors:
+	 *
+	 * True if client understands writeback connectors
+	 */
+	unsigned writeback_connectors:1;
 
 	/**
 	 * @is_master:

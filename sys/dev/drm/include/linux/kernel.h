@@ -58,6 +58,7 @@
 #define	IS_ALIGNED(x, y)	(((x) & ((y) - 1)) == 0)
 #define	DIV_ROUND_UP		howmany
 #define DIV_ROUND_UP_ULL(X, N)	DIV_ROUND_UP((unsigned long long)(X), (N))
+#define	DIV_ROUND_DOWN_ULL(x, n) (((unsigned long long)(x) / (n)) * (n))
 
 #define udelay(t)       	DELAY(t)
 

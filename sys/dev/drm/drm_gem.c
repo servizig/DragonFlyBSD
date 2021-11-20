@@ -71,6 +71,7 @@
 #include <drm/drmP.h>
 #include <drm/drm_vma_manager.h>
 #include <drm/drm_gem.h>
+#include <drm/drm_print.h>
 #include "drm_internal.h"
 
 #ifdef __DragonFly__
@@ -415,7 +416,7 @@ EXPORT_SYMBOL_GPL(drm_gem_dumb_map_offset);
  * @file: drm file-private structure to remove the dumb handle from
  * @dev: corresponding drm_device
  * @handle: the dumb handle to remove
- * 
+ *
  * This implements the &drm_driver.dumb_destroy kms driver callback for drivers
  * which use gem to manage their backing storage.
  */
@@ -432,7 +433,7 @@ EXPORT_SYMBOL(drm_gem_dumb_destroy);
  * @file_priv: drm file-private structure to register the handle for
  * @obj: object to register
  * @handlep: pointer to return the created handle to the caller
- * 
+ *
  * This expects the &drm_device.object_name_lock to be held already and will
  * drop it before returning. Used to avoid races in establishing new handles
  * when importing an object from either an flink name or a dma-buf.
@@ -715,9 +716,6 @@ err:
  * @file_priv: drm file-private structure
  *
  * Open an object using the global name, returning a handle and the size.
- *
- * This handle (of course) holds a reference to the object, so the object
- * will not go away until the handle is deleted.
  */
 int
 drm_gem_open_ioctl(struct drm_device *dev, void *data,
@@ -742,14 +740,15 @@ drm_gem_open_ioctl(struct drm_device *dev, void *data,
 
 	/* drm_gem_handle_create_tail unlocks dev->object_name_lock. */
 	ret = drm_gem_handle_create_tail(file_priv, obj, &handle);
-	drm_gem_object_put_unlocked(obj);
 	if (ret)
-		return ret;
+		goto err;
 
 	args->handle = handle;
 	args->size = obj->size;
 
-	return 0;
+err:
+	drm_gem_object_put_unlocked(obj);
+	return ret;
 }
 
 /**
@@ -1021,6 +1020,15 @@ int drm_gem_mmap(struct file *filp, struct vm_area_struct *vma)
 		return -EACCES;
 	}
 
+	if (node->readonly) {
+		if (vma->vm_flags & VM_WRITE) {
+			drm_gem_object_put_unlocked(obj);
+			return -EINVAL;
+		}
+
+		vma->vm_flags &= ~VM_MAYWRITE;
+	}
+
 	ret = drm_gem_mmap_obj(obj, drm_vma_node_size(node) << PAGE_SHIFT,
 			       vma);
 
@@ -1079,3 +1087,19 @@ drm_gem_mmap_single(struct drm_device *dev, vm_ooffset_t *offset, vm_size_t size
 	return (0);
 }
 #endif
+
+void drm_gem_print_info(struct drm_printer *p, unsigned int indent,
+			const struct drm_gem_object *obj)
+{
+	drm_printf_indent(p, indent, "name=%d\n", obj->name);
+	drm_printf_indent(p, indent, "refcount=%u\n",
+			  kref_read(&obj->refcount));
+	drm_printf_indent(p, indent, "start=%08lx\n",
+			  drm_vma_node_start(&obj->vma_node));
+	drm_printf_indent(p, indent, "size=%zu\n", obj->size);
+	drm_printf_indent(p, indent, "imported=%s\n",
+			  obj->import_attach ? "yes" : "no");
+
+	if (obj->dev->driver->gem_print_info)
+		obj->dev->driver->gem_print_info(p, indent, obj);
+}

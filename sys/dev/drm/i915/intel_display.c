@@ -9298,6 +9298,7 @@ static int intel_check_cursor(struct intel_crtc_state *crtc_state,
 	const struct drm_framebuffer *fb = plane_state->base.fb;
 	int src_x, src_y;
 	u32 offset;
+#if 0 /* TODO: sync with 4.19 */
 	int ret;
 
 	ret = drm_plane_helper_check_state(&plane_state->base,
@@ -9307,6 +9308,7 @@ static int intel_check_cursor(struct intel_crtc_state *crtc_state,
 					   true, true);
 	if (ret)
 		return ret;
+#endif
 
 	if (!fb)
 		return 0;
@@ -11082,7 +11084,9 @@ pipe_config_err(bool adjust, const char *name, const char *format, ...)
 	vaf.fmt = format;
 	vaf.va = &args;
 
+#if 0 /* TODO: sync with 4.19 */
 	drm_printk(level, category, "mismatch in %s %pV", name, &vaf);
+#endif
 
 	va_end(args);
 }
@@ -12822,12 +12826,14 @@ intel_check_primary_plane(struct intel_plane *plane,
 		can_position = true;
 	}
 
+#if 0 /* TODO: sync with 4.19 */
 	ret = drm_plane_helper_check_state(&state->base,
 					   &state->clip,
 					   min_scale, max_scale,
 					   can_position, true);
 	if (ret)
 		return ret;
+#endif
 
 	if (!state->base.fb)
 		return 0;
@@ -15297,7 +15303,7 @@ void intel_connector_attach_encoder(struct intel_connector *connector,
 				    struct intel_encoder *encoder)
 {
 	connector->encoder = encoder;
-	drm_mode_connector_attach_encoder(&connector->base,
+	drm_connector_attach_encoder(&connector->base,
 					  &encoder->base);
 }
 

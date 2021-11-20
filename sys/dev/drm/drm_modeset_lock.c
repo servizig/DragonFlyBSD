@@ -113,6 +113,7 @@ retry:
 		kfree(ctx);
 		return;
 	}
+	ww_acquire_done(&ctx->ww_ctx);
 
 	WARN_ON(config->acquire_ctx);
 
@@ -226,12 +227,12 @@ void drm_modeset_drop_locks(struct drm_modeset_acquire_ctx *ctx)
 {
 	WARN_ON(ctx->contended);
 	while (!list_empty(&ctx->locked)) {
-		struct drm_modeset_lock_info *info;
+		struct drm_modeset_lock *lock;
 
-		info = list_first_entry(&ctx->locked,
-				struct drm_modeset_lock_info, ctx_entry);
+		lock = list_first_entry(&ctx->locked,
+				struct drm_modeset_lock, head);
 
-		drm_modeset_unlock(info->lock);
+		drm_modeset_unlock(lock);
 	}
 }
 EXPORT_SYMBOL(drm_modeset_drop_locks);

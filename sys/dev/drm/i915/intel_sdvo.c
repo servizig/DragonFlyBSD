@@ -1876,7 +1876,7 @@ static void intel_sdvo_get_ddc_modes(struct drm_connector *connector)
 	if (edid != NULL) {
 		if (intel_sdvo_connector_matches_edid(to_intel_sdvo_connector(connector),
 						      edid)) {
-			drm_mode_connector_update_edid_property(connector, edid);
+			drm_connector_update_edid_property(connector, edid);
 			drm_add_edid_modes(connector, edid);
 		}
 
@@ -2750,10 +2750,12 @@ static bool intel_sdvo_tv_create_property(struct intel_sdvo *intel_sdvo,
 	if (!intel_sdvo_connector->tv_format)
 		return false;
 
+#if 0 /* TODO: sync with 4.19 */
 	for (i = 0; i < intel_sdvo_connector->format_supported_num; i++)
 		drm_property_add_enum(
 				intel_sdvo_connector->tv_format, i,
 				i, tv_format_names[intel_sdvo_connector->tv_format_supported[i]]);
+#endif
 
 	intel_sdvo_connector->base.base.state->tv.mode = intel_sdvo_connector->tv_format_supported[0];
 	drm_object_attach_property(&intel_sdvo_connector->base.base.base,

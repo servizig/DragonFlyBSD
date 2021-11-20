@@ -5868,9 +5868,11 @@ static bool intel_edp_init_connector(struct intel_dp *intel_dp,
 	edid = drm_get_edid(connector, &intel_dp->aux.ddc);
 	if (edid) {
 		if (drm_add_edid_modes(connector, edid)) {
-			drm_mode_connector_update_edid_property(connector,
+			drm_connector_update_edid_property(connector,
 								edid);
+#if 0 /* TODO: sync with 4.19 */
 			drm_edid_to_eld(connector, edid);
+#endif
 		} else {
 			kfree(edid);
 			edid = ERR_PTR(-EINVAL);
@@ -5991,7 +5993,7 @@ static void intel_dp_modeset_retry_work_fn(struct work_struct *work)
 	/* Set connector link status to BAD and send a Uevent to notify
 	 * userspace to do a modeset.
 	 */
-	drm_mode_connector_set_link_status_property(connector,
+	drm_connector_set_link_status_property(connector,
 						    DRM_MODE_LINK_STATUS_BAD);
 	mutex_unlock(&connector->dev->mode_config.mutex);
 	/* Send Hotplug uevent so userspace can reprobe */

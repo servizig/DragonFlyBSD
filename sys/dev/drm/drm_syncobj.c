@@ -29,9 +29,9 @@
 /**
  * DOC: Overview
  *
- * DRM synchronisation objects (syncobj) are a persistent objects,
- * that contain an optional fence. The fence can be updated with a new
- * fence, or be NULL.
+ * DRM synchronisation objects (syncobj, see struct &drm_syncobj) are
+ * persistent objects that contain an optional fence. The fence can be updated
+ * with a new fence, or be NULL.
  *
  * syncobj's can be waited upon, where it will wait for the underlying
  * fence.
@@ -61,7 +61,8 @@
  * @file_private: drm file private pointer
  * @handle: sync object handle to lookup.
  *
- * Returns a reference to the syncobj pointed to by handle or NULL.
+ * Returns a reference to the syncobj pointed to by handle or NULL. The
+ * reference must be released by calling drm_syncobj_put().
  */
 struct drm_syncobj *drm_syncobj_find(struct drm_file *file_private,
 				     u32 handle)
@@ -96,6 +97,8 @@ static int drm_syncobj_fence_get_or_add_callback(struct drm_syncobj *syncobj,
 						 drm_syncobj_func_t func)
 {
 	int ret;
+
+	WARN_ON(*fence);
 
 	*fence = drm_syncobj_fence_get(syncobj);
 	if (*fence)
@@ -206,7 +209,6 @@ static const struct dma_fence_ops drm_syncobj_null_fence_ops = {
 	.get_driver_name = drm_syncobj_null_fence_get_name,
 	.get_timeline_name = drm_syncobj_null_fence_get_name,
 	.enable_signaling = drm_syncobj_null_fence_enable_signaling,
-	.wait = dma_fence_default_wait,
 	.release = NULL,
 };
 
@@ -229,6 +231,19 @@ static int drm_syncobj_assign_null_handle(struct drm_syncobj *syncobj)
 	return 0;
 }
 
+/**
+ * drm_syncobj_find_fence - lookup and reference the fence in a sync object
+ * @file_private: drm file private pointer
+ * @handle: sync object handle to lookup.
+ * @fence: out parameter for the fence
+ *
+ * This is just a convenience function that combines drm_syncobj_find() and
+ * drm_syncobj_fence_get().
+ *
+ * Returns 0 on success or a negative error value on failure. On success @fence
+ * contains a reference to the fence, which must be released by calling
+ * dma_fence_put().
+ */
 int drm_syncobj_find_fence(struct drm_file *file_private,
 			   u32 handle,
 			   struct dma_fence **fence)
@@ -269,6 +284,12 @@ EXPORT_SYMBOL(drm_syncobj_free);
  * @out_syncobj: returned syncobj
  * @flags: DRM_SYNCOBJ_* flags
  * @fence: if non-NULL, the syncobj will represent this fence
+ *
+ * This is the first function to create a sync object. After creating, drivers
+ * probably want to make it available to userspace, either through
+ * drm_syncobj_get_handle() or drm_syncobj_get_fd().
+ *
+ * Returns 0 on success or a negative error value on failure.
  */
 int drm_syncobj_create(struct drm_syncobj **out_syncobj, uint32_t flags,
 		       struct dma_fence *fence)
@@ -302,6 +323,14 @@ EXPORT_SYMBOL(drm_syncobj_create);
 
 /**
  * drm_syncobj_get_handle - get a handle from a syncobj
+ * @file_private: drm file private pointer
+ * @syncobj: Sync object to export
+ * @handle: out parameter with the new handle
+ *
+ * Exports a sync object created with drm_syncobj_create() as a handle on
+ * @file_private to userspace.
+ *
+ * Returns 0 on success or a negative error value on failure.
  */
 int drm_syncobj_get_handle(struct drm_file *file_private,
 			   struct drm_syncobj *syncobj, u32 *handle)
@@ -373,6 +402,15 @@ static const struct file_operations drm_syncobj_file_fops = {
 };
 #endif
 
+/**
+ * drm_syncobj_get_fd - get a file descriptor from a syncobj
+ * @syncobj: Sync object to export
+ * @p_fd: out parameter with the new file descriptor
+ *
+ * Exports a sync object created with drm_syncobj_create() as a file descriptor.
+ *
+ * Returns 0 on success or a negative error value on failure.
+ */
 int drm_syncobj_get_fd(struct drm_syncobj *syncobj, int *p_fd)
 {
 	struct file *file;
@@ -733,6 +771,9 @@ static signed long drm_syncobj_array_wait_timeout(struct drm_syncobj **syncobjs,
 
 	if (flags & DRM_SYNCOBJ_WAIT_FLAGS_WAIT_FOR_SUBMIT) {
 		for (i = 0; i < count; ++i) {
+			if (entries[i].fence)
+				continue;
+
 			drm_syncobj_fence_get_or_add_callback(syncobjs[i],
 							      &entries[i].fence,
 							      &entries[i].syncobj_cb,

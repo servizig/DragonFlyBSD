@@ -33,6 +33,7 @@
 #include <linux/mount.h>
 #include <linux/slab.h>
 
+#include <drm/drm_client.h>
 #include <drm/drm_drv.h>
 #include <drm/drmP.h>
 
@@ -90,6 +91,7 @@ static bool drm_core_init_complete = false;
 static struct dentry *drm_debugfs_root;
 #endif
 
+#if 0 /* moved to drm_print.h */
 void drm_err(const char *func, const char *format, ...)
 {
 	va_list args;
@@ -100,6 +102,7 @@ void drm_err(const char *func, const char *format, ...)
 	kvprintf(format, args);
 	va_end(args);
 }
+#endif
 
 void drm_ut_debug_printk(const char *function_name, const char *format, ...)
 {
@@ -117,45 +120,8 @@ void drm_ut_debug_printk(const char *function_name, const char *format, ...)
 	va_end(args);
 }
 
-#define DRM_PRINTK_FMT "[" DRM_NAME ":%s]%s %pV"
-#define DRM_PRINTK_FMT_DFLY "[" DRM_NAME ":%s]%s "
-
-void drm_dev_printk(const struct device *dev, const char *level,
-		    unsigned int category, const char *function_name,
-		    const char *prefix, const char *format, ...)
-{
-	struct va_format vaf;
-	va_list args;
-
-	if (category != DRM_UT_NONE && !(drm_debug & category))
-		return;
-
-	va_start(args, format);
-	vaf.fmt = format;
-	vaf.va = &args;
-
-	if (dev)
-#if 0
-		dev_printk(level, dev, DRM_PRINTK_FMT, function_name, prefix,
-			   &vaf);
-	else
-		printk("%s" DRM_PRINTK_FMT, level, function_name, prefix, &vaf);
-#else
-	{
-		kprintf("drm_dev_printk: ");
-		dev_printk(level, dev, DRM_PRINTK_FMT_DFLY, function_name, prefix);
-		kprintf(vaf.fmt, vaf.va);
-	} else {
-		kprintf("drm_dev_printk: ");
-		printk("%s" DRM_PRINTK_FMT_DFLY, level, function_name, prefix);
-		kprintf(vaf.fmt, vaf.va);
-	}
-#endif
-
-	va_end(args);
-}
-EXPORT_SYMBOL(drm_dev_printk);
-
+void drm_printk(const char *level, unsigned int category,
+		const char *format, ...);
 void drm_printk(const char *level, unsigned int category,
 		const char *format, ...)
 {
@@ -440,30 +406,67 @@ void drm_put_dev(struct drm_device *dev)
 }
 EXPORT_SYMBOL(drm_put_dev);
 
-static void drm_device_set_unplugged(struct drm_device *dev)
+/**
+ * drm_dev_enter - Enter device critical section
+ * @dev: DRM device
+ * @idx: Pointer to index that will be passed to the matching drm_dev_exit()
+ *
+ * This function marks and protects the beginning of a section that should not
+ * be entered after the device has been unplugged. The section end is marked
+ * with drm_dev_exit(). Calls to this function can be nested.
+ *
+ * Returns:
+ * True if it is OK to enter the section, false otherwise.
+ */
+bool drm_dev_enter(struct drm_device *dev, int *idx)
 {
-	smp_wmb();
-	atomic_set(&dev->unplugged, 1);
+	*idx = srcu_read_lock(&drm_unplug_srcu);
+
+	if (dev->unplugged) {
+		srcu_read_unlock(&drm_unplug_srcu, *idx);
+		return false;
+	}
+
+	return true;
 }
+EXPORT_SYMBOL(drm_dev_enter);
+
+/**
+ * drm_dev_exit - Exit device critical section
+ * @idx: index returned from drm_dev_enter()
+ *
+ * This function marks the end of a section that should not be entered after
+ * the device has been unplugged.
+ */
+void drm_dev_exit(int idx)
+{
+	srcu_read_unlock(&drm_unplug_srcu, idx);
+}
+EXPORT_SYMBOL(drm_dev_exit);
 
 /**
  * drm_dev_unplug - unplug a DRM device
  * @dev: DRM device
  *
  * This unplugs a hotpluggable DRM device, which makes it inaccessible to
- * userspace operations. Entry-points can use drm_dev_is_unplugged(). This
+ * userspace operations. Entry-points can use drm_dev_enter() and
+ * drm_dev_exit() to protect device resources in a race free manner. This
  * essentially unregisters the device like drm_dev_unregister(), but can be
  * called while there are still open users of @dev.
  */
 void drm_dev_unplug(struct drm_device *dev)
 {
-	drm_dev_unregister(dev);
+	/*
+	 * After synchronizing any critical read section is guaranteed to see
+	 * the new value of ->unplugged, and any critical section which might
+	 * still have seen the old value of ->unplugged is guaranteed to have
+	 * finished.
+	 */
+	dev->unplugged = true;
+	synchronize_srcu(&drm_unplug_srcu);
 
-	mutex_lock(&drm_global_mutex);
-	drm_device_set_unplugged(dev);
-	if (dev->open_count == 0)
-		drm_dev_put(dev);
-	mutex_unlock(&drm_global_mutex);
+	drm_dev_unregister(dev);
+	drm_dev_put(dev);
 }
 EXPORT_SYMBOL(drm_dev_unplug);
 
@@ -591,6 +594,8 @@ int drm_dev_init(struct drm_device *dev,
 	dev->driver = driver;
 
 	INIT_LIST_HEAD(&dev->filelist);
+	INIT_LIST_HEAD(&dev->filelist_internal);
+	INIT_LIST_HEAD(&dev->clientlist);
 	INIT_LIST_HEAD(&dev->ctxlist);
 	INIT_LIST_HEAD(&dev->vmalist);
 	INIT_LIST_HEAD(&dev->maplist);
@@ -600,6 +605,7 @@ int drm_dev_init(struct drm_device *dev,
 	lockinit(&dev->event_lock, "drmev", 0, 0);
 	lockinit(&dev->struct_mutex, "drmslk", 0, LK_CANRECURSE);
 	lockinit(&dev->filelist_mutex, "drmflm", 0, LK_CANRECURSE);
+	lockinit(&dev->clientlist_mutex, "drmclm", 0, LK_CANRECURSE);
 	lockinit(&dev->ctxlist_mutex, "drmclm", 0, LK_CANRECURSE);
 	lockinit(&dev->master_mutex, "drmmm", 0, LK_CANRECURSE);
 
@@ -671,6 +677,7 @@ err_free:
 #endif
 	mutex_destroy(&dev->master_mutex);
 	mutex_destroy(&dev->ctxlist_mutex);
+	mutex_destroy(&dev->clientlist_mutex);
 	mutex_destroy(&dev->filelist_mutex);
 	mutex_destroy(&dev->struct_mutex);
 #ifdef __DragonFly__
@@ -711,6 +718,7 @@ void drm_dev_fini(struct drm_device *dev)
 
 	mutex_destroy(&dev->master_mutex);
 	mutex_destroy(&dev->ctxlist_mutex);
+	mutex_destroy(&dev->clientlist_mutex);
 	mutex_destroy(&dev->filelist_mutex);
 	mutex_destroy(&dev->struct_mutex);
 	kfree(dev->unique);
@@ -868,7 +876,7 @@ static void remove_compat_control_link(struct drm_device *dev)
 	if (!minor)
 		return;
 
-	name = kasprintf(GFP_KERNEL, "controlD%d", minor->index);
+	name = kasprintf(GFP_KERNEL, "controlD%d", minor->index + 64);
 	if (!name)
 		return;
 
@@ -976,6 +984,8 @@ void drm_dev_unregister(struct drm_device *dev)
 		drm_lastclose(dev);
 
 	dev->registered = false;
+
+	drm_client_dev_unregister(dev);
 
 	if (drm_core_check_feature(dev, DRIVER_MODESET))
 		drm_modeset_unregister_all(dev);

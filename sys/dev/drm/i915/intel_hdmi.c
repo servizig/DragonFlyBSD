@@ -516,12 +516,14 @@ intel_hdmi_set_hdmi_infoframe(struct drm_encoder *encoder,
 			      const struct intel_crtc_state *crtc_state)
 {
 	union hdmi_infoframe frame;
+#if 0 /* TODO: sync with 4.19 */
 	int ret;
 
 	ret = drm_hdmi_vendor_infoframe_from_display_mode(&frame.vendor.hdmi,
 							  &crtc_state->base.adjusted_mode);
 	if (ret < 0)
 		return;
+#endif
 
 	intel_write_infoframe(encoder, crtc_state, &frame);
 }

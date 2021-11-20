@@ -144,6 +144,14 @@ struct drm_mm_node {
 #endif
 };
 
+/**
+ * struct drm_mm - DRM allocator
+ *
+ * DRM range allocator with a few special functions and features geared towards
+ * managing GPU memory. Except for the @color_adjust callback the structure is
+ * entirely opaque and should only be accessed through the provided functions
+ * and macros. This structure can be embedded into larger driver structures.
+ */
 struct drm_mm {
 	/* List of all memory nodes that immediately precede a free hole. */
 	struct list_head hole_stack;
@@ -160,7 +168,17 @@ struct drm_mm {
 	unsigned long scan_active;
 };
 
+/**
+ * struct drm_mm_scan - DRM allocator eviction roaster data
+ *
+ * This structure tracks data needed for the eviction roaster set up using
+ * drm_mm_scan_init(), and used with drm_mm_scan_add_block() and
+ * drm_mm_scan_remove_block(). The structure is entirely opaque and should only
+ * be accessed through the provided functions and macros. It is meant to be
+ * allocated temporarily by the driver on the stack.
+ */
 struct drm_mm_scan {
+	/* private: */
 	struct drm_mm *mm;
 
 	u64 size;

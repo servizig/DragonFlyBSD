@@ -262,7 +262,7 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
 	info->stride = fb->pitches[0];
 	info->depth = sizes->surface_bpp;
 	info->is_vga_boot_display = vga_pci_is_boot_display(vga_dev);
-	info->fbops = amdgpufb_ops;
+	info->fbops = &amdgpufb_ops;
 
 	unsigned long tmp = amdgpu_bo_gpu_offset(abo) - adev->gmc.vram_start;
 	info->vaddr = (vm_offset_t)amdgpu_bo_kptr(abo);

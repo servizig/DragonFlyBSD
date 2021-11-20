@@ -246,7 +246,7 @@ static int intelfb_create(struct drm_fb_helper *helper,
 	info->depth = sizes->surface_bpp;
 	info->paddr = ggtt->mappable_base + vma->node.start;
 	info->is_vga_boot_display = vga_pci_is_boot_display(vga_dev);
-	info->fbops = intelfb_ops;
+	info->fbops = &intelfb_ops;
 
 #else
 	strcpy(info->fix.id, "inteldrmfb");

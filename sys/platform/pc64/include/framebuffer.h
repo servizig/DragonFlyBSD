@@ -56,8 +56,10 @@ struct fb_info {
 	uint16_t depth;
 	int is_vga_boot_display;
 	void *par;
-	struct fb_ops fbops;
+	struct fb_ops *fbops;
 	device_t device;
+	unsigned long screen_size;
+	char *screen_buffer;
 };
 
 int probe_efi_fb(int early);
