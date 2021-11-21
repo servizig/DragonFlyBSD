@@ -3114,7 +3114,7 @@ int drm_fb_helper_generic_probe(struct drm_fb_helper *fb_helper,
 		return PTR_ERR(fbi);
 
 	fbi->par = fb_helper;
-	fbi->fbops = &drm_fbdev_fb_ops;
+	fbi->fbops = drm_fbdev_fb_ops;
 	fbi->screen_size = fb->height * fb->pitches[0];
 #if 0
 	fbi->fix.smem_len = fbi->screen_size;
@@ -3149,8 +3149,8 @@ int drm_fb_helper_generic_probe(struct drm_fb_helper *fb_helper,
 			return -ENOMEM;
 		}
 
-		*fbops = *fbi->fbops;
-		fbi->fbops = fbops;
+		*fbops = fbi->fbops;
+		fbi->fbops = *fbops;
 		fbi->screen_buffer = shadow;
 #if 0
 		fbi->fbdefio = &drm_fbdev_defio;

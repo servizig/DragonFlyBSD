@@ -273,7 +273,7 @@ static int radeonfb_create(struct drm_fb_helper *helper,
 	info->stride = fb->pitches[0];
 	info->depth = sizes->surface_bpp;
 	info->is_vga_boot_display = vga_pci_is_boot_display(vga_dev);
-	info->fbops = &radeonfb_ops;
+	info->fbops = radeonfb_ops;
 	/* We use info->screen_base and info->screen_size would-be values */
 #if 0
 	info->paddr = (vm_paddr_t)rbo->kptr;
