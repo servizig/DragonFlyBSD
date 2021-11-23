@@ -227,12 +227,12 @@ void drm_modeset_drop_locks(struct drm_modeset_acquire_ctx *ctx)
 {
 	WARN_ON(ctx->contended);
 	while (!list_empty(&ctx->locked)) {
-		struct drm_modeset_lock *lock;
+		struct drm_modeset_lock_info *info;
 
-		lock = list_first_entry(&ctx->locked,
-				struct drm_modeset_lock, head);
+		info = list_first_entry(&ctx->locked,
+				struct drm_modeset_lock_info, ctx_entry);
 
-		drm_modeset_unlock(lock);
+		drm_modeset_unlock(info->lock);
 	}
 }
 EXPORT_SYMBOL(drm_modeset_drop_locks);
