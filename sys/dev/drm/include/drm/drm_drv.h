@@ -633,8 +633,10 @@ void drm_dev_get(struct drm_device *dev);
 void drm_dev_put(struct drm_device *dev);
 void drm_dev_unref(struct drm_device *dev);
 void drm_put_dev(struct drm_device *dev);
+#if 0 /* notyet */
 bool drm_dev_enter(struct drm_device *dev, int *idx);
 void drm_dev_exit(int idx);
+#endif
 void drm_dev_unplug(struct drm_device *dev);
 
 /**
@@ -648,6 +650,9 @@ void drm_dev_unplug(struct drm_device *dev);
  */
 static inline bool drm_dev_is_unplugged(struct drm_device *dev)
 {
+	STUB();
+
+#ifdef __linux__
 	int idx;
 
 	if (drm_dev_enter(dev, &idx)) {
@@ -656,6 +661,9 @@ static inline bool drm_dev_is_unplugged(struct drm_device *dev)
 	}
 
 	return true;
+#else
+	return false;
+#endif
 }
 
 /**

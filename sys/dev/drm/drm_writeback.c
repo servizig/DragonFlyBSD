@@ -208,10 +208,10 @@ int drm_writeback_connector_init(struct drm_device *dev,
 		goto attach_fail;
 
 	INIT_LIST_HEAD(&wb_connector->job_queue);
-	spin_lock_init(&wb_connector->job_lock);
+	lockinit(&wb_connector->job_lock, "dwbcjl", 0, LK_CANRECURSE);
 
 	wb_connector->fence_context = dma_fence_context_alloc(1);
-	spin_lock_init(&wb_connector->fence_lock);
+	lockinit(&wb_connector->fence_lock, "dwbcfl", 0, LK_CANRECURSE);
 	snprintf(wb_connector->timeline_name,
 		 sizeof(wb_connector->timeline_name),
 		 "CONNECTOR:%d-%s", connector->base.id, connector->name);

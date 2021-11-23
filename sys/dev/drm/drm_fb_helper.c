@@ -1261,6 +1261,7 @@ void drm_fb_helper_set_suspend(struct drm_fb_helper *fb_helper, bool suspend)
 		fb_set_suspend(fb_helper->fbdev, suspend);
 }
 EXPORT_SYMBOL(drm_fb_helper_set_suspend);
+#endif
 
 /**
  * drm_fb_helper_set_suspend_unlocked - wrapper around fb_set_suspend that also
@@ -1281,6 +1282,7 @@ EXPORT_SYMBOL(drm_fb_helper_set_suspend);
 void drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper,
 					bool suspend)
 {
+#if 0
 	if (!fb_helper || !fb_helper->fbdev)
 		return;
 
@@ -1305,9 +1307,11 @@ void drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper,
 
 	fb_set_suspend(fb_helper->fbdev, suspend);
 	console_unlock();
+#endif
 }
 EXPORT_SYMBOL(drm_fb_helper_set_suspend_unlocked);
 
+#if 0
 static int setcmap_pseudo_palette(struct fb_cmap *cmap, struct fb_info *info)
 {
 	u32 *palette = (u32 *)info->pseudo_palette;
@@ -1968,7 +1972,6 @@ static int drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
 	return 0;
 }
 
-#if 0
 /**
  * drm_fb_helper_fill_fix - initializes fixed fbdev information
  * @info: fbdev registered by the helper
@@ -1985,6 +1988,7 @@ static int drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
 void drm_fb_helper_fill_fix(struct fb_info *info, uint32_t pitch,
 			    uint32_t depth)
 {
+#if 0
 	info->fix.type = FB_TYPE_PACKED_PIXELS;
 	info->fix.visual = depth == 8 ? FB_VISUAL_PSEUDOCOLOR :
 		FB_VISUAL_TRUECOLOR;
@@ -1997,6 +2001,7 @@ void drm_fb_helper_fill_fix(struct fb_info *info, uint32_t pitch,
 	info->fix.accel = FB_ACCEL_NONE;
 
 	info->fix.line_length = pitch;
+#endif
 }
 EXPORT_SYMBOL(drm_fb_helper_fill_fix);
 
@@ -2017,6 +2022,7 @@ EXPORT_SYMBOL(drm_fb_helper_fill_fix);
 void drm_fb_helper_fill_var(struct fb_info *info, struct drm_fb_helper *fb_helper,
 			    uint32_t fb_width, uint32_t fb_height)
 {
+#if 0
 	struct drm_framebuffer *fb = fb_helper->fb;
 
 	info->pseudo_palette = fb_helper->pseudo_palette;
@@ -2032,9 +2038,9 @@ void drm_fb_helper_fill_var(struct fb_info *info, struct drm_fb_helper *fb_helpe
 
 	info->var.xres = fb_width;
 	info->var.yres = fb_height;
+#endif
 }
 EXPORT_SYMBOL(drm_fb_helper_fill_var);
-#endif
 
 static int drm_fb_helper_probe_connector_modes(struct drm_fb_helper *fb_helper,
 						uint32_t maxX,

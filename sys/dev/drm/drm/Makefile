@@ -46,6 +46,7 @@ SRCS	= \
 	drm_modeset_lock.c \
 	drm_modeset_helper.c \
 	drm_panel.c \
+	drm_panel_orientation_quirks.c \
 	drm_pci.c \
 	drm_plane.c \
 	drm_plane_helper.c \
@@ -62,6 +63,7 @@ SRCS	= \
 	drm_vblank.c \
 	drm_vm.c \
 	drm_vma_manager.c \
+	drm_writeback.c \
 	linux_async.c \
 	linux_compat.c \
 	linux_completion.c \
