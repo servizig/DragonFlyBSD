@@ -808,7 +808,9 @@ void dce120_tg_set_blank(struct timing_generator *tg,
 			tg110->offsets.crtc, 0);
 }
 
-static
+bool dce120_tg_validate_timing(struct timing_generator *tg,
+	const struct dc_crtc_timing *timing);
+
 void dce120_tg_wait_for_state(struct timing_generator *tg,
 	enum crtc_state state)
 {

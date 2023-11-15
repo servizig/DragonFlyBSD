@@ -64,6 +64,7 @@ typedef struct {
 
 int amdgpu_atom_debug = 0;
 static int amdgpu_atom_execute_table_locked(struct atom_context *ctx, int index, uint32_t * params);
+int amdgpu_atom_execute_table(struct atom_context *ctx, int index, uint32_t * params);
 
 static uint32_t atom_arg_mask[8] =
     { 0xFFFFFFFF, 0xFFFF, 0xFFFF00, 0xFFFF0000, 0xFF, 0xFF00, 0xFF0000,
@@ -741,8 +742,8 @@ static void atom_op_jump(atom_exec_context *ctx, int *ptr, int arg)
 			cjiffies = jiffies;
 			if (time_after(cjiffies, ctx->last_jump_jiffies)) {
 				cjiffies -= ctx->last_jump_jiffies;
-				if ((jiffies_to_msecs(cjiffies) > 10000)) {
-					DRM_ERROR("atombios stuck in loop for more than 10secs aborting\n");
+				if ((jiffies_to_msecs(cjiffies) > 5000)) {
+					DRM_ERROR("atombios stuck in loop for more than 5secs aborting\n");
 					ctx->abort = true;
 				}
 			} else {

@@ -65,7 +65,7 @@ SRCS+= amdgpu_device.c amdgpu_kms.c \
 	amdgpu_prime.c amdgpu_vm.c amdgpu_ib.c amdgpu_pll.c \
 	amdgpu_ucode.c amdgpu_bo_list.c amdgpu_ctx.c amdgpu_sync.c \
 	amdgpu_gtt_mgr.c amdgpu_vram_mgr.c amdgpu_virt.c amdgpu_atomfirmware.c \
-	amdgpu_queue_mgr.c amdgpu_vf_error.c amdgpu_sched.c amdgpu_debugfs.c \
+	amdgpu_vf_error.c amdgpu_sched.c amdgpu_debugfs.c \
 	amdgpu_ids.c
 
 SRCS+= \
