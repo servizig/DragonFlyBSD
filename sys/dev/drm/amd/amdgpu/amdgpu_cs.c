@@ -1106,7 +1106,7 @@ static int amdgpu_syncobj_lookup_and_add_to_sync(struct amdgpu_cs_parser *p,
 {
 	int r;
 	struct dma_fence *fence;
-	r = drm_syncobj_find_fence(p->filp, handle, 0, &fence);
+	r = drm_syncobj_find_fence(p->filp, handle, &fence);
 	if (r)
 		return r;
 
@@ -1195,7 +1195,7 @@ static void amdgpu_cs_post_dependencies(struct amdgpu_cs_parser *p)
 	int i;
 
 	for (i = 0; i < p->num_post_dep_syncobjs; ++i)
-		drm_syncobj_replace_fence(p->post_dep_syncobjs[i], 0, p->fence);
+		drm_syncobj_replace_fence(p->post_dep_syncobjs[i], p->fence);
 }
 
 static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
@@ -1279,7 +1279,7 @@ int amdgpu_cs_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 	union drm_amdgpu_cs *cs = data;
 	struct amdgpu_cs_parser parser = {};
 	bool reserved_buffers = false;
-	int i, r;
+	int r;
 
 	if (!adev->accel_working)
 		return -EBUSY;

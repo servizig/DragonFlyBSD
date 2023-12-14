@@ -358,9 +358,9 @@ static void amdgpu_vm_bo_idle(struct amdgpu_vm_bo_base *vm_bo)
  */
 static void amdgpu_vm_bo_invalidated(struct amdgpu_vm_bo_base *vm_bo)
 {
-	spin_lock(&vm_bo->vm->invalidated_lock);
+	lockmgr(&vm_bo->vm->invalidated_lock, LK_EXCLUSIVE);
 	list_move(&vm_bo->vm_status, &vm_bo->vm->invalidated);
-	spin_unlock(&vm_bo->vm->invalidated_lock);
+	lockmgr(&vm_bo->vm->invalidated_lock, LK_RELEASE);
 }
 
 /**
@@ -373,9 +373,9 @@ static void amdgpu_vm_bo_invalidated(struct amdgpu_vm_bo_base *vm_bo)
  */
 static void amdgpu_vm_bo_done(struct amdgpu_vm_bo_base *vm_bo)
 {
-	spin_lock(&vm_bo->vm->invalidated_lock);
+	lockmgr(&vm_bo->vm->invalidated_lock, LK_EXCLUSIVE);
 	list_del_init(&vm_bo->vm_status);
-	spin_unlock(&vm_bo->vm->invalidated_lock);
+	lockmgr(&vm_bo->vm->invalidated_lock, LK_RELEASE);
 }
 
 /**
@@ -713,19 +713,18 @@ void amdgpu_vm_move_to_lru_tail(struct amdgpu_device *adev,
 
 	memset(&vm->lru_bulk_move, 0, sizeof(vm->lru_bulk_move));
 
-	spin_lock(&glob->lru_lock);
+	lockmgr(&glob->lru_lock, LK_EXCLUSIVE);
 	list_for_each_entry(bo_base, &vm->idle, vm_status) {
 		struct amdgpu_bo *bo = bo_base->bo;
 
 		if (!bo->parent)
 			continue;
 
-		ttm_bo_move_to_lru_tail(&bo->tbo, &vm->lru_bulk_move);
+		ttm_bo_move_to_lru_tail(&bo->tbo);
 		if (bo->shadow)
-			ttm_bo_move_to_lru_tail(&bo->shadow->tbo,
-						&vm->lru_bulk_move);
+			ttm_bo_move_to_lru_tail(&bo->shadow->tbo);
 	}
-	spin_unlock(&glob->lru_lock);
+	lockmgr(&glob->lru_lock, LK_RELEASE);
 
 	vm->bulk_moveable = true;
 }
@@ -1586,7 +1585,7 @@ static void amdgpu_vm_update_huge(struct amdgpu_pte_update_params *params,
 {
 	if (level != AMDGPU_VM_PTB) {
 		flags |= AMDGPU_PDE_PTE;
-		amdgpu_gmc_get_vm_pde(params->adev, level, &addr, &flags);
+		amdgpu_gmc_get_vm_pde(params->adev, level, (u64)&addr, (u64)&flags);
 	}
 
 	amdgpu_vm_update_func(params, bo, pe, addr, count, incr, flags);
@@ -2224,7 +2223,7 @@ static void amdgpu_vm_add_prt_cb(struct amdgpu_device *adev,
 	if (!adev->gmc.gmc_funcs->set_prt)
 		return;
 
-	cb = kmalloc(sizeof(struct amdgpu_prt_cb), GFP_KERNEL);
+	cb = kmalloc(sizeof(struct amdgpu_prt_cb), M_DRM, GFP_KERNEL);
 	if (!cb) {
 		/* Last resort when we are OOM */
 		if (fence)
@@ -2379,12 +2378,12 @@ int amdgpu_vm_handle_moved(struct amdgpu_device *adev,
 			return r;
 	}
 
-	spin_lock(&vm->invalidated_lock);
+	lockmgr(&vm->invalidated_lock, LK_EXCLUSIVE);
 	while (!list_empty(&vm->invalidated)) {
 		bo_va = list_first_entry(&vm->invalidated, struct amdgpu_bo_va,
 					 base.vm_status);
 		resv = bo_va->base.bo->tbo.resv;
-		spin_unlock(&vm->invalidated_lock);
+		lockmgr(&vm->invalidated_lock, LK_RELEASE);
 
 		/* Try to reserve the BO to avoid clearing its ptes */
 		if (!amdgpu_vm_debug && reservation_object_trylock(resv))
@@ -2399,9 +2398,9 @@ int amdgpu_vm_handle_moved(struct amdgpu_device *adev,
 
 		if (!clear)
 			reservation_object_unlock(resv);
-		spin_lock(&vm->invalidated_lock);
+		lockmgr(&vm->invalidated_lock, LK_EXCLUSIVE);
 	}
-	spin_unlock(&vm->invalidated_lock);
+	lockmgr(&vm->invalidated_lock, LK_RELEASE);
 
 	return 0;
 }
@@ -2840,9 +2839,9 @@ void amdgpu_vm_bo_rmv(struct amdgpu_device *adev,
 		}
 	}
 
-	spin_lock(&vm->invalidated_lock);
+	lockmgr(&vm->invalidated_lock, LK_EXCLUSIVE);
 	list_del(&bo_va->base.vm_status);
-	spin_unlock(&vm->invalidated_lock);
+	lockmgr(&vm->invalidated_lock, LK_RELEASE);
 
 	list_for_each_entry_safe(mapping, next, &bo_va->valids, list) {
 		list_del(&mapping->list);
@@ -3020,13 +3019,13 @@ static struct amdgpu_retryfault_hashtable *init_fault_hash(void)
 {
 	struct amdgpu_retryfault_hashtable *fault_hash;
 
-	fault_hash = kmalloc(sizeof(*fault_hash), GFP_KERNEL);
+	fault_hash = kmalloc(sizeof(*fault_hash), M_DRM, GFP_KERNEL);
 	if (!fault_hash)
 		return fault_hash;
 
 	INIT_CHASH_TABLE(fault_hash->hash,
 			AMDGPU_PAGEFAULT_HASH_BITS, 8, 0);
-	spin_lock_init(&fault_hash->lock);
+	lockinit(&fault_hash->lock, "agvmfhl", 0, LK_CANRECURSE);
 	fault_hash->count = 0;
 
 	return fault_hash;
@@ -3060,7 +3059,7 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	INIT_LIST_HEAD(&vm->moved);
 	INIT_LIST_HEAD(&vm->idle);
 	INIT_LIST_HEAD(&vm->invalidated);
-	spin_lock_init(&vm->invalidated_lock);
+	lockinit(&vm->invalidated_lock, "agvmil", 0, LK_CANRECURSE);
 	INIT_LIST_HEAD(&vm->freed);
 
 	/* create scheduler entity for page table updates */

@@ -306,7 +306,7 @@ int amdgpu_vce_resume(struct amdgpu_device *adev)
 	hdr = (const struct common_firmware_header *)adev->vce.fw->data;
 	offset = le32_to_cpu(hdr->ucode_array_offset_bytes);
 	memcpy_toio(cpu_addr, adev->vce.fw->data + offset,
-		    adev->vce.fw->size - offset);
+		    adev->vce.fw->datasize - offset);
 
 	amdgpu_bo_kunmap(adev->vce.vcpu_bo);
 

@@ -27,6 +27,8 @@
 #include <drm/amdgpu_drm.h>
 #include <drm/gpu_scheduler.h>
 #include <drm/drm_print.h>
+/* XXX: delete after upgrade to 4.19+ */
+#include <drm/drmP.h>
 
 /* max number of rings */
 #define AMDGPU_MAX_RINGS		21

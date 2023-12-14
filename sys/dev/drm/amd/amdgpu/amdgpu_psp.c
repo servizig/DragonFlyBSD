@@ -187,7 +187,7 @@ static int psp_tmr_load(struct psp_context *psp)
 		return -ENOMEM;
 
 	psp_prep_tmr_cmd_buf(cmd, psp->tmr_mc_addr, PSP_TMR_SIZE);
-	DRM_INFO("reserve 0x%x from 0x%llx for PSP TMR SIZE\n",
+	DRM_INFO("reserve 0x%x from 0x%lx for PSP TMR SIZE\n",
 			PSP_TMR_SIZE, psp->tmr_mc_addr);
 
 	ret = psp_cmd_submit_buf(psp, NULL, cmd,

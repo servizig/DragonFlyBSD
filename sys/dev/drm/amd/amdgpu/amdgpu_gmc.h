@@ -84,7 +84,7 @@ struct amdgpu_gmc_funcs {
 				     uint32_t flags);
 	/* get the pde for a given mc addr */
 	void (*get_vm_pde)(struct amdgpu_device *adev, int level,
-			   u64 *dst, u64 *flags);
+			   uint64_t *dst, uint64_t *flags);
 };
 
 struct amdgpu_xgmi {

@@ -1087,7 +1087,9 @@ amdgpu_dm_update_connector_after_detect(struct amdgpu_dm_connector *aconnector)
 		aconnector->dc_sink = sink;
 		if (sink->dc_edid.length == 0) {
 			aconnector->edid = NULL;
+#if 0 /* enable when upgrade to 4.20 */
 			drm_dp_cec_unset_edid(&aconnector->dm_dp_aux.aux);
+#endif
 		} else {
 			aconnector->edid =
 				(struct edid *) sink->dc_edid.raw_edid;
@@ -1095,13 +1097,17 @@ amdgpu_dm_update_connector_after_detect(struct amdgpu_dm_connector *aconnector)
 
 			drm_connector_update_edid_property(connector,
 					aconnector->edid);
+#if 0 /* enable when upgrade to 4.20 */
 			drm_dp_cec_set_edid(&aconnector->dm_dp_aux.aux,
 					    aconnector->edid);
+#endif
 		}
 		amdgpu_dm_update_freesync_caps(connector, aconnector->edid);
 
 	} else {
+#if 0 /* enable when upgrade to 4.20 */
 		drm_dp_cec_unset_edid(&aconnector->dm_dp_aux.aux);
+#endif
 		amdgpu_dm_update_freesync_caps(connector, NULL);
 		drm_connector_update_edid_property(connector, NULL);
 		aconnector->num_modes = 0;
@@ -1292,7 +1298,9 @@ static void handle_hpd_rx_irq(void *param)
 		dm_handle_hpd_rx_irq(aconnector);
 
 	if (dc_link->type != dc_connection_mst_branch) {
+#if 0 /* enable when upgrade to 4.20 */
 		drm_dp_cec_irq(&aconnector->dm_dp_aux.aux);
+#endif
 		mutex_unlock(&aconnector->hpd_lock);
 	}
 }
@@ -2574,7 +2582,7 @@ static void fill_audio_info(struct audio_info *audio_info,
 
 	cea_revision = drm_connector->display_info.cea_rev;
 
-	strscpy(audio_info->display_name,
+	strncpy(audio_info->display_name,
 		edid_caps->display_name,
 		AUDIO_INFO_DISPLAY_NAME_SIZE_IN_CHARS);
 
@@ -2895,7 +2903,9 @@ static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 	.atomic_duplicate_state = dm_crtc_duplicate_state,
 	.atomic_destroy_state = dm_crtc_destroy_state,
 	.set_crc_source = amdgpu_dm_crtc_set_crc_source,
+#if 0 /* enable when upgrade to 4.20 */
 	.verify_crc_source = amdgpu_dm_crtc_verify_crc_source,
+#endif
 	.enable_vblank = dm_enable_vblank,
 	.disable_vblank = dm_disable_vblank,
 };
@@ -3041,7 +3051,9 @@ static void amdgpu_dm_connector_destroy(struct drm_connector *connector)
 		dm->backlight_dev = NULL;
 	}
 #endif
+#if 0 /* enable when upgrade to 4.20 */
 	drm_dp_cec_unregister_connector(&aconnector->dm_dp_aux.aux);
+#endif
 	drm_connector_unregister(connector);
 	drm_connector_cleanup(connector);
 	kfree(connector);
@@ -3675,7 +3687,7 @@ amdgpu_dm_create_common_mode(struct drm_encoder *encoder,
 	mode->hdisplay = hdisplay;
 	mode->vdisplay = vdisplay;
 	mode->type &= ~DRM_MODE_TYPE_PREFERRED;
-	strscpy(mode->name, name, DRM_DISPLAY_MODE_LEN);
+	strncpy(mode->name, name, DRM_DISPLAY_MODE_LEN);
 
 	return mode;
 
@@ -3971,7 +3983,7 @@ static int amdgpu_dm_connector_init(struct amdgpu_display_manager *dm,
 		link,
 		link_index);
 
-	drm_connector_attach_encoder(
+	drm_mode_connector_attach_encoder(
 		&aconnector->base, &aencoder->base);
 
 	drm_connector_register(&aconnector->base);
@@ -4945,6 +4957,7 @@ static int do_aquire_global_lock(struct drm_device *dev,
 	return ret < 0 ? ret : 0;
 }
 
+static
 void set_freesync_on_stream(struct amdgpu_display_manager *dm,
 			    struct dm_crtc_state *new_crtc_state,
 			    struct dm_connector_state *new_con_state,
@@ -5326,6 +5339,8 @@ static int dm_update_planes_state(struct dc *dc,
 
 	return ret;
 }
+
+static
 enum surface_update_type dm_determine_update_type_for_commit(struct dc *dc, struct drm_atomic_state *state)
 {
 

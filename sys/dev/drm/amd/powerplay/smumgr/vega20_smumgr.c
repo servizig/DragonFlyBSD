@@ -395,7 +395,7 @@ static int vega20_smu_init(struct pp_hwmgr *hwmgr)
 			PAGE_SIZE,
 			AMDGPU_GEM_DOMAIN_VRAM,
 			&priv->smu_tables.entry[TABLE_PPTABLE].handle,
-			&priv->smu_tables.entry[TABLE_PPTABLE].mc_addr,
+			(u64 *)&priv->smu_tables.entry[TABLE_PPTABLE].mc_addr,
 			&priv->smu_tables.entry[TABLE_PPTABLE].table);
 	if (ret)
 		goto free_backend;
@@ -409,7 +409,7 @@ static int vega20_smu_init(struct pp_hwmgr *hwmgr)
 			PAGE_SIZE,
 			AMDGPU_GEM_DOMAIN_VRAM,
 			&priv->smu_tables.entry[TABLE_WATERMARKS].handle,
-			&priv->smu_tables.entry[TABLE_WATERMARKS].mc_addr,
+			(u64 *)&priv->smu_tables.entry[TABLE_WATERMARKS].mc_addr,
 			&priv->smu_tables.entry[TABLE_WATERMARKS].table);
 	if (ret)
 		goto err0;
@@ -423,7 +423,7 @@ static int vega20_smu_init(struct pp_hwmgr *hwmgr)
 			PAGE_SIZE,
 			AMDGPU_GEM_DOMAIN_VRAM,
 			&priv->smu_tables.entry[TABLE_PMSTATUSLOG].handle,
-			&priv->smu_tables.entry[TABLE_PMSTATUSLOG].mc_addr,
+			(u64 *)&priv->smu_tables.entry[TABLE_PMSTATUSLOG].mc_addr,
 			&priv->smu_tables.entry[TABLE_PMSTATUSLOG].table);
 	if (ret)
 		goto err1;
@@ -437,7 +437,7 @@ static int vega20_smu_init(struct pp_hwmgr *hwmgr)
 			PAGE_SIZE,
 			AMDGPU_GEM_DOMAIN_VRAM,
 			&priv->smu_tables.entry[TABLE_OVERDRIVE].handle,
-			&priv->smu_tables.entry[TABLE_OVERDRIVE].mc_addr,
+			(u64 *)&priv->smu_tables.entry[TABLE_OVERDRIVE].mc_addr,
 			&priv->smu_tables.entry[TABLE_OVERDRIVE].table);
 	if (ret)
 		goto err2;
@@ -451,7 +451,7 @@ static int vega20_smu_init(struct pp_hwmgr *hwmgr)
 			PAGE_SIZE,
 			AMDGPU_GEM_DOMAIN_VRAM,
 			&priv->smu_tables.entry[TABLE_SMU_METRICS].handle,
-			&priv->smu_tables.entry[TABLE_SMU_METRICS].mc_addr,
+			(u64 *)&priv->smu_tables.entry[TABLE_SMU_METRICS].mc_addr,
 			&priv->smu_tables.entry[TABLE_SMU_METRICS].table);
 	if (ret)
 		goto err3;
@@ -465,7 +465,7 @@ static int vega20_smu_init(struct pp_hwmgr *hwmgr)
 			PAGE_SIZE,
 			AMDGPU_GEM_DOMAIN_VRAM,
 			&priv->smu_tables.entry[TABLE_ACTIVITY_MONITOR_COEFF].handle,
-			&priv->smu_tables.entry[TABLE_ACTIVITY_MONITOR_COEFF].mc_addr,
+			(u64 *)&priv->smu_tables.entry[TABLE_ACTIVITY_MONITOR_COEFF].mc_addr,
 			&priv->smu_tables.entry[TABLE_ACTIVITY_MONITOR_COEFF].table);
 	if (ret)
 		goto err4;
@@ -477,23 +477,23 @@ static int vega20_smu_init(struct pp_hwmgr *hwmgr)
 
 err4:
 	amdgpu_bo_free_kernel(&priv->smu_tables.entry[TABLE_SMU_METRICS].handle,
-			&priv->smu_tables.entry[TABLE_SMU_METRICS].mc_addr,
+			(u64 *)&priv->smu_tables.entry[TABLE_SMU_METRICS].mc_addr,
 			&priv->smu_tables.entry[TABLE_SMU_METRICS].table);
 err3:
 	amdgpu_bo_free_kernel(&priv->smu_tables.entry[TABLE_OVERDRIVE].handle,
-			&priv->smu_tables.entry[TABLE_OVERDRIVE].mc_addr,
+			(u64 *)&priv->smu_tables.entry[TABLE_OVERDRIVE].mc_addr,
 			&priv->smu_tables.entry[TABLE_OVERDRIVE].table);
 err2:
 	amdgpu_bo_free_kernel(&priv->smu_tables.entry[TABLE_PMSTATUSLOG].handle,
-			&priv->smu_tables.entry[TABLE_PMSTATUSLOG].mc_addr,
+			(u64 *)&priv->smu_tables.entry[TABLE_PMSTATUSLOG].mc_addr,
 			&priv->smu_tables.entry[TABLE_PMSTATUSLOG].table);
 err1:
 	amdgpu_bo_free_kernel(&priv->smu_tables.entry[TABLE_WATERMARKS].handle,
-			&priv->smu_tables.entry[TABLE_WATERMARKS].mc_addr,
+			(u64 *)&priv->smu_tables.entry[TABLE_WATERMARKS].mc_addr,
 			&priv->smu_tables.entry[TABLE_WATERMARKS].table);
 err0:
 	amdgpu_bo_free_kernel(&priv->smu_tables.entry[TABLE_PPTABLE].handle,
-			&priv->smu_tables.entry[TABLE_PPTABLE].mc_addr,
+			(u64 *)&priv->smu_tables.entry[TABLE_PPTABLE].mc_addr,
 			&priv->smu_tables.entry[TABLE_PPTABLE].table);
 free_backend:
 	kfree(hwmgr->smu_backend);
@@ -508,22 +508,22 @@ static int vega20_smu_fini(struct pp_hwmgr *hwmgr)
 
 	if (priv) {
 		amdgpu_bo_free_kernel(&priv->smu_tables.entry[TABLE_PPTABLE].handle,
-				&priv->smu_tables.entry[TABLE_PPTABLE].mc_addr,
+				(u64 *)&priv->smu_tables.entry[TABLE_PPTABLE].mc_addr,
 				&priv->smu_tables.entry[TABLE_PPTABLE].table);
 		amdgpu_bo_free_kernel(&priv->smu_tables.entry[TABLE_WATERMARKS].handle,
-				&priv->smu_tables.entry[TABLE_WATERMARKS].mc_addr,
+				(u64 *)&priv->smu_tables.entry[TABLE_WATERMARKS].mc_addr,
 				&priv->smu_tables.entry[TABLE_WATERMARKS].table);
 		amdgpu_bo_free_kernel(&priv->smu_tables.entry[TABLE_PMSTATUSLOG].handle,
-				&priv->smu_tables.entry[TABLE_PMSTATUSLOG].mc_addr,
+				(u64 *)&priv->smu_tables.entry[TABLE_PMSTATUSLOG].mc_addr,
 				&priv->smu_tables.entry[TABLE_PMSTATUSLOG].table);
 		amdgpu_bo_free_kernel(&priv->smu_tables.entry[TABLE_OVERDRIVE].handle,
-				&priv->smu_tables.entry[TABLE_OVERDRIVE].mc_addr,
+				(u64 *)&priv->smu_tables.entry[TABLE_OVERDRIVE].mc_addr,
 				&priv->smu_tables.entry[TABLE_OVERDRIVE].table);
 		amdgpu_bo_free_kernel(&priv->smu_tables.entry[TABLE_SMU_METRICS].handle,
-				&priv->smu_tables.entry[TABLE_SMU_METRICS].mc_addr,
+				(u64 *)&priv->smu_tables.entry[TABLE_SMU_METRICS].mc_addr,
 				&priv->smu_tables.entry[TABLE_SMU_METRICS].table);
 		amdgpu_bo_free_kernel(&priv->smu_tables.entry[TABLE_ACTIVITY_MONITOR_COEFF].handle,
-				&priv->smu_tables.entry[TABLE_ACTIVITY_MONITOR_COEFF].mc_addr,
+				(u64 *)&priv->smu_tables.entry[TABLE_ACTIVITY_MONITOR_COEFF].mc_addr,
 				&priv->smu_tables.entry[TABLE_ACTIVITY_MONITOR_COEFF].table);
 		kfree(hwmgr->smu_backend);
 		hwmgr->smu_backend = NULL;

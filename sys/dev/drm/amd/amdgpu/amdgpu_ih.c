@@ -79,7 +79,7 @@ int amdgpu_ih_ring_init(struct amdgpu_device *adev, struct amdgpu_ih_ring *ih,
 
 		r = amdgpu_bo_create_kernel(adev, ih->ring_size, PAGE_SIZE,
 					    AMDGPU_GEM_DOMAIN_GTT,
-					    &ih->ring_obj, &ih->gpu_addr,
+					    &ih->ring_obj, (u64*)&ih->gpu_addr,
 					    (void **)&ih->ring);
 		if (r) {
 			amdgpu_device_wb_free(adev, ih->rptr_offs);
@@ -112,7 +112,7 @@ void amdgpu_ih_ring_fini(struct amdgpu_device *adev, struct amdgpu_ih_ring *ih)
 				  (void *)ih->ring, ih->rb_dma_addr);
 		ih->ring = NULL;
 	} else {
-		amdgpu_bo_free_kernel(&ih->ring_obj, &ih->gpu_addr,
+		amdgpu_bo_free_kernel(&ih->ring_obj, (u64*)&ih->gpu_addr,
 				      (void **)&ih->ring);
 		amdgpu_device_wb_free(adev, ih->wptr_offs);
 		amdgpu_device_wb_free(adev, ih->rptr_offs);

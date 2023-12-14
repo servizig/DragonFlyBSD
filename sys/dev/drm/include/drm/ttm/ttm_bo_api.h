@@ -52,6 +52,8 @@ struct ttm_placement;
 
 struct ttm_place;
 
+struct ttm_lru_bulk_move;
+
 /**
  * struct ttm_bus_placement
  *

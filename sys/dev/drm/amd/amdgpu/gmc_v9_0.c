@@ -333,9 +333,11 @@ static signed long  amdgpu_kiq_reg_write_reg_wait(struct amdgpu_device *adev,
 
 	r = amdgpu_fence_wait_polling(ring, seq, MAX_KIQ_REG_WAIT);
 
+#if 0
 	/* don't wait anymore for IRQ context */
 	if (r < 1 && in_interrupt())
 		goto failed_kiq;
+#endif
 
 	might_sleep();
 
@@ -877,6 +879,9 @@ static int gmc_v9_0_gart_init(struct amdgpu_device *adev)
 
 static unsigned gmc_v9_0_get_vbios_fb_size(struct amdgpu_device *adev)
 {
+#ifdef __DragonFly__
+	return 64 * 1024 * 1024;
+#else
 	u32 d1vga_control = RREG32_SOC15(DCE, 0, mmD1VGA_CONTROL);
 	unsigned size;
 
@@ -884,10 +889,10 @@ static unsigned gmc_v9_0_get_vbios_fb_size(struct amdgpu_device *adev)
 	 * TODO Remove once GART corruption is resolved
 	 * Check related code in gmc_v9_0_sw_fini
 	 * */
+
 	if (gmc_v9_0_keep_stolen_memory(adev))
 		return 64 * 1024 * 1024;
 
-#if 0
 	if (REG_GET_FIELD(d1vga_control, D1VGA_CONTROL, D1VGA_MODE_ENABLE)) {
 		size = 9 * 1024 * 1024; /* reserve 8MB for vga emulator and 1 MB for FB */
 	} else {
@@ -917,9 +922,8 @@ static unsigned gmc_v9_0_get_vbios_fb_size(struct amdgpu_device *adev)
 	if ((adev->gmc.real_vram_size - size) < (8 * 1024 * 1024))
 		return 0;
 
-#endif
-/* XXX: dfly size might not be initialized */
 	return size;
+#endif
 }
 
 static int gmc_v9_0_sw_init(void *handle)

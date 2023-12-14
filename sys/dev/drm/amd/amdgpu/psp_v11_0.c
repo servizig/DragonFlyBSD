@@ -260,7 +260,7 @@ static int psp_v11_0_ring_init(struct psp_context *psp,
 	ret = amdgpu_bo_create_kernel(adev, ring->ring_size, PAGE_SIZE,
 				      AMDGPU_GEM_DOMAIN_VRAM,
 				      &adev->firmware.rbuf,
-				      &ring->ring_mem_mc_addr,
+				      (u64 *)&ring->ring_mem_mc_addr,
 				      (void **)&ring->ring_mem);
 	if (ret) {
 		ring->ring_size = 0;
@@ -333,7 +333,7 @@ static int psp_v11_0_ring_destroy(struct psp_context *psp,
 		DRM_ERROR("Fail to stop psp ring\n");
 
 	amdgpu_bo_free_kernel(&adev->firmware.rbuf,
-			      &ring->ring_mem_mc_addr,
+			      (u64 *)&ring->ring_mem_mc_addr,
 			      (void **)&ring->ring_mem);
 
 	return ret;
@@ -561,9 +561,9 @@ static int psp_v11_0_xgmi_set_topology_info(struct psp_context *psp,
 	return 0;
 }
 
-static u64 psp_v11_0_xgmi_get_hive_id(struct psp_context *psp)
+static uint64_t psp_v11_0_xgmi_get_hive_id(struct psp_context *psp)
 {
-	u64 hive_id = 0;
+	uint64_t hive_id = 0;
 
 	/* Remove me when we can get correct hive_id through PSP */
 	if (psp->adev->gmc.xgmi.num_physical_nodes)

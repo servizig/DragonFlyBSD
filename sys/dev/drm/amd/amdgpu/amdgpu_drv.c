@@ -130,9 +130,16 @@ uint amdgpu_smu_memory_pool_size = 0;
 /* FBC (bit 0) disabled by default*/
 uint amdgpu_dc_feature_mask = 0;
 
+#if 0
 struct amdgpu_mgpu_info mgpu_info = {
 	.mutex = __MUTEX_INITIALIZER(mgpu_info.mutex),
 };
+#elif defined(__DragonFly__)
+struct amdgpu_mgpu_info mgpu_info;
+/*static struct lock mgpu_info_mutex;*/
+LOCK_SYSINIT(mgpu_info_mutex, &mgpu_info.mutex, "amgpum", LK_CANRECURSE);
+#endif
+
 
 /**
  * DOC: vramlimit (int)

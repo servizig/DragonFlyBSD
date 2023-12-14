@@ -94,7 +94,7 @@ struct amdgpu_gpu_instance
 struct amdgpu_mgpu_info
 {
 	struct amdgpu_gpu_instance	gpu_ins[MAX_GPU_INSTANCE];
-	struct mutex			mutex;
+	struct lock			mutex;
 	uint32_t			num_gpu;
 	uint32_t			num_dgpu;
 	uint32_t			num_apu;

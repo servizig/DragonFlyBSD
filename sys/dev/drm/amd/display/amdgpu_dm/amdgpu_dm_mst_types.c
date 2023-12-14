@@ -344,7 +344,7 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 		master->connector_id);
 
 	aconnector->mst_encoder = dm_dp_create_fake_mst_encoder(master);
-	drm_connector_attach_encoder(&aconnector->base,
+	drm_mode_connector_attach_encoder(&aconnector->base,
 				     &aconnector->mst_encoder->base);
 
 	drm_object_attach_property(
@@ -356,7 +356,7 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 		dev->mode_config.tile_property,
 		0);
 
-	drm_connector_set_path_property(connector, pathprop);
+	drm_mode_connector_set_path_property(connector, pathprop);
 
 	/*
 	 * Initialize connector state before adding the connectror to drm and
@@ -434,8 +434,10 @@ void amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,
 	aconnector->dm_dp_aux.ddc_service = aconnector->dc_link->ddc;
 
 	drm_dp_aux_register(&aconnector->dm_dp_aux.aux);
+#if 0 /* enable when upgrade to 4.20 */
 	drm_dp_cec_register_connector(&aconnector->dm_dp_aux.aux,
 				      aconnector->base.name, dm->adev->dev);
+#endif
 	aconnector->mst_mgr.cbs = &dm_mst_cbs;
 	drm_dp_mst_topology_mgr_init(
 		&aconnector->mst_mgr,

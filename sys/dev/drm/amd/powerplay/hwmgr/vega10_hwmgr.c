@@ -73,6 +73,7 @@ static const uint32_t channel_number[] = {1, 2, 0, 4, 0, 8, 0, 16, 2};
 
 static const ULONG PhwVega10_Magic = (ULONG)(PHM_VIslands_Magic);
 
+static
 struct vega10_power_state *cast_phw_vega10_power_state(
 				  struct pp_hw_power_state *hw_ps)
 {
@@ -4985,6 +4986,7 @@ static const struct pp_hwmgr_func vega10_hwmgr_funcs = {
 	.get_performance_level = vega10_get_performance_level,
 };
 
+int vega10_hwmgr_init(struct pp_hwmgr *hwmgr);
 int vega10_hwmgr_init(struct pp_hwmgr *hwmgr)
 {
 	hwmgr->hwmgr_func = &vega10_hwmgr_funcs;

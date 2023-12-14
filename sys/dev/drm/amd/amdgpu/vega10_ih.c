@@ -266,13 +266,13 @@ static bool vega10_ih_prescreen_iv(struct amdgpu_device *adev)
 	}
 
 	/* Track retry faults in per-VM fault FIFO. */
-	spin_lock(&adev->vm_manager.pasid_lock);
+	lockmgr(&adev->vm_manager.pasid_lock, LK_EXCLUSIVE);
 	vm = idr_find(&adev->vm_manager.pasid_idr, pasid);
 	addr = ((u64)(dw5 & 0xf) << 44) | ((u64)dw4 << 12);
 	key = AMDGPU_VM_FAULT(pasid, addr);
 	if (!vm) {
 		/* VM not found, process it normally */
-		spin_unlock(&adev->vm_manager.pasid_lock);
+		lockmgr(&adev->vm_manager.pasid_lock, LK_RELEASE);
 		return true;
 	} else {
 		r = amdgpu_vm_add_fault(vm->fault_hash, key);
@@ -281,7 +281,7 @@ static bool vega10_ih_prescreen_iv(struct amdgpu_device *adev)
 		 * ignore further page faults
 		 */
 		if (r != 0) {
-			spin_unlock(&adev->vm_manager.pasid_lock);
+			lockmgr(&adev->vm_manager.pasid_lock, LK_RELEASE);
 			goto ignore_iv;
 		}
 	}

@@ -37,8 +37,6 @@
 #define AMDGPU_GFX_CG_DISABLED_MODE		0x00000004L
 #define AMDGPU_GFX_LBPW_DISABLED_MODE		0x00000008L
 
-void amdgpu_gfx_compute_queue_acquire(struct amdgpu_device *adev);
-
 struct amdgpu_rlc_funcs {
 	void (*enter_safe_mode)(struct amdgpu_device *adev);
 	void (*exit_safe_mode)(struct amdgpu_device *adev);
@@ -245,7 +243,7 @@ struct sq_work {
 };
 
 struct amdgpu_gfx {
-	struct mutex			gpu_clock_mutex;
+	struct lock			gpu_clock_mutex;
 	struct amdgpu_gfx_config	config;
 	struct amdgpu_rlc		rlc;
 	struct amdgpu_mec		mec;
@@ -304,12 +302,12 @@ struct amdgpu_gfx {
 
 	/* gfx off */
 	bool                            gfx_off_state; /* true: enabled, false: disabled */
-	struct mutex                    gfx_off_mutex;
+	struct lock                    gfx_off_mutex;
 	uint32_t                        gfx_off_req_count; /* default 1, enable gfx off: dec 1, disable gfx off: add 1 */
 	struct delayed_work             gfx_off_delay_work;
 
 	/* pipe reservation */
-	struct mutex			pipe_reserve_mutex;
+	struct lock			pipe_reserve_mutex;
 	DECLARE_BITMAP			(pipe_reserve_bitmap, AMDGPU_MAX_COMPUTE_QUEUES);
 };
 

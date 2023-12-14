@@ -172,8 +172,10 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 	     amdgpu_vm_need_pipeline_sync(ring, job))) {
 		need_pipe_sync = true;
 
+#if 0
 		if (tmp)
 			trace_amdgpu_ib_pipe_sync(job, tmp);
+#endif
 
 		dma_fence_put(tmp);
 	}

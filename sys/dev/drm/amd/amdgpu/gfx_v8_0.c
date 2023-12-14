@@ -4886,9 +4886,6 @@ static int gfx_v8_0_kcq_disable(struct amdgpu_device *adev)
 	r = amdgpu_ring_alloc(kiq_ring, 6 * adev->gfx.num_compute_rings);
 	if (r)
 		DRM_ERROR("Failed to lock KIQ (%d).\n", r);
-		amdgpu_gfx_scratch_free(adev, scratch);
-		return r;
-	}
 
 	for (i = 0; i < adev->gfx.num_compute_rings; i++) {
 		struct amdgpu_ring *ring = &adev->gfx.compute_ring[i];

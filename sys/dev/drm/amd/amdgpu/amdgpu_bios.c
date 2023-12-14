@@ -217,6 +217,7 @@ static bool amdgpu_read_platform_bios(struct amdgpu_device *adev)
 	adev->bios_size = size;
 
 	return true;
+#endif
 }
 
 #ifdef CONFIG_ACPI

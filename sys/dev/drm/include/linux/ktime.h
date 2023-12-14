@@ -72,6 +72,13 @@ ktime_add_ms(const ktime_t kt, const u64 ms)
 	return ktime_add_ns(kt, NSEC_PER_MSEC * ms);
 }
 
+static inline ktime_t
+ktime_add_us(ktime_t kt, int64_t us)
+{
+
+	return (ktime_add_ns(kt, us * NSEC_PER_USEC));
+}
+
 static inline ktime_t ktime_sub_ns(ktime_t kt, int64_t ns)
 {
 	return kt - ns;

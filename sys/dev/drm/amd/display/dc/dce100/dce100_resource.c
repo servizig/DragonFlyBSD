@@ -30,6 +30,9 @@
 #include "resource.h"
 #include "include/irq_service_interface.h"
 #include "../virtual/virtual_stream_encoder.h"
+#ifdef __DragonFly__
+#include "dce100/dce100_resource.h"
+#endif
 #include "dce110/dce110_resource.h"
 #include "dce110/dce110_timing_generator.h"
 #include "irq/dce110/irq_service_dce110.h"
@@ -625,6 +628,7 @@ static const struct dce_i2c_mask i2c_masks = {
 		I2C_COMMON_MASK_SH_LIST_DCE_COMMON_BASE(_MASK)
 };
 
+static
 struct dce_i2c_hw *dce100_i2c_hw_create(
 	struct dc_context *ctx,
 	uint32_t inst)
@@ -640,6 +644,7 @@ struct dce_i2c_hw *dce100_i2c_hw_create(
 
 	return dce_i2c_hw;
 }
+static
 struct clock_source *dce100_clock_source_create(
 	struct dc_context *ctx,
 	struct dc_bios *bios,

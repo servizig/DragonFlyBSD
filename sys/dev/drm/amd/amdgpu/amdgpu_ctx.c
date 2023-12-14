@@ -113,7 +113,7 @@ static int amdgpu_ctx_init(struct amdgpu_device *adev,
 			amdgpu_ctx_num_entities[i - 1];
 
 	kref_init(&ctx->refcount);
-	spin_init(&ctx->ring_lock, "agcrl");
+	lockinit(&ctx->ring_lock, "agcrl", 0, LK_CANRECURSE);
 	lockinit(&ctx->lock, "agctxl", 0, LK_CANRECURSE);
 
 	ctx->reset_counter = atomic_read(&adev->gpu_reset_counter);
@@ -453,10 +453,10 @@ void amdgpu_ctx_add_fence(struct amdgpu_ctx *ctx,
 
 	dma_fence_get(fence);
 
-	spin_lock(&ctx->ring_lock);
+	lockmgr(&ctx->ring_lock, LK_EXCLUSIVE);
 	centity->fences[idx] = fence;
 	centity->sequence++;
-	spin_unlock(&ctx->ring_lock);
+	lockmgr(&ctx->ring_lock, LK_RELEASE);
 
 	dma_fence_put(other);
 	if (handle)
@@ -470,24 +470,24 @@ struct dma_fence *amdgpu_ctx_get_fence(struct amdgpu_ctx *ctx,
 	struct amdgpu_ctx_entity *centity = to_amdgpu_ctx_entity(entity);
 	struct dma_fence *fence;
 
-	spin_lock(&ctx->ring_lock);
+	lockmgr(&ctx->ring_lock, LK_EXCLUSIVE);
 
 	if (seq == ~0ull)
 		seq = centity->sequence - 1;
 
 	if (seq >= centity->sequence) {
-		spin_unlock(&ctx->ring_lock);
+		lockmgr(&ctx->ring_lock, LK_RELEASE);
 		return ERR_PTR(-EINVAL);
 	}
 
 
 	if (seq + amdgpu_sched_jobs < centity->sequence) {
-		spin_unlock(&ctx->ring_lock);
+		lockmgr(&ctx->ring_lock, LK_RELEASE);
 		return NULL;
 	}
 
 	fence = dma_fence_get(centity->fences[seq & (amdgpu_sched_jobs - 1)]);
-	spin_unlock(&ctx->ring_lock);
+	lockmgr(&ctx->ring_lock, LK_RELEASE);
 
 	return fence;
 }
@@ -505,9 +505,11 @@ void amdgpu_ctx_priority_override(struct amdgpu_ctx *ctx,
 			ctx->init_priority : ctx->override_priority;
 
 	for (i = 0; i < num_entities; i++) {
+#if 0 /* XXX: enable when upgrade drm to 4.20 */
 		struct drm_sched_entity *entity = &ctx->entities[0][i].entity;
 
 		drm_sched_entity_set_priority(entity, ctx_prio);
+#endif
 	}
 }
 

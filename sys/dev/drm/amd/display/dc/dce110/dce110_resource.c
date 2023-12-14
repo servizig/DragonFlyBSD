@@ -642,6 +642,7 @@ static const struct dce_i2c_mask i2c_masks = {
 		I2C_COMMON_MASK_SH_LIST_DCE110(_MASK)
 };
 
+static
 struct dce_i2c_hw *dce110_i2c_hw_create(
 	struct dc_context *ctx,
 	uint32_t inst)
@@ -657,6 +658,7 @@ struct dce_i2c_hw *dce110_i2c_hw_create(
 
 	return dce_i2c_hw;
 }
+static
 struct clock_source *dce110_clock_source_create(
 	struct dc_context *ctx,
 	struct dc_bios *bios,
