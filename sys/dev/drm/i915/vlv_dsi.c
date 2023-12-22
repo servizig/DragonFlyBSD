@@ -69,7 +69,7 @@ enum mipi_dsi_pixel_format pixel_format_from_register_bits(u32 fmt)
 	}
 }
 
-void wait_for_dsi_fifo_empty(struct intel_dsi *intel_dsi, enum port port)
+void vlv_dsi_wait_for_fifo_empty(struct intel_dsi *intel_dsi, enum port port)
 {
 	struct drm_encoder *encoder = &intel_dsi->base.base;
 	struct drm_device *dev = encoder->dev;
@@ -326,6 +326,9 @@ static bool intel_dsi_compute_config(struct intel_encoder *encoder,
 						conn_state->scaling_mode);
 	}
 
+	if (adjusted_mode->flags & DRM_MODE_FLAG_DBLSCAN)
+		return false;
+
 	/* DSI uses short packets for sync events, so clear mode flags for DSI */
 	adjusted_mode->flags = 0;
 
@@ -339,11 +342,15 @@ static bool intel_dsi_compute_config(struct intel_encoder *encoder,
 			pipe_config->cpu_transcoder = TRANSCODER_DSI_C;
 		else
 			pipe_config->cpu_transcoder = TRANSCODER_DSI_A;
-	}
 
-	ret = intel_compute_dsi_pll(encoder, pipe_config);
-	if (ret)
-		return false;
+		ret = bxt_dsi_pll_compute(encoder, pipe_config);
+		if (ret)
+			return false;
+	} else {
+		ret = vlv_dsi_pll_compute(encoder, pipe_config);
+		if (ret)
+			return false;
+	}
 
 	pipe_config->clock_set = true;
 
@@ -543,12 +550,12 @@ static void intel_dsi_device_ready(struct intel_encoder *encoder)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
 
-	if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv))
-		vlv_dsi_device_ready(encoder);
-	else if (IS_BROXTON(dev_priv))
-		bxt_dsi_device_ready(encoder);
-	else if (IS_GEMINILAKE(dev_priv))
+	if (IS_GEMINILAKE(dev_priv))
 		glk_dsi_device_ready(encoder);
+	else if (IS_GEN9_LP(dev_priv))
+		bxt_dsi_device_ready(encoder);
+	else
+		vlv_dsi_device_ready(encoder);
 }
 
 static void glk_dsi_enter_low_power_mode(struct intel_encoder *encoder)
@@ -662,11 +669,11 @@ static void vlv_dsi_clear_device_ready(struct intel_encoder *encoder)
 	}
 }
 
-static void intel_dsi_port_enable(struct intel_encoder *encoder)
+static void intel_dsi_port_enable(struct intel_encoder *encoder,
+				  const struct intel_crtc_state *crtc_state)
 {
-	struct drm_device *dev = encoder->base.dev;
-	struct drm_i915_private *dev_priv = to_i915(dev);
-	struct intel_crtc *intel_crtc = to_intel_crtc(encoder->base.crtc);
+	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
+	struct intel_crtc *crtc = to_intel_crtc(crtc_state->base.crtc);
 	struct intel_dsi *intel_dsi = enc_to_intel_dsi(&encoder->base);
 	enum port port;
 
@@ -705,7 +712,7 @@ static void intel_dsi_port_enable(struct intel_encoder *encoder)
 			if (IS_BROXTON(dev_priv))
 				temp |= LANE_CONFIGURATION_DUAL_LINK_A;
 			else
-				temp |= intel_crtc->pipe ?
+				temp |= crtc->pipe ?
 					LANE_CONFIGURATION_DUAL_LINK_B :
 					LANE_CONFIGURATION_DUAL_LINK_A;
 		}
@@ -807,8 +814,13 @@ static void intel_dsi_pre_enable(struct intel_encoder *encoder,
 	 * The BIOS may leave the PLL in a wonky state where it doesn't
 	 * lock. It needs to be fully powered down to fix it.
 	 */
-	intel_disable_dsi_pll(encoder);
-	intel_enable_dsi_pll(encoder, pipe_config);
+	if (IS_GEN9_LP(dev_priv)) {
+		bxt_dsi_pll_disable(encoder);
+		bxt_dsi_pll_enable(encoder, pipe_config);
+	} else {
+		vlv_dsi_pll_disable(encoder);
+		vlv_dsi_pll_enable(encoder, pipe_config);
+	}
 
 	if (IS_BROXTON(dev_priv)) {
 		/* Add MIPI IO reset programming for modeset */
@@ -875,7 +887,7 @@ static void intel_dsi_pre_enable(struct intel_encoder *encoder,
 
 		intel_dsi_vbt_exec_sequence(intel_dsi, MIPI_SEQ_DISPLAY_ON);
 
-		intel_dsi_port_enable(encoder);
+		intel_dsi_port_enable(encoder, pipe_config);
 	}
 
 	intel_panel_enable_backlight(pipe_config, conn_state);
@@ -926,11 +938,10 @@ static void intel_dsi_clear_device_ready(struct intel_encoder *encoder)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
 
-	if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv) ||
-	    IS_BROXTON(dev_priv))
-		vlv_dsi_clear_device_ready(encoder);
-	else if (IS_GEMINILAKE(dev_priv))
+	if (IS_GEMINILAKE(dev_priv))
 		glk_dsi_clear_device_ready(encoder);
+	else
+		vlv_dsi_clear_device_ready(encoder);
 }
 
 static void intel_dsi_post_disable(struct intel_encoder *encoder,
@@ -946,7 +957,7 @@ static void intel_dsi_post_disable(struct intel_encoder *encoder,
 
 	if (is_vid_mode(intel_dsi)) {
 		for_each_dsi_port(port, intel_dsi->ports)
-			wait_for_dsi_fifo_empty(intel_dsi, port);
+			vlv_dsi_wait_for_fifo_empty(intel_dsi, port);
 
 		intel_dsi_port_disable(encoder);
 		usleep_range(2000, 5000);
@@ -976,10 +987,12 @@ static void intel_dsi_post_disable(struct intel_encoder *encoder,
 				val & ~MIPIO_RST_CTRL);
 	}
 
-	intel_disable_dsi_pll(encoder);
-
-	if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv)) {
+	if (IS_GEN9_LP(dev_priv)) {
+		bxt_dsi_pll_disable(encoder);
+	} else {
 		u32 val;
+
+		vlv_dsi_pll_disable(encoder);
 
 		val = I915_READ(DSPCLK_GATE_D);
 		val &= ~DPOUNIT_CLOCK_GATE_DISABLE;
@@ -1021,7 +1034,7 @@ static bool intel_dsi_get_hw_state(struct intel_encoder *encoder,
 	 * configuration, otherwise accessing DSI registers will hang the
 	 * machine. See BSpec North Display Engine registers/MIPI[BXT].
 	 */
-	if (IS_GEN9_LP(dev_priv) && !intel_dsi_pll_is_enabled(dev_priv))
+	if (IS_GEN9_LP(dev_priv) && !bxt_dsi_pll_is_enabled(dev_priv))
 		goto out_put_power;
 
 	/* XXX: this only works for one DSI output */
@@ -1082,7 +1095,7 @@ static void bxt_dsi_get_pipe_config(struct intel_encoder *encoder,
 	struct drm_display_mode *adjusted_mode =
 					&pipe_config->base.adjusted_mode;
 	struct drm_display_mode *adjusted_mode_sw;
-	struct intel_crtc *intel_crtc;
+	struct intel_crtc *crtc = to_intel_crtc(pipe_config->base.crtc);
 	struct intel_dsi *intel_dsi = enc_to_intel_dsi(&encoder->base);
 	unsigned int lane_count = intel_dsi->lane_count;
 	unsigned int bpp, fmt;
@@ -1093,8 +1106,7 @@ static void bxt_dsi_get_pipe_config(struct intel_encoder *encoder,
 				crtc_hblank_start_sw, crtc_hblank_end_sw;
 
 	/* FIXME: hw readout should not depend on SW state */
-	intel_crtc = to_intel_crtc(encoder->base.crtc);
-	adjusted_mode_sw = &intel_crtc->config->base.adjusted_mode;
+	adjusted_mode_sw = &crtc->config->base.adjusted_mode;
 
 	/*
 	 * Atleast one port is active as encoder->get_config called only if
@@ -1243,16 +1255,21 @@ static void intel_dsi_get_config(struct intel_encoder *encoder,
 	u32 pclk;
 	DRM_DEBUG_KMS("\n");
 
-	if (IS_GEN9_LP(dev_priv))
+	pipe_config->output_types |= BIT(INTEL_OUTPUT_DSI);
+
+	if (IS_GEN9_LP(dev_priv)) {
 		bxt_dsi_get_pipe_config(encoder, pipe_config);
+		pclk = bxt_dsi_get_pclk(encoder, pipe_config->pipe_bpp,
+					pipe_config);
+	} else {
+		pclk = vlv_dsi_get_pclk(encoder, pipe_config->pipe_bpp,
+					pipe_config);
+	}
 
-	pclk = intel_dsi_get_pclk(encoder, pipe_config->pipe_bpp,
-				  pipe_config);
-	if (!pclk)
-		return;
-
-	pipe_config->base.adjusted_mode.crtc_clock = pclk;
-	pipe_config->port_clock = pclk;
+	if (pclk) {
+		pipe_config->base.adjusted_mode.crtc_clock = pclk;
+		pipe_config->port_clock = pclk;
+	}
 }
 
 static enum drm_mode_status
@@ -1265,10 +1282,8 @@ intel_dsi_mode_valid(struct drm_connector *connector,
 
 	DRM_DEBUG_KMS("\n");
 
-	if (mode->flags & DRM_MODE_FLAG_DBLSCAN) {
-		DRM_DEBUG_KMS("MODE_NO_DBLESCAN\n");
+	if (mode->flags & DRM_MODE_FLAG_DBLSCAN)
 		return MODE_NO_DBLESCAN;
-	}
 
 	if (fixed_mode) {
 		if (mode->hdisplay > fixed_mode->hdisplay)
@@ -1583,20 +1598,24 @@ static void intel_dsi_unprepare(struct intel_encoder *encoder)
 	enum port port;
 	u32 val;
 
-	if (!IS_GEMINILAKE(dev_priv)) {
-		for_each_dsi_port(port, intel_dsi->ports) {
-			/* Panel commands can be sent when clock is in LP11 */
-			I915_WRITE(MIPI_DEVICE_READY(port), 0x0);
+	if (IS_GEMINILAKE(dev_priv))
+		return;
 
-			intel_dsi_reset_clocks(encoder, port);
-			I915_WRITE(MIPI_EOT_DISABLE(port), CLOCKSTOP);
+	for_each_dsi_port(port, intel_dsi->ports) {
+		/* Panel commands can be sent when clock is in LP11 */
+		I915_WRITE(MIPI_DEVICE_READY(port), 0x0);
 
-			val = I915_READ(MIPI_DSI_FUNC_PRG(port));
-			val &= ~VID_MODE_FORMAT_MASK;
-			I915_WRITE(MIPI_DSI_FUNC_PRG(port), val);
+		if (IS_GEN9_LP(dev_priv))
+			bxt_dsi_reset_clocks(encoder, port);
+		else
+			vlv_dsi_reset_clocks(encoder, port);
+		I915_WRITE(MIPI_EOT_DISABLE(port), CLOCKSTOP);
 
-			I915_WRITE(MIPI_DEVICE_READY(port), 0x1);
-		}
+		val = I915_READ(MIPI_DSI_FUNC_PRG(port));
+		val &= ~VID_MODE_FORMAT_MASK;
+		I915_WRITE(MIPI_DSI_FUNC_PRG(port), val);
+
+		I915_WRITE(MIPI_DEVICE_READY(port), 0x1);
 	}
 }
 
@@ -1665,6 +1684,27 @@ static const struct drm_connector_funcs intel_dsi_connector_funcs = {
 	.atomic_duplicate_state = intel_digital_connector_duplicate_state,
 };
 
+static int intel_dsi_get_panel_orientation(struct intel_connector *connector)
+{
+	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
+	int orientation = DRM_MODE_PANEL_ORIENTATION_NORMAL;
+	enum i9xx_plane_id i9xx_plane;
+	u32 val;
+
+	if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv)) {
+		if (connector->encoder->crtc_mask == BIT(PIPE_B))
+			i9xx_plane = PLANE_B;
+		else
+			i9xx_plane = PLANE_A;
+
+		val = I915_READ(DSPCNTR(i9xx_plane));
+		if (val & DISPPLANE_ROTATE_180)
+			orientation = DRM_MODE_PANEL_ORIENTATION_BOTTOM_UP;
+	}
+
+	return orientation;
+}
+
 static void intel_dsi_add_properties(struct intel_connector *connector)
 {
 	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
@@ -1680,10 +1720,17 @@ static void intel_dsi_add_properties(struct intel_connector *connector)
 								allowed_scalers);
 
 		connector->base.state->scaling_mode = DRM_MODE_SCALE_ASPECT;
+
+		connector->base.display_info.panel_orientation =
+			intel_dsi_get_panel_orientation(connector);
+		drm_connector_init_panel_orientation_property(
+				&connector->base,
+				connector->panel.fixed_mode->hdisplay,
+				connector->panel.fixed_mode->vdisplay);
 	}
 }
 
-void intel_dsi_init(struct drm_i915_private *dev_priv)
+void vlv_dsi_init(struct drm_i915_private *dev_priv)
 {
 	struct drm_device *dev = &dev_priv->drm;
 	struct intel_dsi *intel_dsi;
@@ -1700,14 +1747,10 @@ void intel_dsi_init(struct drm_i915_private *dev_priv)
 	if (!intel_bios_is_dsi_present(dev_priv, &port))
 		return;
 
-	if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv)) {
-		dev_priv->mipi_mmio_base = VLV_MIPI_BASE;
-	} else if (IS_GEN9_LP(dev_priv)) {
+	if (IS_GEN9_LP(dev_priv))
 		dev_priv->mipi_mmio_base = BXT_MIPI_BASE;
-	} else {
-		DRM_ERROR("Unsupported Mipi device to reg base");
-		return;
-	}
+	else
+		dev_priv->mipi_mmio_base = VLV_MIPI_BASE;
 
 	intel_dsi = kzalloc(sizeof(*intel_dsi), GFP_KERNEL);
 	if (!intel_dsi)
@@ -1822,7 +1865,7 @@ void intel_dsi_init(struct drm_i915_private *dev_priv)
 	connector->display_info.width_mm = fixed_mode->width_mm;
 	connector->display_info.height_mm = fixed_mode->height_mm;
 
-	intel_panel_init(&intel_connector->panel, fixed_mode, NULL, NULL);
+	intel_panel_init(&intel_connector->panel, fixed_mode, NULL);
 	intel_panel_setup_backlight(connector, INVALID_PIPE);
 
 	intel_dsi_add_properties(intel_connector);

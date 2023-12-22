@@ -133,6 +133,9 @@ dma_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 		}
 		/* wake_up_process() directly uses task_struct pointers as sleep identifiers */
 		err = lksleep(current, fence->lock, intr ? PCATCH : 0, "dmafence", ret);
+		if (intr) {
+kprintf("dma_fence_default_wait: lksleep err=%d\n", err);
+		}
 		if (err == EINTR || err == ERESTART) {
 			ret = -ERESTARTSYS;
 			break;

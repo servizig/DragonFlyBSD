@@ -344,7 +344,7 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 		master->connector_id);
 
 	aconnector->mst_encoder = dm_dp_create_fake_mst_encoder(master);
-	drm_mode_connector_attach_encoder(&aconnector->base,
+	drm_connector_attach_encoder(&aconnector->base,
 				     &aconnector->mst_encoder->base);
 
 	drm_object_attach_property(
@@ -356,7 +356,7 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 		dev->mode_config.tile_property,
 		0);
 
-	drm_mode_connector_set_path_property(connector, pathprop);
+	drm_connector_set_path_property(connector, pathprop);
 
 	/*
 	 * Initialize connector state before adding the connectror to drm and

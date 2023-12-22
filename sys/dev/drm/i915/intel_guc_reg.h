@@ -21,8 +21,8 @@
  * IN THE SOFTWARE.
  *
  */
-#ifndef _I915_GUC_REG_H_
-#define _I915_GUC_REG_H_
+#ifndef _INTEL_GUC_REG_H_
+#define _INTEL_GUC_REG_H_
 
 /* Definitions of GuC H/W registers, bits, etc */
 
@@ -52,7 +52,8 @@
 #define SOFT_SCRATCH_COUNT		16
 
 #define UOS_RSA_SCRATCH(i)		_MMIO(0xc200 + (i) * 4)
-#define   UOS_RSA_SCRATCH_MAX_COUNT	  64
+#define UOS_RSA_SCRATCH_COUNT		64
+
 #define DMA_ADDR_0_LOW			_MMIO(0xc300)
 #define DMA_ADDR_0_HIGH			_MMIO(0xc304)
 #define DMA_ADDR_1_LOW			_MMIO(0xc308)
@@ -65,22 +66,20 @@
 #define   UOS_MOVE			  (1<<4)
 #define   START_DMA			  (1<<0)
 #define DMA_GUC_WOPCM_OFFSET		_MMIO(0xc340)
+#define   GUC_WOPCM_OFFSET_VALID	  (1<<0)
 #define   HUC_LOADING_AGENT_VCR		  (0<<1)
 #define   HUC_LOADING_AGENT_GUC		  (1<<1)
-#define   GUC_WOPCM_OFFSET_VALUE	  0x80000	/* 512KB */
+#define   GUC_WOPCM_OFFSET_SHIFT	14
+#define   GUC_WOPCM_OFFSET_MASK		  (0x3ffff << GUC_WOPCM_OFFSET_SHIFT)
 #define GUC_MAX_IDLE_COUNT		_MMIO(0xC3E4)
 
 #define HUC_STATUS2             _MMIO(0xD3B0)
 #define   HUC_FW_VERIFIED       (1<<7)
 
-/* Defines WOPCM space available to GuC firmware */
 #define GUC_WOPCM_SIZE			_MMIO(0xc050)
-/* GuC addresses below GUC_WOPCM_TOP don't map through the GTT */
-#define   GUC_WOPCM_TOP			  (0x80 << 12)	/* 512KB */
-#define   BXT_GUC_WOPCM_RC6_RESERVED	  (0x10 << 12)	/* 64KB  */
-
-/* GuC addresses above GUC_GGTT_TOP also don't map through the GTT */
-#define GUC_GGTT_TOP			0xFEE00000
+#define   GUC_WOPCM_SIZE_LOCKED		  (1<<0)
+#define   GUC_WOPCM_SIZE_SHIFT		12
+#define   GUC_WOPCM_SIZE_MASK		  (0xfffff << GUC_WOPCM_SIZE_SHIFT)
 
 #define GEN8_GT_PM_CONFIG		_MMIO(0x138140)
 #define GEN9LP_GT_PM_CONFIG		_MMIO(0x138140)
@@ -101,13 +100,6 @@
 #define   GUC_ENABLE_READ_CACHE_FOR_WOPCM_DATA	(1<<10)
 #define   GUC_ENABLE_MIA_CLOCK_GATING		(1<<15)
 #define   GUC_GEN10_SHIM_WC_ENABLE		(1<<21)
-
-#define GUC_SHIM_CONTROL_VALUE	(GUC_DISABLE_SRAM_INIT_TO_ZEROES	| \
-				 GUC_ENABLE_READ_CACHE_LOGIC		| \
-				 GUC_ENABLE_MIA_CACHING			| \
-				 GUC_ENABLE_READ_CACHE_FOR_SRAM_DATA	| \
-				 GUC_ENABLE_READ_CACHE_FOR_WOPCM_DATA	| \
-				 GUC_ENABLE_MIA_CLOCK_GATING)
 
 #define GUC_SEND_INTERRUPT		_MMIO(0xc4c8)
 #define   GUC_SEND_TRIGGER		  (1<<0)

@@ -625,6 +625,9 @@ int ttm_mem_io_lock(struct ttm_mem_type_manager *man, bool interruptible);
 void ttm_mem_io_unlock(struct ttm_mem_type_manager *man);
 
 void ttm_bo_del_sub_from_lru(struct ttm_buffer_object *bo);
+#if 0
+void ttm_bo_add_to_lru(struct ttm_buffer_object *bo);
+#endif
 
 /**
  * __ttm_bo_reserve:

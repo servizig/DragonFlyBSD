@@ -126,6 +126,27 @@ extern int ttm_read_lock(struct ttm_lock *lock, bool interruptible);
 extern int ttm_read_trylock(struct ttm_lock *lock, bool interruptible);
 
 /**
+ * ttm_write_unlock
+ *
+ * @lock: Pointer to a struct ttm_lock
+ *
+ * Releases a write lock.
+ */
+extern void ttm_write_unlock(struct ttm_lock *lock);
+
+/**
+ * ttm_write_lock
+ *
+ * @lock: Pointer to a struct ttm_lock
+ * @interruptible: Interruptible sleeping while waiting for a lock.
+ *
+ * Takes the lock in write mode.
+ * Returns:
+ * -ERESTARTSYS If interrupted by a signal and interruptible is true.
+ */
+extern int ttm_write_lock(struct ttm_lock *lock, bool interruptible);
+
+/**
  * ttm_lock_downgrade
  *
  * @lock: Pointer to a struct ttm_lock
@@ -185,7 +206,9 @@ extern int ttm_vt_unlock(struct ttm_lock *lock);
  *
  * Releases a write lock.
  */
+#if 0 /* declared earlier in this file */
 extern void ttm_write_unlock(struct ttm_lock *lock);
+#endif
 
 /**
  * ttm_write_lock
@@ -197,7 +220,9 @@ extern void ttm_write_unlock(struct ttm_lock *lock);
  * Returns:
  * -ERESTARTSYS If interrupted by a signal and interruptible is true.
  */
+#if 0 /* declared earlier in this file */
 extern int ttm_write_lock(struct ttm_lock *lock, bool interruptible);
+#endif
 
 /**
  * ttm_lock_set_kill

@@ -106,7 +106,23 @@ __copy_from_user_inatomic_nocache(void *to, const void __user *from,
 		goto err; \
 } while (0)
 
-#define user_access_begin()
+/* TODO: check me, taken from FreeBSD */
+static inline int
+access_ok(const void *uaddr, size_t len)
+{
+	uintptr_t saddr;
+	uintptr_t eaddr;
+	
+	/* get start and end address */
+	saddr = (uintptr_t)uaddr;
+	eaddr = (uintptr_t)uaddr + len;
+	
+	/* verify addresses are valid for userspace */
+	return ((saddr == eaddr) ||
+	    (eaddr > saddr && eaddr <= VM_MAX_USER_ADDRESS));
+}
+
+#define user_access_begin(unused, addr, size)	access_ok(addr, size)
 #define user_access_end()
 
 #endif	/* _ASM_UACCESS_H_ */

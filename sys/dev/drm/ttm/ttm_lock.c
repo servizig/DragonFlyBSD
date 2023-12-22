@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: GPL-2.0 OR MIT */
 /**************************************************************************
  *
  * Copyright (c) 2007-2009 VMware, Inc., Palo Alto, CA., USA
@@ -85,17 +84,11 @@ int ttm_read_lock(struct ttm_lock *lock, bool interruptible)
 {
 	int ret = 0;
 
-	if (interruptible) {
-		kprintf("#2#begin#: ttm_read_lock.wait_event_interruptible\n");
+	if (interruptible)
 		ret = wait_event_interruptible(lock->queue,
 					       __ttm_read_lock(lock));
-		kprintf("#2#end#: ttm_read_lock.wait_event_interruptible\n");
-	}
-	else {
-		kprintf("#1#begin#: ttm_read_lock.wait_event\n");
+	else
 		wait_event(lock->queue, __ttm_read_lock(lock));
-		kprintf("#1#end#: ttm_read_lock.wait_event\n");
-	}
 	return ret;
 }
 EXPORT_SYMBOL(ttm_read_lock);
@@ -129,17 +122,11 @@ int ttm_read_trylock(struct ttm_lock *lock, bool interruptible)
 	int ret = 0;
 	bool locked;
 
-	if (interruptible) {
-		kprintf("#4#begin#: ttm_read_trylock.wait_event_interruptible\n");
+	if (interruptible)
 		ret = wait_event_interruptible
 			(lock->queue, __ttm_read_trylock(lock, &locked));
-		kprintf("#4#end#: ttm_read_trylock.wait_event_interruptible\n");
-	}
-	else {
-		kprintf("#3#begin#: ttm_read_trylock.wait_event\n");
+	else
 		wait_event(lock->queue, __ttm_read_trylock(lock, &locked));
-		kprintf("#3#end#: ttm_read_trylock.wait_event\n");
-	}
 
 	if (unlikely(ret != 0)) {
 		BUG_ON(locked);
@@ -184,21 +171,16 @@ int ttm_write_lock(struct ttm_lock *lock, bool interruptible)
 	int ret = 0;
 
 	if (interruptible) {
-		kprintf("#6#begin#: ttm_write_lock.wait_event_interruptible\n");
 		ret = wait_event_interruptible(lock->queue,
 					       __ttm_write_lock(lock));
-		kprintf("#6#end#: ttm_write_lock.wait_event_interruptible\n");
 		if (unlikely(ret != 0)) {
 			spin_lock(&lock->lock);
 			lock->flags &= ~TTM_WRITE_LOCK_PENDING;
 			wake_up_all(&lock->queue);
 			spin_unlock(&lock->lock);
 		}
-	} else {
-		kprintf("#5#begin#: ttm_write_lock.wait_event\n");
+	} else
 		wait_event(lock->queue, __ttm_write_lock(lock));
-		kprintf("#5#end#: ttm_write_lock.wait_event\n");
-	}
 
 	return ret;
 }
@@ -252,10 +234,8 @@ int ttm_vt_lock(struct ttm_lock *lock,
 	int ret = 0;
 
 	if (interruptible) {
-		kprintf("#8#begin#: ttm_vt_lock.wait_event_interruptible\n");
 		ret = wait_event_interruptible(lock->queue,
 					       __ttm_vt_lock(lock));
-		kprintf("#8#end#: ttm_vt_lock.wait_event_interruptible\n");
 		if (unlikely(ret != 0)) {
 			spin_lock(&lock->lock);
 			lock->flags &= ~TTM_VT_LOCK_PENDING;
@@ -263,11 +243,8 @@ int ttm_vt_lock(struct ttm_lock *lock,
 			spin_unlock(&lock->lock);
 			return ret;
 		}
-	} else {
-		kprintf("#7#begin#: ttm_vt_lock.wait_event\n");
+	} else
 		wait_event(lock->queue, __ttm_vt_lock(lock));
-		kprintf("#7#end#: ttm_vt_lock.wait_event\n");
-	}
 
 	/*
 	 * Add a base-object, the destructor of which will
@@ -320,8 +297,6 @@ static bool __ttm_suspend_lock(struct ttm_lock *lock)
 
 void ttm_suspend_lock(struct ttm_lock *lock)
 {
-	kprintf("#9#begin#: ttm_suspend_lock.wait_event\n");
 	wait_event(lock->queue, __ttm_suspend_lock(lock));
-	kprintf("#9#end#: ttm_suspend_lock.wait_event\n");
 }
 EXPORT_SYMBOL(ttm_suspend_lock);

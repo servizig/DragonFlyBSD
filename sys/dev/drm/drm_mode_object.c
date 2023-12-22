@@ -184,7 +184,9 @@ EXPORT_SYMBOL(drm_mode_object_find);
 void drm_mode_object_put(struct drm_mode_object *obj)
 {
 	if (obj->free_cb) {
+#if 0
 		DRM_DEBUG("OBJ ID: %d (%d)\n", obj->id, kref_read(&obj->refcount));
+#endif
 		kref_put(&obj->refcount, obj->free_cb);
 	}
 }
@@ -201,7 +203,9 @@ EXPORT_SYMBOL(drm_mode_object_put);
 void drm_mode_object_get(struct drm_mode_object *obj)
 {
 	if (obj->free_cb) {
+#if 0
 		DRM_DEBUG("OBJ ID: %d (%d)\n", obj->id, kref_read(&obj->refcount));
+#endif
 		kref_get(&obj->refcount);
 	}
 }
@@ -435,8 +439,7 @@ static int set_property_legacy(struct drm_mode_object *obj,
 	drm_modeset_lock_all(dev);
 	switch (obj->type) {
 	case DRM_MODE_OBJECT_CONNECTOR:
-		ret = drm_mode_connector_set_obj_prop(obj, prop,
-						      prop_value);
+		ret = drm_connector_set_obj_prop(obj, prop, prop_value);
 		break;
 	case DRM_MODE_OBJECT_CRTC:
 		ret = drm_mode_crtc_set_obj_prop(obj, prop, prop_value);
@@ -461,12 +464,13 @@ static int set_property_atomic(struct drm_mode_object *obj,
 	struct drm_modeset_acquire_ctx ctx;
 	int ret;
 
-	drm_modeset_acquire_init(&ctx, 0);
-
 	state = drm_atomic_state_alloc(dev);
 	if (!state)
 		return -ENOMEM;
+
+	drm_modeset_acquire_init(&ctx, 0);
 	state->acquire_ctx = &ctx;
+
 retry:
 	if (prop == state->dev->mode_config.dpms_property) {
 		if (obj->type != DRM_MODE_OBJECT_CONNECTOR) {

@@ -99,6 +99,12 @@ ktime_sub(ktime_t lhs, ktime_t rhs)
 }
 
 static inline ktime_t
+ktime_add(ktime_t lhs, ktime_t rhs)
+{
+        return lhs + rhs;
+}
+
+static inline ktime_t
 ns_to_ktime(u64 ns)
 {
 	return ns;

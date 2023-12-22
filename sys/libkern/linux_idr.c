@@ -555,6 +555,9 @@ idr_replace(struct idr *idp, void *ptr, int id)
 	if (idrnp == NULL) {
 		ret = NULL;
 	} else {
+		if (ptr != NULL && idrnp->data == NULL) {
+			idrnp->allocated++;
+		}
 		ret = idrnp->data;
 		idrnp->data = ptr;
 	}

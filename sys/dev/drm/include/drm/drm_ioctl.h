@@ -70,6 +70,7 @@ typedef int drm_ioctl_compat_t(struct file *filp, unsigned int cmd,
 			       unsigned long arg);
 
 #define DRM_IOCTL_NR(n)                ((n) & 0xff)
+#define DRM_IOCTL_TYPE(n)              IOCGROUP(n)
 #define DRM_MAJOR       226
 
 /**
@@ -110,13 +111,6 @@ enum drm_ioctl_flags {
 	 * This is equivalent to callers with the SYSADMIN capability.
 	 */
 	DRM_ROOT_ONLY		= BIT(2),
-	/**
-	 * @DRM_CONTROL_ALLOW:
-	 *
-	 * Deprecated, do not use. Control nodes are in the process of getting
-	 * removed.
-	 */
-	DRM_CONTROL_ALLOW	= BIT(3),
 	/**
 	 * @DRM_UNLOCKED:
 	 *

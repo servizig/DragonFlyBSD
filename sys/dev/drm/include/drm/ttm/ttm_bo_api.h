@@ -542,6 +542,10 @@ int ttm_bo_init_reserved(struct ttm_bo_device *bdev,
  * @page_alignment: Data alignment in pages.
  * @interruptible: If needing to sleep to wait for GPU resources,
  * sleep interruptible.
+ * pinned in physical memory. If this behaviour is not desired, this member
+ * holds a pointer to a persistent shmem object. Typically, this would
+ * point to the shmem object backing a GEM object if TTM is used to back a
+ * GEM user interface.
  * @acc_size: Accounted size for this object.
  * @resv: Pointer to a reservation_object, or NULL to let ttm allocate one.
  * @destroy: Destroy function. Use NULL for kfree().

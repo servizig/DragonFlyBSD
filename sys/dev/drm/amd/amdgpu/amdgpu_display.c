@@ -513,6 +513,7 @@ int amdgpu_display_framebuffer_init(struct drm_device *dev,
 	drm_helper_mode_fill_fb_struct(dev, &rfb->base, mode_cmd);
 	ret = drm_framebuffer_init(dev, &rfb->base, &amdgpu_fb_funcs);
 	if (ret) {
+DRM_DEBUG_IOCTL("drm_framebuffer_init failed: %d", ret);
 		rfb->base.obj[0] = NULL;
 		return ret;
 	}
@@ -549,6 +550,7 @@ amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 
 	ret = amdgpu_display_framebuffer_init(dev, amdgpu_fb, mode_cmd, obj);
 	if (ret) {
+DRM_DEBUG_IOCTL("amdgpu_display_framebuffer_init failed: %d", ret);
 		kfree(amdgpu_fb);
 		drm_gem_object_put_unlocked(obj);
 		return ERR_PTR(ret);

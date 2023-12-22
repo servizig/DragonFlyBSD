@@ -376,15 +376,18 @@ int amdgpu_mode_dumb_mmap(struct drm_file *filp,
 
 	gobj = drm_gem_object_lookup(filp, handle);
 	if (gobj == NULL) {
+DRM_DEBUG("gobj is null\n");
 		return -ENOENT;
 	}
 	robj = gem_to_amdgpu_bo(gobj);
 	if (amdgpu_ttm_tt_get_usermm(robj->tbo.ttm) ||
 	    (robj->flags & AMDGPU_GEM_CREATE_NO_CPU_ACCESS)) {
 		drm_gem_object_put_unlocked(gobj);
+DRM_DEBUG("PERMISSION ERROR\n");
 		return -EPERM;
 	}
 	*offset_p = amdgpu_bo_mmap_offset(robj);
+DRM_DEBUG("handle=%d, offset_p=%jx\n", handle, *offset_p);
 	drm_gem_object_put_unlocked(gobj);
 	return 0;
 }
@@ -772,9 +775,11 @@ int amdgpu_mode_dumb_create(struct drm_file *file_priv,
 	/* drop reference from allocate - handle holds it now */
 	drm_gem_object_put_unlocked(gobj);
 	if (r) {
+DRM_ERROR("drm_gem_object_put_unlocked returned %d\n", r);
 		return r;
 	}
 	args->handle = handle;
+DRM_DEBUG("handle=%d, pitch=%d, size=%llu\n", args->handle, args->pitch, args->size);
 	return 0;
 }
 

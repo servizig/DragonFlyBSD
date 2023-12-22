@@ -944,10 +944,9 @@ static int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file
  */
 void amdgpu_driver_lastclose_kms(struct drm_device *dev)
 {
-#if 0
-	// empty function as of 4.19
+
 	drm_fb_helper_lastclose(dev);
-#endif
+
 	vga_switcheroo_process_delayed_switch();
 }
 

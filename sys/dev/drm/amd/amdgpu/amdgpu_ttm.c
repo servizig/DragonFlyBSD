@@ -2453,8 +2453,10 @@ static ssize_t amdgpu_iomem_read(struct file *f, char __user *buf,
 			return -EPERM;
 
 		p = pfn_to_page(pfn);
+#if 0 /* XXX DRAGONFLY - dev_mapping NULL atm */
 		if (p->mapping != adev->mman.bdev.dev_mapping)
 			return -EPERM;
+#endif
 
 		ptr = kmap(p);
 		r = copy_to_user(buf, ptr + off, bytes);
@@ -2504,8 +2506,10 @@ static ssize_t amdgpu_iomem_write(struct file *f, const char __user *buf,
 			return -EPERM;
 
 		p = pfn_to_page(pfn);
+#if 0 /* XXX DRAGONFLY - dev_mapping NULL atm */
 		if (p->mapping != adev->mman.bdev.dev_mapping)
 			return -EPERM;
+#endif
 
 		ptr = kmap(p);
 		r = copy_from_user(ptr + off, buf, bytes);

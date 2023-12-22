@@ -35,18 +35,20 @@
  */
 
 #define I915_CSR_GLK "i915/glk_dmc_ver1_04.bin"
+MODULE_FIRMWARE(I915_CSR_GLK);
 #define GLK_CSR_VERSION_REQUIRED	CSR_VERSION(1, 4)
 
-#define I915_CSR_CNL "i915/cnl_dmc_ver1_04.bin"
-#define CNL_CSR_VERSION_REQUIRED	CSR_VERSION(1, 4)
+#define I915_CSR_CNL "i915/cnl_dmc_ver1_07.bin"
+MODULE_FIRMWARE(I915_CSR_CNL);
+#define CNL_CSR_VERSION_REQUIRED	CSR_VERSION(1, 7)
 
-#define I915_CSR_KBL "i915/kbl_dmc_ver1_01.bin"
+#define I915_CSR_KBL "i915/kbl_dmc_ver1_04.bin"
 MODULE_FIRMWARE(I915_CSR_KBL);
-#define KBL_CSR_VERSION_REQUIRED	CSR_VERSION(1, 1)
+#define KBL_CSR_VERSION_REQUIRED	CSR_VERSION(1, 4)
 
-#define I915_CSR_SKL "i915/skl_dmc_ver1_26.bin"
+#define I915_CSR_SKL "i915/skl_dmc_ver1_27.bin"
 MODULE_FIRMWARE(I915_CSR_SKL);
-#define SKL_CSR_VERSION_REQUIRED	CSR_VERSION(1, 26)
+#define SKL_CSR_VERSION_REQUIRED	CSR_VERSION(1, 27)
 
 #define I915_CSR_BXT "i915/bxt_dmc_ver1_07.bin"
 MODULE_FIRMWARE(I915_CSR_BXT);
@@ -198,6 +200,7 @@ intel_get_stepping_info(struct drm_i915_private *dev_priv)
 		si = bxt_stepping_info;
 	} else {
 		size = 0;
+		si = NULL;
 	}
 
 	if (INTEL_REVID(dev_priv) < size)
@@ -279,9 +282,16 @@ static uint32_t *parse_csr_fw(struct drm_i915_private *dev_priv,
 	uint32_t i;
 	uint32_t *dmc_payload;
 	uint32_t required_version;
+	size_t fsize;
 
 	if (!fw)
 		return NULL;
+
+	fsize = sizeof(struct intel_css_header) +
+		sizeof(struct intel_package_header) +
+		sizeof(struct intel_dmc_header);
+	if (fsize > fw->datasize)
+		goto error_truncated;
 
 	/* Extract CSS Header information*/
 	css_header = (struct intel_css_header *)fw->data;
@@ -295,7 +305,10 @@ static uint32_t *parse_csr_fw(struct drm_i915_private *dev_priv,
 
 	csr->version = css_header->version;
 
-	if (IS_CANNONLAKE(dev_priv)) {
+	if (csr->fw_path == i915_modparams.dmc_firmware_path) {
+		/* Bypass version check for firmware override. */
+		required_version = csr->version;
+	} else if (IS_CANNONLAKE(dev_priv)) {
 		required_version = CNL_CSR_VERSION_REQUIRED;
 	} else if (IS_GEMINILAKE(dev_priv)) {
 		required_version = GLK_CSR_VERSION_REQUIRED;
@@ -354,6 +367,9 @@ static uint32_t *parse_csr_fw(struct drm_i915_private *dev_priv,
 		return NULL;
 	}
 	readcount += dmc_offset;
+	fsize += dmc_offset;
+	if (fsize > fw->datasize)
+		goto error_truncated;
 
 	/* Extract dmc_header information. */
 	dmc_header = (struct intel_dmc_header *)&fw->data[readcount];
@@ -385,6 +401,10 @@ static uint32_t *parse_csr_fw(struct drm_i915_private *dev_priv,
 
 	/* fw_size is in dwords, so multiplied by 4 to convert into bytes. */
 	nbytes = dmc_header->fw_size * 4;
+	fsize += nbytes;
+	if (fsize > fw->datasize)
+		goto error_truncated;
+
 	if (nbytes > CSR_MAX_FW_SIZE) {
 		DRM_ERROR("DMC firmware too big (%u bytes)\n", nbytes);
 		return NULL;
@@ -398,6 +418,10 @@ static uint32_t *parse_csr_fw(struct drm_i915_private *dev_priv,
 	}
 
 	return memcpy(dmc_payload, &fw->data[readcount], nbytes);
+
+error_truncated:
+	DRM_ERROR("Truncated DMC firmware, rejecting.\n");
+	return NULL;
 }
 
 static void csr_load_work_fn(struct work_struct *work)
@@ -450,7 +474,9 @@ void intel_csr_ucode_init(struct drm_i915_private *dev_priv)
 	if (!HAS_CSR(dev_priv))
 		return;
 
-	if (IS_CANNONLAKE(dev_priv))
+	if (i915_modparams.dmc_firmware_path)
+		csr->fw_path = i915_modparams.dmc_firmware_path;
+	else if (IS_CANNONLAKE(dev_priv))
 		csr->fw_path = I915_CSR_CNL;
 	else if (IS_GEMINILAKE(dev_priv))
 		csr->fw_path = I915_CSR_GLK;
