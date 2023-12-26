@@ -2344,8 +2344,12 @@ bool amdgpu_device_asic_has_dc_support(enum amd_asic_type asic_type)
  */
 bool amdgpu_device_has_dc_support(struct amdgpu_device *adev)
 {
+#if 0
 	if (amdgpu_sriov_vf(adev))
 		return false;
+#endif
+	if (amdgpu_sriov_vf(adev))
+		DRM_DEBUG("amdgpu_sriov_vf returns true, which should not happen");
 
 	return amdgpu_device_asic_has_dc_support(adev->asic_type);
 }
