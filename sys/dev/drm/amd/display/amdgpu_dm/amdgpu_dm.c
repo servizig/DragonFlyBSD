@@ -1575,9 +1575,58 @@ static const struct backlight_ops amdgpu_dm_backlight_ops = {
 };
 #endif
 
+/*
+ * Read max backlight level
+ */
+static int
+sysctl_backlight_max(SYSCTL_HANDLER_ARGS)
+{
+	int err, val;
+
+	val = AMDGPU_MAX_BL_LEVEL;
+	err = sysctl_handle_int(oidp, &val, 0, req);
+	return(err);
+}
+
+/*
+ * Read/write backlight level
+ */
+static int
+sysctl_backlight_handler(SYSCTL_HANDLER_ARGS)
+{
+	struct amdgpu_display_manager *dm;
+	int err, val;
+
+	dm = (struct amdgpu_display_manager *)arg1;
+	val = 0;
+
+	err = sysctl_handle_int(oidp, &val, 0, req);
+	if (err != 0 || req->newptr == NULL) {
+		return(err);
+	}
+
+	if (val >= 0 && val <= AMDGPU_MAX_BL_LEVEL) {
+		dc_link_set_backlight_level(dm->backlight_link, val, 0, 0);
+	}
+
+	return(err);
+}
+
 static void
 amdgpu_dm_register_backlight_device(struct amdgpu_display_manager *dm)
 {
+	SYSCTL_ADD_PROC(&dm->ddev->sysctl->ctx, &sysctl__hw_children,
+			OID_AUTO, "backlight_max",
+			CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_ANYBODY,
+			dm, sizeof(int),
+			sysctl_backlight_max,
+			"I", "Max backlight level");
+	SYSCTL_ADD_PROC(&dm->ddev->sysctl->ctx, &sysctl__hw_children,
+			OID_AUTO, "backlight_level",
+			CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_ANYBODY,
+			dm, sizeof(int),
+			sysctl_backlight_handler,
+			"I", "Backlight level");
 #if 0
 	char bl_name[16];
 	struct backlight_properties props = { 0 };
@@ -1657,8 +1706,11 @@ static void register_backlight_device(struct amdgpu_display_manager *dm,
 		 */
 		amdgpu_dm_register_backlight_device(dm);
 
+#if 0
 		if (dm->backlight_dev)
 			dm->backlight_link = link;
+#endif
+		dm->backlight_link = link;
 	}
 #endif
 }
