@@ -1598,7 +1598,7 @@ sysctl_backlight_handler(SYSCTL_HANDLER_ARGS)
 	int err, val;
 
 	dm = (struct amdgpu_display_manager *)arg1;
-	val = 0;
+	val = dc_link_get_backlight_level(dm->backlight_link);
 
 	err = sysctl_handle_int(oidp, &val, 0, req);
 	if (err != 0 || req->newptr == NULL) {
