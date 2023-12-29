@@ -578,13 +578,11 @@ static int __setup_page_dma(struct i915_address_space *vm,
 	if (unlikely(!p->page))
 		return -ENOMEM;
 
-#if 0 /* TODO: fix me */
 	p->daddr = dma_map_page_attrs(vm->dma,
 				      p->page, 0, PAGE_SIZE,
 				      PCI_DMA_BIDIRECTIONAL,
 				      DMA_ATTR_SKIP_CPU_SYNC |
 				      DMA_ATTR_NO_WARN);
-#endif
 	if (unlikely(dma_mapping_error(vm->dma, p->daddr))) {
 		vm_free_page(vm, p->page);
 		return -ENOMEM;
@@ -2453,13 +2451,11 @@ int i915_gem_gtt_prepare_pages(struct drm_i915_gem_object *obj,
 			       struct sg_table *pages)
 {
 	do {
-#if 0 /* TODO: fix me */
 		if (dma_map_sg_attrs(&obj->base.dev->pdev->dev,
 				     pages->sgl, pages->nents,
 				     PCI_DMA_BIDIRECTIONAL,
 				     DMA_ATTR_NO_WARN))
 			return 0;
-#endif
 
 		/* If the DMA remap fails, one cause can be that we have
 		 * too many objects pinned in a small remapping table,

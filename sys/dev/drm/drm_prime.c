@@ -316,8 +316,6 @@ struct sg_table *drm_gem_map_dma_buf(struct dma_buf_attachment *attach,
 	sgt = obj->dev->driver->gem_prime_get_sg_table(obj);
 
 	if (!IS_ERR(sgt)) {
-		STUB();
-#if 0
 		if (!dma_map_sg_attrs(attach->dev, sgt->sgl, sgt->nents, dir,
 				      DMA_ATTR_SKIP_CPU_SYNC)) {
 			sg_free_table(sgt);
@@ -327,7 +325,6 @@ struct sg_table *drm_gem_map_dma_buf(struct dma_buf_attachment *attach,
 			prime_attach->sgt = sgt;
 			prime_attach->dir = dir;
 		}
-#endif
 	}
 
 	return sgt;

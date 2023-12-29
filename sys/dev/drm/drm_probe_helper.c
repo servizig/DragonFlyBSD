@@ -568,7 +568,9 @@ void drm_kms_helper_hotplug_event(struct drm_device *dev)
 	if (dev->mode_config.funcs->output_poll_changed)
 		dev->mode_config.funcs->output_poll_changed(dev);
 
+#if 0 /* drm client implementation GPL'ed until 5.7 */
 	drm_client_dev_hotplug(dev);
+#endif
 }
 EXPORT_SYMBOL(drm_kms_helper_hotplug_event);
 

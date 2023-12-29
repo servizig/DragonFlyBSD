@@ -516,7 +516,7 @@ static void guc_add_request(struct intel_guc *guc, struct i915_request *rq)
 	u32 ctx_desc = lower_32_bits(rq->hw_context->lrc_desc);
 	u32 ring_tail = intel_ring_set_tail(rq->ring, rq->tail) / sizeof(u64);
 
-	spin_lock(&client->wq_lock);
+	lockmgr(&client->wq_lock, LK_EXCLUSIVE);
 
 	guc_wq_item_append(client, engine->guc_id, ctx_desc,
 			   ring_tail, rq->global_seqno);
@@ -524,7 +524,7 @@ static void guc_add_request(struct intel_guc *guc, struct i915_request *rq)
 
 	client->submissions[engine->id] += 1;
 
-	spin_unlock(&client->wq_lock);
+	lockmgr(&client->wq_lock, LK_RELEASE);
 }
 
 /*
@@ -770,9 +770,9 @@ static void guc_dequeue(struct intel_engine_cs *engine)
 
 	local_irq_save(flags);
 
-	spin_lock(&engine->timeline.lock);
+	lockmgr(&engine->timeline.lock, LK_EXCLUSIVE);
 	submit = __guc_dequeue(engine);
-	spin_unlock(&engine->timeline.lock);
+	lockmgr(&engine->timeline.lock, LK_RELEASE);
 
 	if (submit)
 		guc_submit(engine);
@@ -953,7 +953,7 @@ guc_client_alloc(struct drm_i915_private *dev_priv,
 	client->engines = engines;
 	client->priority = priority;
 	client->doorbell_id = GUC_DOORBELL_INVALID;
-	spin_lock_init(&client->wq_lock);
+	lockinit(&client->wq_lock, "i915guccwql", 0, LK_CANRECURSE);
 
 	ret = ida_simple_get(&guc->stage_ids, 0, GUC_MAX_STAGE_DESCRIPTORS,
 			     GFP_KERNEL);

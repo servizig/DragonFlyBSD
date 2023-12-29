@@ -301,9 +301,9 @@ void drm_err(const char *format, ...);
 
 #else
 
-// same as upstream but with extra function name argument
+/* same as upstream but with extra function name argument */
 extern __printf(4, 5)
-void drm_dev_printk(const char *func, const struct device *dev, 
+void drm_dev_printk(const char *func, const struct device *dev,
                     const char *level, char *format, ...);
 
 extern __printf(4, 5)

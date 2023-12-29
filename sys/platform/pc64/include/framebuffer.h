@@ -58,8 +58,6 @@ struct fb_info {
 	void *par;
 	struct fb_ops fbops;
 	device_t device;
-	unsigned long screen_size;
-	char *screen_buffer;
 };
 
 int probe_efi_fb(int early);

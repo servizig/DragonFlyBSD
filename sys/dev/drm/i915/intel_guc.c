@@ -70,7 +70,9 @@ void intel_guc_init_early(struct intel_guc *guc)
 {
 	intel_guc_fw_init_early(guc);
 	intel_guc_ct_init_early(&guc->ct);
+#if 0
 	intel_guc_log_init_early(&guc->log);
+#endif
 
 	lockinit(&guc->send_mutex, "i9pgsm", 0, LK_CANRECURSE);
 	lockinit(&guc->irq_lock, "i9pgil", 0, LK_CANRECURSE);
@@ -200,9 +202,11 @@ int intel_guc_init(struct intel_guc *guc)
 		goto err_fetch;
 	GEM_BUG_ON(!guc->shared_data);
 
+#if 0
 	ret = intel_guc_log_create(&guc->log);
 	if (ret)
 		goto err_shared;
+#endif
 
 	ret = intel_guc_ads_create(guc);
 	if (ret)
@@ -215,8 +219,10 @@ int intel_guc_init(struct intel_guc *guc)
 	return 0;
 
 err_log:
+#if 0
 	intel_guc_log_destroy(&guc->log);
 err_shared:
+#endif
 	guc_shared_data_destroy(guc);
 err_fetch:
 	intel_uc_fw_fini(&guc->fw);
@@ -229,7 +235,9 @@ void intel_guc_fini(struct intel_guc *guc)
 
 	i915_ggtt_disable_guc(dev_priv);
 	intel_guc_ads_destroy(guc);
+#if 0
 	intel_guc_log_destroy(&guc->log);
+#endif
 	guc_shared_data_destroy(guc);
 	intel_uc_fw_fini(&guc->fw);
 }
@@ -486,9 +494,11 @@ void intel_guc_to_host_process_recv_msg(struct intel_guc *guc, u32 msg)
 	/* Make sure to handle only enabled messages */
 	msg &= guc->msg_enabled_mask;
 
+#if 0
 	if (msg & (INTEL_GUC_RECV_MSG_FLUSH_LOG_BUFFER |
 		   INTEL_GUC_RECV_MSG_CRASH_DUMP_POSTED))
 		intel_guc_log_handle_flush_event(&guc->log);
+#endif
 }
 
 int intel_guc_sample_forcewake(struct intel_guc *guc)

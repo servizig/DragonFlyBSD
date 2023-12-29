@@ -124,8 +124,8 @@ __i915_printk(struct drm_i915_private *dev_priv, const char *level,
 		 */
 #if 0
 		if (!test_taint(TAINT_USER))
-			dev_notice(kdev, "%s", FDO_BUG_MSG);
 #endif
+			dev_notice(kdev, "%s", FDO_BUG_MSG);
 		shown_bug_once = true;
 	}
 }

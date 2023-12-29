@@ -345,6 +345,17 @@ struct i915_gpu_state *i915_first_error_state(struct drm_i915_private *i915);
 void i915_reset_error_state(struct drm_i915_private *i915);
 
 #else
+#ifdef __DragonFly__ /* fix missing-prototypes */
+__printf(2, 3)
+void i915_error_printf(struct drm_i915_error_state_buf *e, const char *f, ...);
+int i915_error_state_to_str(struct drm_i915_error_state_buf *estr,
+			    const struct i915_gpu_state *gpu);
+int i915_error_state_buf_init(struct drm_i915_error_state_buf *eb,
+			      struct drm_i915_private *i915,
+			      size_t count, loff_t pos);
+struct i915_gpu_state *i915_capture_gpu_state(struct drm_i915_private *i915);
+void __i915_gpu_state_free(struct kref *kref);
+#endif
 
 static inline void i915_capture_error_state(struct drm_i915_private *dev_priv,
 					    u32 engine_mask,

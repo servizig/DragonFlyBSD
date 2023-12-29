@@ -1707,7 +1707,7 @@ ktime_t intel_engine_get_busy_time(struct intel_engine_cs *engine)
  */
 void intel_disable_engine_stats(struct intel_engine_cs *engine)
 {
-#if 0 /* TODO: why not working for the uninitialized? */
+#if 0
 	unsigned long flags;
 #else
 	unsigned long flags = 0;

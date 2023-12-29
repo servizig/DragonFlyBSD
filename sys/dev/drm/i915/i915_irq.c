@@ -3257,7 +3257,7 @@ void i915_handle_error(struct drm_i915_private *dev_priv,
 	char error_msg[80];
 	char *msg = NULL;
 
-#if 0
+#if 0 /* nonnull argument 'fmt' compared to NULL */
 	if (fmt) {
 #endif
 		va_list args;

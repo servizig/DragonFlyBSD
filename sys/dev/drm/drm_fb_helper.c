@@ -773,6 +773,8 @@ static void drm_fb_helper_resume_worker(struct work_struct *work)
 static void drm_fb_helper_dirty_blit_real(struct drm_fb_helper *fb_helper,
 					  struct drm_clip_rect *clip)
 {
+	DRM_ERROR("drm_fb_helper_dirty_blit_real is not implemented");
+#if 0
 	struct drm_framebuffer *fb = fb_helper->fb;
 	unsigned int cpp = drm_format_plane_cpp(fb->format->format, 0);
 	size_t offset = clip->y1 * fb->pitches[0] + clip->x1 * cpp;
@@ -786,6 +788,7 @@ static void drm_fb_helper_dirty_blit_real(struct drm_fb_helper *fb_helper,
 		src += fb->pitches[0];
 		dst += fb->pitches[0];
 	}
+#endif
 }
 
 static void drm_fb_helper_dirty_work(struct work_struct *work)
@@ -1650,51 +1653,10 @@ static bool drm_fb_pixel_format_equal(const struct fb_var_screeninfo *var_1,
 	       var_1->transp.length == var_2->transp.length &&
 	       var_1->transp.msb_right == var_2->transp.msb_right;
 }
-#endif
 
-/**
- * drm_fb_helper_check_var - implementation for &fb_ops.fb_check_var
- * @var: screeninfo to check
- * @info: fbdev registered by the helper
- */
-int drm_fb_helper_check_var(struct fb_var_screeninfo *var,
-			    struct fb_info *info)
+static void drm_fb_helper_fill_pixel_fmt(struct fb_var_screeninfo *var,
+					 u8 depth)
 {
-#if 0
-	struct drm_fb_helper *fb_helper = info->par;
-	struct drm_framebuffer *fb = fb_helper->fb;
-	int depth;
-
-	if (var->pixclock != 0 || in_dbg_master())
-		return -EINVAL;
-
-	/*
-	 * Changes struct fb_var_screeninfo are currently not pushed back
-	 * to KMS, hence fail if different settings are requested.
-	 */
-	if (var->bits_per_pixel != fb->format->cpp[0] * 8 ||
-	    var->xres > fb->width || var->yres > fb->height ||
-	    var->xres_virtual > fb->width || var->yres_virtual > fb->height) {
-		DRM_DEBUG("fb requested width/height/bpp can't fit in current fb "
-			  "request %dx%d-%d (virtual %dx%d) > %dx%d-%d\n",
-			  var->xres, var->yres, var->bits_per_pixel,
-			  var->xres_virtual, var->yres_virtual,
-			  fb->width, fb->height, fb->format->cpp[0] * 8);
-		return -EINVAL;
-	}
-
-	switch (var->bits_per_pixel) {
-	case 16:
-		depth = (var->green.length == 6) ? 16 : 15;
-		break;
-	case 32:
-		depth = (var->transp.length > 0) ? 32 : 24;
-		break;
-	default:
-		depth = var->bits_per_pixel;
-		break;
-	}
-
 	switch (depth) {
 	case 8:
 		var->red.offset = 0;
@@ -1746,8 +1708,69 @@ int drm_fb_helper_check_var(struct fb_var_screeninfo *var,
 		var->transp.length = 8;
 		break;
 	default:
+		break;
+	}
+}
+#endif
+
+/**
+ * drm_fb_helper_check_var - implementation for &fb_ops.fb_check_var
+ * @var: screeninfo to check
+ * @info: fbdev registered by the helper
+ */
+int drm_fb_helper_check_var(struct fb_var_screeninfo *var,
+			    struct fb_info *info)
+{
+#if 0
+	struct drm_fb_helper *fb_helper = info->par;
+	struct drm_framebuffer *fb = fb_helper->fb;
+
+	if (in_dbg_master())
+		return -EINVAL;
+
+	if (var->pixclock != 0) {
+		DRM_DEBUG("fbdev emulation doesn't support changing the pixel clock, value of pixclock is ignored\n");
+		var->pixclock = 0;
+	}
+
+	/*
+	 * Changes struct fb_var_screeninfo are currently not pushed back
+	 * to KMS, hence fail if different settings are requested.
+	 */
+	if (var->bits_per_pixel != fb->format->cpp[0] * 8 ||
+	    var->xres > fb->width || var->yres > fb->height ||
+	    var->xres_virtual > fb->width || var->yres_virtual > fb->height) {
+		DRM_DEBUG("fb requested width/height/bpp can't fit in current fb "
+			  "request %dx%d-%d (virtual %dx%d) > %dx%d-%d\n",
+			  var->xres, var->yres, var->bits_per_pixel,
+			  var->xres_virtual, var->yres_virtual,
+			  fb->width, fb->height, fb->format->cpp[0] * 8);
 		return -EINVAL;
 	}
+
+	/*
+	 * Workaround for SDL 1.2, which is known to be setting all pixel format
+	 * fields values to zero in some cases. We treat this situation as a
+	 * kind of "use some reasonable autodetected values".
+	 */
+	if (!var->red.offset     && !var->green.offset    &&
+	    !var->blue.offset    && !var->transp.offset   &&
+	    !var->red.length     && !var->green.length    &&
+	    !var->blue.length    && !var->transp.length   &&
+	    !var->red.msb_right  && !var->green.msb_right &&
+	    !var->blue.msb_right && !var->transp.msb_right) {
+		drm_fb_helper_fill_pixel_fmt(var, fb->format->depth);
+	}
+
+	/*
+	 * drm fbdev emulation doesn't support changing the pixel format at all,
+	 * so reject all pixel format changing requests.
+	 */
+	if (!drm_fb_pixel_format_equal(var, &info->var)) {
+		DRM_DEBUG("fbdev emulation doesn't support changing the pixel format\n");
+		return -EINVAL;
+	}
+
 #endif
 	return 0;
 }
@@ -2710,8 +2733,14 @@ __drm_fb_helper_initial_config_and_unlock(struct drm_fb_helper *fb_helper,
 	info = fb_helper->fbdev;
 #if 0
 	info->var.pixclock = 0;
+	/* Shamelessly allow physical address leaking to userspace */
+#if IS_ENABLED(CONFIG_DRM_FBDEV_LEAK_PHYS_SMEM)
+	if (!drm_leak_fbdev_smem)
 #endif
+		/* don't leak any physical addresses to userspace */
+		info->flags |= FBINFO_HIDE_SMEM_START;
 
+#endif
 	/* Need to drop locks to avoid recursive deadlock in
 	 * register_framebuffer. This is ok because the only thing left to do is
 	 * register the fbdev emulation instance in kernel_fb_helper_list. */
@@ -3018,25 +3047,22 @@ static int drm_fbdev_fb_release(struct fb_info *info, int user)
 }
 #endif
 
+#if 0 /* drm client implementation GPL'ed until 5.7 */
 static void drm_fbdev_cleanup(struct drm_fb_helper *fb_helper)
 {
-#if 0
 	struct fb_info *fbi = fb_helper->fbdev;
-#endif
 	struct fb_ops *fbops = NULL;
 	void *shadow = NULL;
 
 	if (!fb_helper->dev)
 		return;
 
-#if 0
 	if (fbi && fbi->fbdefio) {
 
 		fb_deferred_io_cleanup(fbi);
 		shadow = fbi->screen_buffer;
 		fbops = fbi->fbops;
 	}
-#endif
 
 	drm_fb_helper_fini(fb_helper);
 
@@ -3062,6 +3088,7 @@ static void drm_fbdev_release(struct drm_fb_helper *fb_helper)
 		kfree(fb_helper);
 	}
 }
+#endif
 
 /*
  * fb_ops.fb_destroy is called by the last put_fb_info() call at the end of
@@ -3126,6 +3153,9 @@ static struct fb_deferred_io drm_fbdev_defio = {
 int drm_fb_helper_generic_probe(struct drm_fb_helper *fb_helper,
 				struct drm_fb_helper_surface_size *sizes)
 {
+	DRM_ERROR("fbdev generic probe is not implemented");
+	return -EINVAL;
+#if 0 /* drm client implementation GPL'ed until 5.7 */
 	struct drm_client_dev *client = &fb_helper->client;
 	struct drm_client_buffer *buffer;
 	struct drm_framebuffer *fb;
@@ -3201,13 +3231,17 @@ int drm_fb_helper_generic_probe(struct drm_fb_helper *fb_helper,
 	}
 
 	return 0;
+#endif
 }
 EXPORT_SYMBOL(drm_fb_helper_generic_probe);
 
+#if 0
 static const struct drm_fb_helper_funcs drm_fb_helper_generic_funcs = {
 	.fb_probe = drm_fb_helper_generic_probe,
 };
+#endif
 
+#if 0
 static void drm_fbdev_client_unregister(struct drm_client_dev *client)
 {
 	struct drm_fb_helper *fb_helper = drm_fb_helper_from_client(client);
@@ -3278,6 +3312,7 @@ static const struct drm_client_funcs drm_fbdev_client_funcs = {
 	.restore	= drm_fbdev_client_restore,
 	.hotplug	= drm_fbdev_client_hotplug,
 };
+#endif
 
 /**
  * drm_fb_helper_generic_fbdev_setup() - Setup generic fbdev emulation
@@ -3304,6 +3339,9 @@ static const struct drm_client_funcs drm_fbdev_client_funcs = {
  */
 int drm_fbdev_generic_setup(struct drm_device *dev, unsigned int preferred_bpp)
 {
+	DRM_ERROR("fbdev generic setup is not implemented");
+	return -EINVAL;
+#if 0 /* drm client implementation GPL'ed until 5.7 */
 	struct drm_fb_helper *fb_helper;
 	int ret;
 
@@ -3331,6 +3369,7 @@ int drm_fbdev_generic_setup(struct drm_device *dev, unsigned int preferred_bpp)
 	drm_client_add(&fb_helper->client);
 
 	return 0;
+#endif
 }
 EXPORT_SYMBOL(drm_fbdev_generic_setup);
 

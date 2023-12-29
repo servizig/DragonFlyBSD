@@ -123,14 +123,10 @@ int drm_mode_addfb(struct drm_device *dev, struct drm_mode_fb_cmd *or,
 	if (r.pixel_format == DRM_FORMAT_XRGB2101010 &&
 	    dev->driver->driver_features & DRIVER_PREFER_XBGR_30BPP)
 		r.pixel_format = DRM_FORMAT_XBGR2101010;
-DRM_DEBUG_IOCTL("width=%d, height=%d, pitch=%d, pixel_format=%d, handle=%d",
-	r.width, r.height, r.pitches[0], r.pixel_format, r.handles[0]);
 	ret = drm_mode_addfb2(dev, &r, file_priv);
 	if (ret) {
-DRM_DEBUG_IOCTL("drm_mode_addfb2 failed: %d", ret);
 		return ret;
 	}
-DRM_DEBUG_IOCTL("fb_id=%d", r.fb_id);
 	or->fb_id = r.fb_id;
 
 	return 0;
@@ -305,7 +301,6 @@ drm_internal_framebuffer_create(struct drm_device *dev,
 
 	ret = framebuffer_check(dev, r);
 	if (ret) {
-DRM_DEBUG_IOCTL("fb check failed: %d", ret);
 		return ERR_PTR(ret);
 	}
 
@@ -344,7 +339,6 @@ int drm_mode_addfb2(struct drm_device *dev,
 
 	fb = drm_internal_framebuffer_create(dev, r, file_priv);
 	if (IS_ERR(fb)) {
-DRM_DEBUG_IOCTL("fb create failed: %lx", PTR_ERR(fb));
 		return PTR_ERR(fb);
 	}
 
@@ -701,7 +695,6 @@ int drm_framebuffer_init(struct drm_device *dev, struct drm_framebuffer *fb,
 	ret = __drm_mode_object_add(dev, &fb->base, DRM_MODE_OBJECT_FB,
 				    false, drm_framebuffer_free);
 	if (ret) {
-DRM_DEBUG_IOCTL("__drm_mode_object_add failed: %d", ret);
 		goto out;
 	}
 

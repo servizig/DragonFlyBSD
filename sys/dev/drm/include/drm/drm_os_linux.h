@@ -9,19 +9,19 @@
 #include <linux/io-64-nonatomic-lo-hi.h>
 
 /* Handle the DRM options from kernel config. */
-// #ifdef __DragonFly__
-// #include "opt_drm.h"
-// #ifdef DRM_DEBUG
-// #  if DRM_DEBUG>1
-// #    define DRM_DEBUG_DEFAULT_ON 2
-// #  else
-// #    define DRM_DEBUG_DEFAULT_ON 1
-// #  endif
-// #undef DRM_DEBUG
-// #else /* !DRM_DEBUG */
-// #  define DRM_DEBUG_DEFAULT_ON 0
-// #endif /* DRM_DEBUG */
-// #endif /* __DragonFly__ */
+#ifdef __DragonFly__
+#include "opt_drm.h"
+#ifdef DRM_DEBUG_DEFAULT
+#  if DRM_DEBUG_DEFAULT>1
+#    define DRM_DEBUG_DEFAULT_ON 2
+#  else
+#    define DRM_DEBUG_DEFAULT_ON 1
+#  endif
+#undef DRM_DEBUG_DEFAULT
+#else /* !DRM_DEBUG_DEFAULT */
+#  define DRM_DEBUG_DEFAULT_ON 0
+#endif /* DRM_DEBUG_DEFAULT */
+#endif /* __DragonFly__ */
 
 /** Current process ID */
 #define DRM_CURRENTPID			(curproc != NULL ? curproc->p_pid : -1)

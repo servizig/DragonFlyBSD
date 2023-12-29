@@ -81,6 +81,7 @@ struct intel_guc_log {
 	} stats[GUC_MAX_LOG_BUFFER];
 };
 
+#if 0
 void intel_guc_log_init_early(struct intel_guc_log *log);
 int intel_guc_log_create(struct intel_guc_log *log);
 void intel_guc_log_destroy(struct intel_guc_log *log);
@@ -92,6 +93,7 @@ void intel_guc_log_relay_flush(struct intel_guc_log *log);
 void intel_guc_log_relay_close(struct intel_guc_log *log);
 
 void intel_guc_log_handle_flush_event(struct intel_guc_log *log);
+#endif
 
 static inline u32 intel_guc_log_get_level(struct intel_guc_log *log)
 {

@@ -83,6 +83,19 @@ dma_map_sg(struct device *dev, struct scatterlist *sg,
 	return nents;
 }
 
+static inline int
+dma_map_sg_attrs(struct device *dev, struct scatterlist *sg,
+	   int nents, enum dma_data_direction dir, unsigned long attrs)
+{
+	struct scatterlist *s;
+	int i;
+
+	for_each_sg(sg, s, nents, i)
+		s->dma_address = sg_phys(s);
+
+	return nents;
+}
+
 static inline void
 dma_unmap_sg(struct device *dev, struct scatterlist *sg,
 	     int nents, enum dma_data_direction dir)

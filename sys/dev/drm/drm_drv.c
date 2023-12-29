@@ -51,7 +51,6 @@
  */
 #ifdef __DragonFly__
 /* Provides three levels of debug: off, minimal, verbose */
-/* TODO: uncomment and fix debug mode
 #if DRM_DEBUG_DEFAULT_ON == 1
 #define DRM_DEBUGBITS_ON (DRM_UT_CORE | DRM_UT_DRIVER | DRM_UT_KMS |	\
 			  DRM_UT_PRIME| DRM_UT_ATOMIC | DRM_UT_FIOCTL)
@@ -62,11 +61,7 @@
 #else
 #define DRM_DEBUGBITS_ON (0x0)
 #endif
-*/
 
-#define DRM_DEBUGBITS_ON (DRM_UT_CORE |	\
-			  DRM_UT_PRIME | DRM_UT_FIOCTL |	\
-			  DRM_UT_PID  | DRM_UT_IOCTL )
 unsigned int drm_debug = DRM_DEBUGBITS_ON;	/* defaults to 0 */
 #else
 unsigned int drm_debug = 0;
@@ -946,7 +941,9 @@ void drm_dev_unregister(struct drm_device *dev)
 
 	dev->registered = false;
 
+#if 0 /* drm_client implementation GPL'ed until 5.7 */
 	drm_client_dev_unregister(dev);
+#endif
 
 	if (drm_core_check_feature(dev, DRIVER_MODESET))
 		drm_modeset_unregister_all(dev);
@@ -1259,13 +1256,11 @@ drm_mmap_single(struct dev_mmap_single_args *ap)
 	struct vm_object **obj_res = ap->a_object;
 	int nprot = ap->a_nprot;
 
-DRM_DEBUG("offset=0x%jx, size=%ld\n", *offset, size);
 	dev = drm_get_device_from_kdev(kdev);
 	if (dev->drm_ttm_bdev != NULL) {
 		return (ttm_bo_mmap_single(ap->a_fp, dev,
 					   offset, size, obj_res, nprot));
 	} else if ((dev->driver->driver_features & DRIVER_GEM) != 0) {
-DRM_DEBUG("drm_gem_mmap_single\n");
 		return (drm_gem_mmap_single(dev, offset, size, obj_res, nprot));
 	} else {
 		return (ENODEV);

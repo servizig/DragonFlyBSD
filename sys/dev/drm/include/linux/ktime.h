@@ -92,6 +92,13 @@ static inline ktime_t ktime_get(void)
 	return (ts.tv_sec * NSEC_PER_SEC) + ts.tv_nsec;
 }
 
+static inline ktime_t ktime_get_real_seconds(void)
+{
+	struct timespec ts;
+	nanouptime(&ts);
+	return (ts.tv_sec);
+}
+
 static inline ktime_t
 ktime_sub(ktime_t lhs, ktime_t rhs)
 {

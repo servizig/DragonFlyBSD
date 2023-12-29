@@ -146,23 +146,19 @@ struct drm_vma_offset_node *drm_vma_offset_lookup_locked(struct drm_vma_offset_m
 	struct drm_mm_node *node, *best;
 	struct rb_node *iter;
 	unsigned long offset;
-DRM_DEBUG("start=0x%jx, pages=0x%jd\n", start, pages);
 
 	iter = mgr->vm_addr_space_mm.interval_tree.rb_root.rb_node;
 	best = NULL;
 
 	while (likely(iter)) {
 		node = rb_entry(iter, struct drm_mm_node, rb);
-DRM_DEBUG("node->start=0x%llx\n", node->start);
 		offset = node->start;
 		if (start >= offset) {
-DRM_DEBUG("go_to_rigth\n");
 			iter = iter->rb_right;
 			best = node;
 			if (start == offset)
 				break;
 		} else {
-DRM_DEBUG("go_to_left\n");
 			iter = iter->rb_left;
 		}
 	}
@@ -176,7 +172,7 @@ DRM_DEBUG("go_to_left\n");
 
 	if (!best)
 		return NULL;
-DRM_DEBUG("best->start=0x%llx\n", best->start);
+
 	return container_of(best, struct drm_vma_offset_node, vm_node);
 }
 EXPORT_SYMBOL(drm_vma_offset_lookup_locked);

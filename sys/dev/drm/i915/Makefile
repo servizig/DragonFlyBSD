@@ -52,6 +52,7 @@ SRCS += intel_uc.c \
 	intel_guc.c \
 	intel_guc_ct.c \
 	intel_guc_log.c \
+	intel_guc_submission.c \
 	intel_guc_fw.c \
 	intel_huc.c
 
@@ -132,7 +133,10 @@ SRCS += i915_query.c \
  	intel_wopcm.c \
  	intel_workarounds.c \
  	vlv_dsi.c \
- 	vlv_dsi_pll.c
+ 	vlv_dsi_pll.c \
+	i915_timeline.c
+
+SRCS += intel_stolen.c
 
 # CONFIG_DRM_I915_GVT
 #SRCS += intel_gvt.c

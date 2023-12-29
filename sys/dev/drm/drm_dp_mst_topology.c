@@ -2830,7 +2830,7 @@ fail:
 	return ret;
 }
 
-#ifdef __linux__
+#if 0
 static int do_get_act_status(struct drm_dp_aux *aux)
 {
 	int ret;
@@ -2852,7 +2852,7 @@ static int do_get_act_status(struct drm_dp_aux *aux)
  */
 int drm_dp_check_act_status(struct drm_dp_mst_topology_mgr *mgr)
 {
-#ifdef __linux__ /* needs review */
+#if 0
 	/*
 	 * There doesn't seem to be any recommended retry count or timeout in
 	 * the MST specification. Since some hubs have been observed to take

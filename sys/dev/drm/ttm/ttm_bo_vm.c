@@ -85,7 +85,6 @@ static int ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 	 */
 	ret = dma_fence_wait(bo->moving, true);
 	if (unlikely(ret != 0)) {
-DRM_DEBUG("dma_fence_wait ret=%d\n", ret);
 		ret = (ret != -ERESTARTSYS) ? VM_FAULT_SIGBUS :
 			VM_FAULT_NOPAGE;
 		goto out_unlock;
@@ -552,7 +551,6 @@ retry:
 	ret = ttm_bo_reserve(bo, true, true, NULL);
 	if (unlikely(ret != 0)) {
 		if (ret != -EBUSY) {
-DRM_DEBUG("ttm_bo_reserve pager_error, ret=%d\n", ret);
 			retval = VM_PAGER_ERROR;
 			goto out_unlock2;
 		}
@@ -578,7 +576,6 @@ DRM_DEBUG("ttm_bo_reserve pager_error, ret=%d\n", ret);
 		 * mmap_sem -> bo::reserve, we'd use a blocking reserve here
 		 * instead of retrying the fault...
 		 */
-DRM_DEBUG("ttm_bo_reserve, line 579, ret=%d\n", ret);
 		retval = VM_PAGER_ERROR;
 		goto out_unlock2;
 	}
@@ -593,11 +590,9 @@ DRM_DEBUG("ttm_bo_reserve, line 579, ret=%d\n", ret);
 			/* fall through */
 		case -ERESTARTSYS:
 		case -EINTR:
-DRM_DEBUG("fault_reserve_notify, line 594, ret=%d\n", ret);
 			retval = VM_PAGER_ERROR;
 			goto out_unlock1;
 		default:
-DRM_DEBUG("fault_reserve_notify, line 598, ret=%d\n", ret);
 			retval = VM_PAGER_ERROR;
 			goto out_unlock1;
 		}
@@ -625,18 +620,15 @@ DRM_DEBUG("fault_reserve_notify, line 598, ret=%d\n", ret);
 
 	ret = ttm_mem_io_lock(man, true);
 	if (unlikely(ret != 0)) {
-DRM_DEBUG("ttm_mem_io_lock, line 617, ret=%d\n", ret);
 		retval = VM_PAGER_ERROR;
 		goto out_unlock1;
 	}
 	ret = ttm_mem_io_reserve_vm(bo);
 	if (unlikely(ret != 0)) {
-DRM_DEBUG("ttm_mem_io_reserve_vm, line 623, ret=%d\n", ret);
 		retval = VM_PAGER_ERROR;
 		goto out_io_unlock1;
 	}
 	if (unlikely(OFF_TO_IDX(offset) >= bo->num_pages)) {
-DRM_DEBUG("ttm_mem_io_reserve_vm, line 628, OFF_TO_IDX(offset)=%ld, bo->num_pages=%ld\n", OFF_TO_IDX(offset), bo->num_pages);
 		retval = VM_PAGER_ERROR;
 		goto out_io_unlock1;
 	}
@@ -690,14 +682,12 @@ DRM_DEBUG("ttm_mem_io_reserve_vm, line 628, OFF_TO_IDX(offset)=%ld, bo->num_page
 
 		};
 		if (ttm_tt_populate(ttm, &ctx)) {
-DRM_DEBUG("ttm_tt_populate, line 683\n");
 			retval = VM_PAGER_ERROR;
 			goto out_io_unlock1;
 		}
 
 		m = (struct vm_page *)ttm->pages[OFF_TO_IDX(offset)];
 		if (unlikely(!m)) {
-DRM_DEBUG("m is null, line 690\n");
 			retval = VM_PAGER_ERROR;
 			goto out_io_unlock1;
 		}
@@ -798,7 +788,6 @@ ttm_bo_mmap_single(struct file *fp, struct drm_device *dev,
 	/* vma.vm_page_prot */
 	/* vma.vm_flags */
 
-DRM_DEBUG("vm_start=0x%jx, vm_end=0x%jx, vm_pgoff=0x%jx\n", vma.vm_start, vma.vm_end, vma.vm_pgoff);
 	/*
 	 * Call the linux-ported code to do the work, and on success just
 	 * setup our own VM object and ignore what the linux code did other
@@ -806,20 +795,16 @@ DRM_DEBUG("vm_start=0x%jx, vm_end=0x%jx, vm_pgoff=0x%jx\n", vma.vm_start, vma.vm
 	 */
 	ret = ttm_bo_mmap(fp, &vma, bdev);
 
-DRM_DEBUG("ttm_bo_mmap ret=%d\n", ret);
 	if (ret == 0) {
 		bo = vma.vm_private_data;
-DRM_DEBUG("bo=%p\n", bo);
 		vm_obj = cdev_pager_allocate(bo, OBJT_MGTDEVICE,
 					     &ttm_pager_ops,
 					     size, nprot, 0,
 					     curthread->td_ucred);
-DRM_DEBUG("vm_obj=%p\n", vm_obj);
 		if (vm_obj) {
 			*obj_res = vm_obj;
 			*offset = 0;		/* object-relative offset */
 		} else {
-DRM_DEBUG("ttm_bo_unref\n");
 			ttm_bo_unref(&bo);
 			ret = EINVAL;
 		}

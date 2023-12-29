@@ -62,7 +62,6 @@ SRCS	= \
 	drm_vblank.c \
 	drm_vm.c \
 	drm_vma_manager.c \
-	drm_writeback.c \
 	linux_async.c \
 	linux_compat.c \
 	linux_completion.c \

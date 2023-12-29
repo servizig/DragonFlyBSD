@@ -87,6 +87,7 @@ struct drm_client_dev {
 	struct drm_file *file;
 };
 
+#if 0 /* implementation GPL'ed until 5.7 */
 int drm_client_init(struct drm_device *dev, struct drm_client_dev *client,
 		    const char *name, const struct drm_client_funcs *funcs);
 void drm_client_release(struct drm_client_dev *client);
@@ -95,6 +96,7 @@ void drm_client_add(struct drm_client_dev *client);
 void drm_client_dev_unregister(struct drm_device *dev);
 void drm_client_dev_hotplug(struct drm_device *dev);
 void drm_client_dev_restore(struct drm_device *dev);
+#endif
 
 /**
  * struct drm_client_buffer - DRM client buffer
@@ -131,10 +133,12 @@ struct drm_client_buffer {
 	struct drm_framebuffer *fb;
 };
 
+#if 0 /* implementation GPL'ed until 5.7 */
 struct drm_client_buffer *
 drm_client_framebuffer_create(struct drm_client_dev *client, u32 width, u32 height, u32 format);
 void drm_client_framebuffer_delete(struct drm_client_buffer *buffer);
 
 int drm_client_debugfs_init(struct drm_minor *minor);
+#endif
 
 #endif

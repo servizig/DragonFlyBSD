@@ -119,7 +119,7 @@ EXPORT_SYMBOL(__drm_printfn_coredump);
 
 void __drm_puts_seq_file(struct drm_printer *p, const char *str)
 {
-#ifdef __DragonFly__ /* TODO: check if this thing is valid, from FreeBSD */
+#ifdef __DragonFly__
 	seq_puts((struct seq_file *)(p->arg), str);
 #else
 	seq_puts(p->arg, str);

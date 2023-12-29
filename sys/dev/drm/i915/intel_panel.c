@@ -1122,6 +1122,7 @@ void intel_panel_enable_backlight(const struct intel_crtc_state *crtc_state,
 }
 
 #if IS_ENABLED(CONFIG_BACKLIGHT_CLASS_DEVICE)
+
 #if 0 /* unused */
 static u32 intel_panel_get_backlight(struct intel_connector *connector)
 {
@@ -1141,6 +1142,7 @@ static u32 intel_panel_get_backlight(struct intel_connector *connector)
 	DRM_DEBUG_DRIVER("get backlight PWM = %d\n", val);
 	return val;
 }
+#endif
 
 /* set backlight brightness to level in range [0..max], scaling wrt hw min */
 static void intel_panel_set_backlight(const struct drm_connector_state *conn_state,
@@ -1167,6 +1169,7 @@ static void intel_panel_set_backlight(const struct drm_connector_state *conn_sta
 	mutex_unlock(&dev_priv->backlight_lock);
 }
 
+#if 0 /* unused */
 static int intel_backlight_device_update_status(struct backlight_device *bd)
 {
 	struct intel_connector *connector = bl_get_data(bd);
@@ -1811,9 +1814,7 @@ static int
 sysctl_backlight_handler(SYSCTL_HANDLER_ARGS)
 {
 	struct intel_connector *connector = arg1;
-#if 0
 	const struct drm_connector_state *conn_state = connector->base.state;
-#endif
 	struct drm_device *dev = connector->base.dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	struct intel_panel *panel = &connector->panel;
@@ -1834,9 +1835,7 @@ sysctl_backlight_handler(SYSCTL_HANDLER_ARGS)
 
 	if (val != user_level && val >= 0 && val <= max_brightness) {
 		drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
-#if 0
 		intel_panel_set_backlight(conn_state, val, max_brightness);
-#endif
 		drm_modeset_unlock(&dev->mode_config.connection_mutex);
 	}
 

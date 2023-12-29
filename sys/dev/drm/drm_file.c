@@ -573,7 +573,9 @@ void drm_lastclose(struct drm_device * dev)
 	if (drm_core_check_feature(dev, DRIVER_LEGACY))
 		drm_legacy_dev_reinit(dev);
 
+#if 0 /* drm client implementation GPL'ed until 5.7 */
 	drm_client_dev_restore(dev);
+#endif
 }
 
 /**

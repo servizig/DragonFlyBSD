@@ -365,10 +365,12 @@ static void compress_fini(struct compress *c,
 {
 }
 
+#if 0 /* unused */
 static void err_compression_marker(struct drm_i915_error_state_buf *m)
 {
 	err_puts(m, "~");
 }
+#endif
 
 #endif
 
@@ -447,7 +449,7 @@ static void error_print_request(struct drm_i915_error_state_buf *m,
 	if (!erq->seqno)
 		return;
 
-	err_printf(m, "%s pid %d, ban score %d, seqno %8x:%08x, prio %d, emitted %dms, start %08x, head %08x, tail %08x\n",
+	err_printf(m, "%s pid %d, ban score %d, seqno %8x:%08x, prio %d, emitted %ldms, start %08x, head %08x, tail %08x\n",
 		   prefix, erq->pid, erq->ban_score,
 		   erq->context, erq->seqno, erq->sched_attr.priority,
 		   jiffies_to_msecs(erq->jiffies - epoch),
@@ -536,7 +538,7 @@ static void error_print_engine(struct drm_i915_error_state_buf *m,
 	err_printf(m, "  hangcheck stall: %s\n", yesno(ee->hangcheck_stalled));
 	err_printf(m, "  hangcheck action: %s\n",
 		   hangcheck_action_to_str(ee->hangcheck_action));
-	err_printf(m, "  hangcheck action timestamp: %dms (%lu%s)\n",
+	err_printf(m, "  hangcheck action timestamp: %ldms (%lu%s)\n",
 		   jiffies_to_msecs(ee->hangcheck_timestamp - epoch),
 		   ee->hangcheck_timestamp,
 		   ee->hangcheck_timestamp == epoch ? "; epoch" : "");
@@ -564,6 +566,8 @@ static void print_error_obj(struct drm_i915_error_state_buf *m,
 			    const char *name,
 			    struct drm_i915_error_object *obj)
 {
+	STUB();
+#if 0
 	char out[ASCII85_BUFSZ];
 	int page;
 
@@ -590,6 +594,7 @@ static void print_error_obj(struct drm_i915_error_state_buf *m,
 			err_puts(m, ascii85_encode(obj->pages[page][i], out));
 	}
 	err_puts(m, "\n");
+#endif
 }
 
 static void err_print_capabilities(struct drm_i915_error_state_buf *m,
@@ -664,7 +669,7 @@ int i915_error_state_to_str(struct drm_i915_error_state_buf *m,
 	err_printf(m, "Uptime: %lld s %ld us\n",
 		   (s64)ts.tv_sec, ts.tv_nsec / NSEC_PER_USEC);
 	err_printf(m, "Epoch: %lu jiffies (%u HZ)\n", error->epoch, HZ);
-	err_printf(m, "Capture: %lu jiffies; %d ms ago, %d ms after epoch\n",
+	err_printf(m, "Capture: %lu jiffies; %ld ms ago, %ld ms after epoch\n",
 		   error->capture,
 		   jiffies_to_msecs(jiffies - error->capture),
 		   jiffies_to_msecs(error->capture - error->epoch));
@@ -853,17 +858,17 @@ int i915_error_state_buf_init(struct drm_i915_error_state_buf *ebuf,
 	 * so that we can move it to start position.
 	 */
 	ebuf->size = count + 1 > PAGE_SIZE ? count + 1 : PAGE_SIZE;
-	ebuf->buf = kmalloc(ebuf->size,
+	ebuf->buf = kmalloc(ebuf->size, M_DRM,
 				GFP_KERNEL | __GFP_NORETRY | __GFP_NOWARN);
 
 	if (ebuf->buf == NULL) {
 		ebuf->size = PAGE_SIZE;
-		ebuf->buf = kmalloc(ebuf->size, GFP_KERNEL);
+		ebuf->buf = kmalloc(ebuf->size, M_DRM, GFP_KERNEL);
 	}
 
 	if (ebuf->buf == NULL) {
 		ebuf->size = 128;
-		ebuf->buf = kmalloc(ebuf->size, GFP_KERNEL);
+		ebuf->buf = kmalloc(ebuf->size, M_DRM, GFP_KERNEL);
 	}
 
 	if (ebuf->buf == NULL)
@@ -965,7 +970,7 @@ i915_error_object_create(struct drm_i915_private *i915,
 
 	num_pages = min_t(u64, vma->size, vma->obj->base.size) >> PAGE_SHIFT;
 	num_pages = DIV_ROUND_UP(10 * num_pages, 8); /* worstcase zlib growth */
-	dst = kmalloc(sizeof(*dst) + num_pages * sizeof(u32 *),
+	dst = kmalloc(sizeof(*dst) + num_pages * sizeof(u32 *), M_DRM,
 		      GFP_ATOMIC | __GFP_NOWARN);
 	if (!dst)
 		return NULL;
@@ -1071,6 +1076,7 @@ static u32 capture_error_bo(struct drm_i915_error_buffer *err,
 	return i;
 }
 
+#if 0 /* unused */
 /* Generate a semi-unique error code. The code is not meant to have meaning, The
  * code's only purpose is to try to prevent false duplicated bug reports by
  * grossly estimating a GPU error state.
@@ -1104,6 +1110,7 @@ static uint32_t i915_error_generate_code(struct drm_i915_private *dev_priv,
 
 	return error_code;
 }
+#endif
 
 static void gem_record_fences(struct i915_gpu_state *error)
 {
@@ -1704,6 +1711,7 @@ static void capture_reg_state(struct i915_gpu_state *error)
 	error->pgtbl_er = I915_READ(PGTBL_ER);
 }
 
+#if 0 /* unused */
 static void i915_error_capture_msg(struct drm_i915_private *dev_priv,
 				   struct i915_gpu_state *error,
 				   u32 engine_mask,
@@ -1730,6 +1738,7 @@ static void i915_error_capture_msg(struct drm_i915_private *dev_priv,
 		  error_msg,
 		  engine_mask ? "reset" : "continue");
 }
+#endif
 
 static void capture_gen_state(struct i915_gpu_state *error)
 {
@@ -1828,6 +1837,7 @@ i915_capture_gpu_state(struct drm_i915_private *i915)
 	return error;
 }
 
+#if 0 /* redefenition */
 /**
  * i915_capture_error_state - capture an error record for later analysis
  * @i915: i915 device
@@ -1887,7 +1897,9 @@ void i915_capture_error_state(struct drm_i915_private *i915,
 		warned = true;
 	}
 }
+#endif
 
+#if 0 /* redefenition */
 struct i915_gpu_state *
 i915_first_error_state(struct drm_i915_private *i915)
 {
@@ -1913,3 +1925,4 @@ void i915_reset_error_state(struct drm_i915_private *i915)
 
 	i915_gpu_state_put(error);
 }
+#endif

@@ -36,7 +36,9 @@
 #include "intel_frontbuffer.h"
 #include "intel_mocs.h"
 #include "intel_workarounds.h"
+#if 0
 #include "i915_gemfs.h"
+#endif
 #include <linux/dma-fence-array.h>
 #include <linux/kthread.h>
 #include <linux/reservation.h>
@@ -2407,7 +2409,7 @@ have_page:
 	 *
 	 * OBJECT EXPECTED TO BE LOCKED.
 	 */
-#endif
+#endif /* __DragonFly__ */
 
 	/* Mark as being mmapped into userspace for later revocation */
 	assert_rpm_wakelock_held(dev_priv);
@@ -6140,9 +6142,11 @@ int i915_gem_init_early(struct drm_i915_private *dev_priv)
 
 	lockinit(&dev_priv->fb_tracking.lock, "drmftl", 0, 0);
 
+#if 0
 	err = i915_gemfs_init(dev_priv);
 	if (err)
 		DRM_NOTE("Unable to create a private tmpfs mount, hugepage support will be disabled(%d).\n", err);
+#endif
 
 	return 0;
 

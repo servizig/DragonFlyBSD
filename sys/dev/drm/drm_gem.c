@@ -361,7 +361,6 @@ drm_gem_handle_delete(struct drm_file *filp, u32 handle)
 	lockmgr(&filp->table_lock, LK_EXCLUSIVE);
 	idr_remove(&filp->object_idr, handle);
 	lockmgr(&filp->table_lock, LK_RELEASE);
-DRM_DEBUG("handle=%d\n", handle);
 	return 0;
 }
 EXPORT_SYMBOL(drm_gem_handle_delete);
