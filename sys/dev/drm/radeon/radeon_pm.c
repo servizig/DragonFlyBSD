@@ -914,6 +914,12 @@ static bool radeon_dpm_single_display(struct radeon_device *rdev)
 			single_display = false;
 	}
 
+	/* 120hz tends to be problematic even if they are under the
+	 * vblank limit.
+	 */
+	if (single_display && (r600_dpm_get_vrefresh(rdev) >= 120))
+		single_display = false;
+
 	return single_display;
 }
 
@@ -924,12 +930,6 @@ static struct radeon_ps *radeon_dpm_pick_power_state(struct radeon_device *rdev,
 	struct radeon_ps *ps;
 	u32 ui_class;
 	bool single_display = radeon_dpm_single_display(rdev);
-
-	/* 120hz tends to be problematic even if they are under the
-	 * vblank limit.
-	 */
-	if (single_display && (r600_dpm_get_vrefresh(rdev) >= 120))
-		single_display = false;
 
 	/* certain older asics have a separare 3D performance state,
 	 * so try that first if the user selected performance
@@ -1140,6 +1140,8 @@ force:
 
 	/* update display watermarks based on new power state */
 	radeon_bandwidth_update(rdev);
+	/* update displays */
+	radeon_dpm_display_configuration_changed(rdev);
 
 	/* wait for the rings to drain */
 	for (i = 0; i < RADEON_NUM_RINGS; i++) {
@@ -1159,9 +1161,6 @@ force:
 	rdev->pm.dpm.current_active_crtcs = rdev->pm.dpm.new_active_crtcs;
 	rdev->pm.dpm.current_active_crtc_count = rdev->pm.dpm.new_active_crtc_count;
 	rdev->pm.dpm.single_display = single_display;
-
-	/* update displays */
-	radeon_dpm_display_configuration_changed(rdev);
 
 	if (rdev->asic->dpm.force_performance_level) {
 		if (rdev->pm.dpm.thermal_active) {

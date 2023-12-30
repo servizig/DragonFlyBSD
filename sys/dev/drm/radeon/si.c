@@ -3243,7 +3243,7 @@ static void si_gpu_init(struct radeon_device *rdev)
 		/* XXX what about 12? */
 		rdev->config.si.tile_config |= (3 << 0);
 		break;
-	}	
+	}
 	switch ((mc_arb_ramcfg & NOOFBANK_MASK) >> NOOFBANK_SHIFT) {
 	case 0: /* four banks */
 		rdev->config.si.tile_config |= 0 << 4;
@@ -7126,12 +7126,12 @@ static void si_pcie_gen3_enable(struct radeon_device *rdev)
 		DRM_INFO("enabling PCIE gen 2 link speeds, disable with radeon.pcie_gen2=0\n");
 	}
 
-	bridge_pos = pci_pcie_cap(root);
-	if (!bridge_pos)
-		return;
+       bridge_pos = pci_pcie_cap(root);
+       if (!bridge_pos)
+               return;
 
-	gpu_pos = pci_pcie_cap(rdev->pdev);
-	if (!gpu_pos)
+       gpu_pos = pci_pcie_cap(rdev->pdev);
+       if (!gpu_pos)
 		return;
 
 	if (speed_cap == PCIE_SPEED_8_0GT) {

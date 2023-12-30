@@ -1010,6 +1010,7 @@ void radeon_atombios_fini(struct radeon_device *rdev)
 {
 	if (rdev->mode_info.atom_context) {
 		kfree(rdev->mode_info.atom_context->scratch);
+		kfree(rdev->mode_info.atom_context->iio);
 	}
 	kfree(rdev->mode_info.atom_context);
 	rdev->mode_info.atom_context = NULL;
@@ -1323,6 +1324,7 @@ int radeon_device_init(struct radeon_device *rdev,
 	lockinit(&rdev->exclusive_lock, "drdel", 0, LK_CANRECURSE);
 	init_waitqueue_head(&rdev->irq.vblank_queue);
 	lockinit(&rdev->mn_lock, "drrml", 0, LK_CANRECURSE);
+	hash_init(rdev->mn_hash);
 	r = radeon_gem_init(rdev);
 	if (r)
 		return r;
