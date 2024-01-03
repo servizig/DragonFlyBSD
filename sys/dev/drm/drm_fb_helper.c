@@ -1757,9 +1757,6 @@ static int drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
 	int i;
 	struct drm_fb_helper_surface_size sizes;
 	int gamma_size = 0;
-#if 0
-	int kms_console = 1;
-#endif
 
 	memset(&sizes, 0, sizeof(struct drm_fb_helper_surface_size));
 	sizes.surface_depth = 24;
@@ -1864,14 +1861,6 @@ static int drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
 	ret = (*fb_helper->funcs->fb_probe)(fb_helper, &sizes);
 	if (ret < 0)
 		return ret;
-
-#if 0
-	TUNABLE_INT_FETCH("kern.kms_console", &kms_console);
-	if (kms_console) {
-		if (register_framebuffer(fb_helper->fbdev) < 0)
-			return -EINVAL;
-	}
-#endif
 
 	return 0;
 }
@@ -2556,9 +2545,14 @@ __drm_fb_helper_initial_config_and_unlock(struct drm_fb_helper *fb_helper,
 	 * register the fbdev emulation instance in kernel_fb_helper_list. */
 	mutex_unlock(&fb_helper->lock);
 
-	ret = register_framebuffer(info);
-	if (ret < 0)
-		return ret;
+	int kms_console = 1;
+
+	TUNABLE_INT_FETCH("kern.kms_console", &kms_console);
+	if (kms_console) {
+		ret = register_framebuffer(info);
+		if (ret < 0)
+			return ret;
+	}
 #if 0
 	dev_info(dev->dev, "fb%d: %s frame buffer device\n",
 		 info->node, info->fix.id);
