@@ -28,8 +28,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _AGP_INTEL_GTT_H_
-#define _AGP_INTEL_GTT_H_
+#ifndef _DRM_INTEL_GTT_H_
+#define _DRM_INTEL_GTT_H_
 
 #include <sys/param.h>
 
@@ -100,4 +100,4 @@ void intel_gtt_insert_page(dma_addr_t addr,
 			   unsigned int pg,
 			   unsigned int flags);
 
-#endif		/* _AGP_INTEL_GTT_H_ */
+#endif		/* _DRM_INTEL_GTT_H_ */
