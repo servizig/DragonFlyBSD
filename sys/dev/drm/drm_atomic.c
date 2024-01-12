@@ -255,6 +255,7 @@ void __drm_atomic_state_free(struct kref *ref)
 	drm_atomic_state_clear(state);
 
 	DRM_DEBUG_ATOMIC("Freeing atomic state %p\n", state);
+	print_backtrace(-1);
 
 	if (config->funcs->atomic_state_free) {
 		config->funcs->atomic_state_free(state);
