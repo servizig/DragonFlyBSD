@@ -942,13 +942,16 @@ static enum dc_status dc_commit_state_no_check(struct dc *dc, struct dc_state *c
 		dc->hwss.enable_accelerated_mode(dc, context);
 
 	dc->hwss.set_bandwidth(dc, context, false);
+DRM_DEBUG("dfly: set_bandwidth#1\n");
 
 	/* re-program planes for existing stream, in case we need to
 	 * free up plane resource for later use
 	 */
 	for (i = 0; i < context->stream_count; i++) {
-		if (context->streams[i]->mode_changed)
+		if (context->streams[i]->mode_changed) {
+DRM_DEBUG("dfly: streams[%d].mode_changed == false\n", i);
 			continue;
+		}
 
 		dc->hwss.apply_ctx_for_surface(
 			dc, context->streams[i],
@@ -958,6 +961,7 @@ static enum dc_status dc_commit_state_no_check(struct dc *dc, struct dc_state *c
 
 	/* Program hardware */
 	dc->hwss.ready_shared_resources(dc, context);
+DRM_DEBUG("dfly: ready_shared_resources\n");
 
 	for (i = 0; i < dc->res_pool->pipe_count; i++) {
 		pipe = &context->res_ctx.pipe_ctx[i];
@@ -965,9 +969,11 @@ static enum dc_status dc_commit_state_no_check(struct dc *dc, struct dc_state *c
 	}
 
 	result = dc->hwss.apply_ctx_to_hw(dc, context);
+DRM_DEBUG("dfly: apply_ctx_to_hw result: %d\n", result);
 
-	if (result != DC_OK)
+	if (result != DC_OK) {
 		return result;
+	}
 
 	if (context->stream_count > 1) {
 		enable_timing_multisync(dc, context);
@@ -978,8 +984,10 @@ static enum dc_status dc_commit_state_no_check(struct dc *dc, struct dc_state *c
 	for (i = 0; i < context->stream_count; i++) {
 		const struct dc_sink *sink = context->streams[i]->sink;
 
-		if (!context->streams[i]->mode_changed)
+		if (!context->streams[i]->mode_changed) {
+DRM_DEBUG("dfly: streams[%d].mode_changed == false\n", i);
 			continue;
+		}
 
 		dc->hwss.apply_ctx_for_surface(
 				dc, context->streams[i],
@@ -1013,6 +1021,7 @@ static enum dc_status dc_commit_state_no_check(struct dc *dc, struct dc_state *c
 
 	/* pplib is notified if disp_num changed */
 	dc->hwss.set_bandwidth(dc, context, true);
+DRM_DEBUG("dfly: set_bandwidth#2\n");
 
 	dc_release_state(dc->current_state);
 

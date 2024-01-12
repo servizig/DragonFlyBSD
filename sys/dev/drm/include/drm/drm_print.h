@@ -268,15 +268,15 @@ static inline struct drm_printer drm_debug_printer(const char *prefix)
  * run-time by using the hw.drm.debug sysctl variable:
  *   # sysctl hw.drm.debug=0xfff
  */
-#define DRM_UT_NONE		0x00
-#define DRM_UT_CORE		0x01
-#define DRM_UT_DRIVER		0x02
-#define DRM_UT_KMS		0x04
-#define DRM_UT_PRIME		0x08
-#define DRM_UT_ATOMIC		0x10
-#define DRM_UT_VBL		0x20
-#define DRM_UT_STATE		0x40
-#define DRM_UT_LEASE		0x80
+#define DRM_UT_NONE		0x000
+#define DRM_UT_CORE		0x001
+#define DRM_UT_DRIVER		0x002
+#define DRM_UT_KMS		0x004
+#define DRM_UT_PRIME		0x008
+#define DRM_UT_ATOMIC		0x010
+#define DRM_UT_VBL		0x020
+#define DRM_UT_STATE		0x040
+#define DRM_UT_LEASE		0x080
 #define DRM_UT_DP		0x100
 /* Extra DragonFly debug categories */
 #ifdef __DragonFly__

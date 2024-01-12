@@ -79,6 +79,17 @@ struct amdgpu_display_manager {
 	struct drm_device *ddev;	/*DRM base driver*/
 	u16 display_indexes_num;
 
+	/**
+	 * @atomic_obj
+	 *
+	 * In combination with &dm_atomic_state it helps manage
+	 * global atomic state that doesn't map cleanly into existing
+	 * drm resources, like &dc_context.
+	 */
+	struct drm_private_obj atomic_obj;
+
+	struct drm_modeset_lock atomic_obj_lock;
+
 	/*
 	 * 'irq_source_handler_table' holds a list of handlers
 	 * per (DAL) IRQ source.
@@ -191,7 +202,7 @@ struct dm_crtc_state {
 #define to_dm_crtc_state(x) container_of(x, struct dm_crtc_state, base)
 
 struct dm_atomic_state {
-	struct drm_atomic_state base;
+	struct drm_private_state base;
 
 	struct dc_state *context;
 };

@@ -1395,6 +1395,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 	if (pipe_ctx->stream->signal != SIGNAL_TYPE_VIRTUAL)
 		if (DC_OK != bios_parser_crtc_source_select(pipe_ctx)) {
 			BREAK_TO_DEBUGGER();
+DRM_DEBUG("dfly: bios_parser_crtc_source_select\n");
 			return DC_ERROR_UNEXPECTED;
 		}
 
@@ -2014,6 +2015,7 @@ enum dc_status dce110_apply_ctx_to_hw(
 	/* Reset old context */
 	/* look up the targets that have been removed since last commit */
 	dc->hwss.reset_hw_ctx_wrap(dc, context);
+DRM_DEBUG("dfly: reset_hw_ctx_wrap\n");
 
 	/* Skip applying if no targets */
 	if (context->stream_count <= 0)
@@ -2069,9 +2071,11 @@ enum dc_status dce110_apply_ctx_to_hw(
 				pipe_ctx,
 				context,
 				dc);
+DRM_DEBUG("dfly: apply_single_controller_ctx_to_hw status = %d, i = %d", status, i);
 
-		if (DC_OK != status)
+		if (DC_OK != status) {
 			return status;
+		}
 	}
 
 	dcb->funcs->set_scratch_critical_state(dcb, false);
