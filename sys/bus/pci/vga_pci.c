@@ -85,8 +85,12 @@ vga_pci_is_boot_display(device_t dev)
 	/* Check that the given device is a video card */
 	if ((pci_get_class(dev) != PCIC_DISPLAY &&
 	    (pci_get_class(dev) != PCIC_OLD ||
-	     pci_get_subclass(dev) != PCIS_OLD_VGA)))
+	     pci_get_subclass(dev) != PCIS_OLD_VGA))) {
+		kprintf("pci_get_class(dev) = %#x\n", pci_get_class(dev));
+		kprintf("pci_get_subclass(dev) = %#x\n", pci_get_subclass(dev));
 		return (0);
+	}
+
 
 	unit = device_get_unit(dev);
 
@@ -96,6 +100,8 @@ vga_pci_is_boot_display(device_t dev)
 		 * call to this function, or the user forced it using
 		 * the hw.pci.default_vgapci_unit tunable.
 		 */
+		kprintf("vga_pci_default_unit = %d\n", vga_pci_default_unit);
+		kprintf("unit = %d\n", unit);
 		return (vga_pci_default_unit == unit);
 	}
 
@@ -117,13 +123,17 @@ vga_pci_is_boot_display(device_t dev)
 		 * value of the "VGA Enable" bit.
 		 */
 		config = pci_read_config(pcib, PCIR_BRIDGECTL_1, 2);
-		if ((config & PCIB_BCR_VGA_ENABLE) == 0)
+		if ((config & PCIB_BCR_VGA_ENABLE) == 0) {
+			kprintf("(PCIB_BCR_VGA_ENABLE) config = %#x\n", unit);
 			return (0);
+		}
 	}
 
 	config = pci_read_config(dev, PCIR_COMMAND, 2);
-	if ((config & (PCIM_CMD_PORTEN | PCIM_CMD_MEMEN)) == 0)
+	if ((config & (PCIM_CMD_PORTEN | PCIM_CMD_MEMEN)) == 0) {
+		kprintf("(PCIM_CMD_PORTEN | PCIM_CMD_MEMEN) config = %#x\n", unit);
 		return (0);
+	}
 
 	/* This video card is the boot display: record its unit number. */
 	vga_pci_default_unit = unit;

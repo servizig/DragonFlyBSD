@@ -326,8 +326,10 @@ register_framebuffer(struct fb_info *info)
 	sc_softc_t *sc;
 
 	/* For now ignore framebuffers, which don't replace the vga display */
-	if (!info->is_vga_boot_display)
+	if (!info->is_vga_boot_display) {
+		kprintf("!info->is_vga_boot_display\n");
 		return 0;
+	}
 
 	lwkt_gettoken(&vga_token);
 	sc = sc_get_softc(0, (sc_console_unit == 0) ? SC_KERNEL_CONSOLE : 0);
@@ -341,6 +343,9 @@ register_framebuffer(struct fb_info *info)
 	/* Ignore this framebuffer if we already switched to KMS framebuffer */
 	if (sc->fbi != NULL && sc->fbi != &efi_fb_info &&
 	    sc->fbi != sc->dummy_fb_info) {
+		kprintf("sc->fbi: %p\n", sc->fbi);
+		kprintf("&efi_fb_info: %p\n", &efi_fb_info);
+		kprintf("sc->dummy_fb_info: %p\n", sc->dummy_fb_info);
 		lwkt_reltoken(&vga_token);
 		return 0;
 	}
