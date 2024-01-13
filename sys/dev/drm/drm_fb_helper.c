@@ -2746,6 +2746,7 @@ __drm_fb_helper_initial_config_and_unlock(struct drm_fb_helper *fb_helper,
 	 * register the fbdev emulation instance in kernel_fb_helper_list. */
 	mutex_unlock(&fb_helper->lock);
 
+#if 0
 	int kms_console = 1;
 
 	TUNABLE_INT_FETCH("kern.kms_console", &kms_console);
@@ -2753,6 +2754,13 @@ __drm_fb_helper_initial_config_and_unlock(struct drm_fb_helper *fb_helper,
 		ret = register_framebuffer(info);
 		if (ret < 0)
 			return ret;
+	}
+#endif
+DRM_DEBUG("dfly: registering framebuffer\n");
+	ret = register_framebuffer(info);
+	if (ret < 0) {
+DRM_DEBUG("dfly: registering framebuffer returned: %d\n", ret);
+		return ret;
 	}
 #if 0
 	dev_info(dev->dev, "fb%d: %s frame buffer device\n",
