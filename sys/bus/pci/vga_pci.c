@@ -123,15 +123,15 @@ vga_pci_is_boot_display(device_t dev)
 		 * value of the "VGA Enable" bit.
 		 */
 		config = pci_read_config(pcib, PCIR_BRIDGECTL_1, 2);
+		kprintf("(PCIB_BCR_VGA_ENABLE) config = %#x\n", config);
 		if ((config & PCIB_BCR_VGA_ENABLE) == 0) {
-			kprintf("(PCIB_BCR_VGA_ENABLE) config = %#x\n", unit);
 			return (0);
 		}
 	}
 
 	config = pci_read_config(dev, PCIR_COMMAND, 2);
 	if ((config & (PCIM_CMD_PORTEN | PCIM_CMD_MEMEN)) == 0) {
-		kprintf("(PCIM_CMD_PORTEN | PCIM_CMD_MEMEN) config = %#x\n", unit);
+		kprintf("(PCIM_CMD_PORTEN | PCIM_CMD_MEMEN) config = %#x\n", config);
 		return (0);
 	}
 
