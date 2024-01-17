@@ -327,7 +327,10 @@ register_framebuffer(struct fb_info *info)
 
 	/* For now ignore framebuffers, which don't replace the vga display */
 	if (!info->is_vga_boot_display) {
+		kprintf("!info->is_vga_boot_display\n");
+#if 0
 		return -1;
+#endif
 	}
 
 	lwkt_gettoken(&vga_token);
