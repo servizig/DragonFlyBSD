@@ -136,7 +136,7 @@ SRCS += i915_query.c \
  	vlv_dsi_pll.c \
 	i915_timeline.c
 
-SRCS += intel_stolen.c
+SRCS += i915_module.c
 
 # CONFIG_DRM_I915_GVT
 #SRCS += intel_gvt.c

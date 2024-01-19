@@ -23,7 +23,9 @@
  * Rob Clark <robdclark@gmail.com>
  */
 
+#ifndef DEBUG
 #define DEBUG /* for pr_debug() */
+#endif
 
 #include <linux/seq_file.h>
 #include <drm/drmP.h>
