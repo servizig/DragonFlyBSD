@@ -196,13 +196,16 @@ vga_pci_map_bios(device_t dev, size_t *size)
 	pcib = device_get_parent(device_get_parent(dev));
 	if (device_get_devclass(device_get_parent(pcib)) ==
 	    devclass_find("pci")) {
+kprintf("vga_pci_map_bios: pcib\n");
 		/*
 		 * The parent bridge is a PCI-to-PCI bridge: check the
 		 * value of the "VGA Enable" bit.
 		 */
 		config = pci_read_config(pcib, PCIR_BRIDGECTL_1, 2);
+kprintf("vga_pci_map_bios: config#1: %d\n", config);
 		if ((config & PCIB_BCR_VGA_ENABLE) == 0) {
 			config |= PCIB_BCR_VGA_ENABLE;
+kprintf("vga_pci_map_bios: config#2: %d\n", config);
 			pci_write_config(pcib, PCIR_BRIDGECTL_1, config, 2);
 		}
 	}

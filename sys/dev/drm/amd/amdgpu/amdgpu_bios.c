@@ -445,26 +445,40 @@ static inline bool amdgpu_acpi_vfct_bios(struct amdgpu_device *adev)
 
 bool amdgpu_get_bios(struct amdgpu_device *adev)
 {
-	if (amdgpu_atrm_get_bios(adev))
+	if (amdgpu_atrm_get_bios(adev)) {
+kprintf("amdgpu_atrm_get_bios\n");
 		goto success;
+	}
 
-	if (amdgpu_acpi_vfct_bios(adev))
+	if (amdgpu_acpi_vfct_bios(adev)) {
+kprintf("amdgpu_acpi_vfct_bios\n");
 		goto success;
+	}
 
-	if (igp_read_bios_from_vram(adev))
+	if (igp_read_bios_from_vram(adev)) {
+kprintf("igp_read_bios_from_vram\n");
 		goto success;
+	}
 
-	if (amdgpu_read_bios(adev))
+	if (amdgpu_read_bios(adev)) {
+kprintf("amdgpu_read_bios\n");
 		goto success;
+	}
 
-	if (amdgpu_read_bios_from_rom(adev))
+	if (amdgpu_read_bios_from_rom(adev)) {
+kprintf("amdgpu_read_bios_from_rom\n");
 		goto success;
+	}
 
-	if (amdgpu_read_disabled_bios(adev))
+	if (amdgpu_read_disabled_bios(adev)) {
+kprintf("amdgpu_read_disabled_bios\n");
 		goto success;
+	}
 
-	if (amdgpu_read_platform_bios(adev))
+	if (amdgpu_read_platform_bios(adev)) {
+kprintf("amdgpu_read_platform_bios\n");
 		goto success;
+	}
 
 	DRM_ERROR("Unable to locate a BIOS ROM\n");
 	return false;
