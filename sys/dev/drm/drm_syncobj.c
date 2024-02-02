@@ -90,7 +90,6 @@ static void drm_syncobj_add_callback_locked(struct drm_syncobj *syncobj,
 	list_add_tail(&cb->node, &syncobj->cb_list);
 }
 
-#if 0
 static int drm_syncobj_fence_get_or_add_callback(struct drm_syncobj *syncobj,
 						 struct dma_fence **fence,
 						 struct drm_syncobj_cb *cb,
@@ -122,7 +121,6 @@ static int drm_syncobj_fence_get_or_add_callback(struct drm_syncobj *syncobj,
 
 	return ret;
 }
-#endif
 
 /**
  * drm_syncobj_add_callback - adds a callback to syncobj::cb_list
@@ -431,7 +429,7 @@ int drm_syncobj_get_fd(struct drm_syncobj *syncobj, int *p_fd)
 		return PTR_ERR(file);
  	}
 #else
-	return -EINVAL;
+	return -ENOSYS;
 #endif
 
 	drm_syncobj_get(syncobj);
@@ -459,6 +457,8 @@ static int drm_syncobj_handle_to_fd(struct drm_file *file_private,
 static int drm_syncobj_fd_to_handle(struct drm_file *file_private,
 				    int fd, u32 *handle)
 {
+	STUB();
+	return -ENOSYS;
 #if 0
 	struct drm_syncobj *syncobj;
 	struct file *file;
@@ -492,7 +492,6 @@ static int drm_syncobj_fd_to_handle(struct drm_file *file_private,
 	fput(file);
 	return ret;
 #endif
-	return -EINVAL;
 }
 
 static int drm_syncobj_import_sync_file_fence(struct drm_file *file_private,
@@ -668,7 +667,6 @@ drm_syncobj_fd_to_handle_ioctl(struct drm_device *dev, void *data,
 					&args->handle);
 }
 
-#if 0
 struct syncobj_wait_entry {
 	struct task_struct *task;
 	struct dma_fence *fence;
@@ -859,6 +857,7 @@ static signed long drm_timeout_abs_to_jiffies(int64_t timeout_nsec)
 	return timeout_jiffies64 + 1;
 }
 
+
 static int drm_syncobj_array_wait(struct drm_device *dev,
 				  struct drm_file *file_private,
 				  struct drm_syncobj_wait *wait,
@@ -880,7 +879,6 @@ static int drm_syncobj_array_wait(struct drm_device *dev,
 		return -ETIME;
 	return 0;
 }
-#endif
 
 static int drm_syncobj_array_find(struct drm_file *file_private,
 				  void __user *user_handles,
@@ -942,7 +940,6 @@ int
 drm_syncobj_wait_ioctl(struct drm_device *dev, void *data,
 		       struct drm_file *file_private)
 {
-#if 0
 	struct drm_syncobj_wait *args = data;
 	struct drm_syncobj **syncobjs;
 	int ret = 0;
@@ -970,8 +967,6 @@ drm_syncobj_wait_ioctl(struct drm_device *dev, void *data,
 	drm_syncobj_array_free(syncobjs, args->count_handles);
 
 	return ret;
-#endif
-	return -EINVAL;
 }
 
 int
