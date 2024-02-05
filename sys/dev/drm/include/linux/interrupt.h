@@ -82,4 +82,24 @@ tasklet_disable(struct tasklet_struct *t)
 	atomic_inc(&t->count);
 }
 
+
+/* TODO: implement me */
+static inline void
+tasklet_unlock_wait(struct tasklet_struct *ts)
+{
+        
+}
+
+static inline void
+tasklet_unlock(struct tasklet_struct *ts)
+{
+        
+}
+
+static inline bool
+tasklet_trylock(struct tasklet_struct *ts)
+{
+        return true;
+}
+
 #endif	/* _LINUX_INTERRUPT_H_ */
