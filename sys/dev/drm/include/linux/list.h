@@ -175,6 +175,11 @@ list_del_init(struct list_head *entry)
 	for ( ; &(p)->field != (h); \
 	    p = list_entry((p)->field.next, typeof(*p), field))
 
+#define list_for_each_entry_from_reverse(pos, head, member)		\
+    for (;								\
+	&pos->member != (head);					 	\
+	pos = list_entry(pos->member.prev, __typeof(*pos), member))
+
 #define list_for_each_entry_continue(p, h, field)			\
 	for (p = list_next_entry((p), field); &p->field != (h);		\
 	    p = list_next_entry((p), field))

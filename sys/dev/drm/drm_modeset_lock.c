@@ -113,6 +113,7 @@ retry:
 		kfree(ctx);
 		return;
 	}
+	ww_acquire_done(&ctx->ww_ctx);
 
 	WARN_ON(config->acquire_ctx);
 
@@ -226,12 +227,12 @@ void drm_modeset_drop_locks(struct drm_modeset_acquire_ctx *ctx)
 {
 	WARN_ON(ctx->contended);
 	while (!list_empty(&ctx->locked)) {
-		struct drm_modeset_lock_info *info;
+		struct drm_modeset_lock *lock;
 
-		info = list_first_entry(&ctx->locked,
-				struct drm_modeset_lock_info, ctx_entry);
+		lock = list_first_entry(&ctx->locked,
+				struct drm_modeset_lock, head);
 
-		drm_modeset_unlock(info->lock);
+		drm_modeset_unlock(lock);
 	}
 }
 EXPORT_SYMBOL(drm_modeset_drop_locks);
@@ -265,7 +266,10 @@ static inline int modeset_lock(struct drm_modeset_lock *lock,
 	} else {
 		ret = ww_mutex_lock(&lock->mutex, &ctx->ww_ctx);
 	}
-	if (ret == -EALREADY) {
+	if (!ret) {
+		WARN_ON(!list_empty(&lock->head));
+		list_add(&lock->head, &ctx->locked);
+	} else if (ret == -EALREADY) {
 		/* we already hold the lock.. this is fine.  For atomic
 		 * we will need to be able to drm_modeset_lock() things
 		 * without having to keep track of what is already locked
@@ -378,17 +382,7 @@ EXPORT_SYMBOL(drm_modeset_lock_single_interruptible);
  */
 void drm_modeset_unlock(struct drm_modeset_lock *lock)
 {
-	struct drm_modeset_lock_info *info;
-
-	/* undo in reverse order */
-	if (!list_empty(&lock->head)) {
-		info = list_last_entry(&lock->head,
-				struct drm_modeset_lock_info, lock_entry);
-		list_del_init(&info->lock_entry);
-		if (info->ctx)
-			list_del_init(&info->ctx_entry);
-		kfree(info);
-	}
+	list_del_init(&lock->head);
 	ww_mutex_unlock(&lock->mutex);
 }
 EXPORT_SYMBOL(drm_modeset_unlock);
