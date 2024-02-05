@@ -44,7 +44,17 @@ local_irq_enable(void)
 static inline bool
 irqs_disabled(void)
 {
-	return !(read_rflags() & 0x200UL);
+	/* dillon: I don't like disabling interrupts.
+	 * The reason we avoid actually hard-disabling interrupts is
+	 * because if something goes wrong we have almost no chance of
+	 * getting a crash dump or for the system to be able to operate while
+	 * drm is stuck / blocked on something.
+	 * XXX: better to use crit_enter/crit_exit
+	 */
+	/* real implementation causes GEM_BUG_ON panic in the i915 driver
+	 * when handling e.g. page flip ioctl
+	 */
+	return (1);
 }
 
 #define local_irq_save(flags)	\

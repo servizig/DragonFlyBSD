@@ -60,6 +60,13 @@ static inline void spin_lock_irq(spinlock_t *lock)
 	lockmgr(lock, LK_EXCLUSIVE);
 }
 
+static inline int spin_trylock_irq(spinlock_t *lock)
+{
+	local_irq_disable();
+	preempt_disable();
+	return lockmgr_try(lock, LK_EXCLUSIVE);
+}
+
 static inline void spin_unlock_irq(spinlock_t *lock)
 {
 	lockmgr(lock, LK_RELEASE);

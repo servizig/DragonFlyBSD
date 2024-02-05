@@ -52,7 +52,7 @@ struct drm_modeset_acquire_ctx {
 	struct drm_modeset_lock *contended;
 
 	/*
-	 * list of held locks (drm_modeset_lock_info)
+	 * list of held locks (drm_modeset_lock)
 	 */
 	struct list_head locked;
 
