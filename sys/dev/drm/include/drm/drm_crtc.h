@@ -1107,7 +1107,9 @@ struct drm_mode_set {
 
 #define obj_to_crtc(x) container_of(x, struct drm_crtc, base)
 
+#if 0 /* causes -Werror=nonnull-compare */
 __printf(6, 7)
+#endif
 int drm_crtc_init_with_planes(struct drm_device *dev,
 			      struct drm_crtc *crtc,
 			      struct drm_plane *primary,

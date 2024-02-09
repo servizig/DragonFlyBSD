@@ -29,6 +29,8 @@
 #include <linux/interrupt.h>
 #ifdef __DragonFly__
 #include <linux/kconfig.h> /* bring in IS_ENABLED */
+#include <linux/xarray.h>
+#include <linux/sizes.h>
 #endif
 
 struct drm_i915_private;

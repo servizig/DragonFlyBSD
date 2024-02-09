@@ -122,7 +122,7 @@ access_ok(const void *uaddr, size_t len)
 	    (eaddr > saddr && eaddr <= VM_MAX_USER_ADDRESS));
 }
 
-#define user_access_begin(unused, addr, size)	access_ok(addr, size)
+#define user_access_begin()
 #define user_access_end()
 
 #endif	/* _ASM_UACCESS_H_ */

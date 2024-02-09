@@ -3,6 +3,7 @@ KMOD	= drm
 SRCS	= \
 	drm_atomic.c \
 	drm_atomic_helper.c \
+	drm_atomic_uapi.c \
 	drm_auth.c \
 	drm_blend.c \
 	drm_bridge.c \

@@ -130,7 +130,7 @@ _list_add(struct list_head *new, struct list_head *prev,
 
 static inline void
 list_del_init(struct list_head *entry)
-{	
+{
 
 	list_del(entry);
 	INIT_LIST_HEAD(entry);
@@ -236,6 +236,18 @@ list_move_tail(struct list_head *entry, struct list_head *head)
 }
 
 static inline void
+list_bulk_move_tail(struct list_head *head, struct list_head *first,
+    struct list_head *last)
+{
+	first->prev->next = last->next;
+	last->next->prev = first->prev;
+	head->prev->next = first;
+	first->prev = head->prev;
+	last->next = head;
+	head->prev = last;
+}
+
+static inline void
 _list_splice(const struct list_head *list, struct list_head *prev,  
     struct list_head *next)
 {
@@ -271,7 +283,7 @@ list_splice_init(struct list_head *list, struct list_head *head)
 {
 
 	_list_splice(list, head, head->next);
-	INIT_LIST_HEAD(list);   
+	INIT_LIST_HEAD(list);
 }
  
 static inline void

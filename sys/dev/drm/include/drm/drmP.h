@@ -197,10 +197,6 @@ int ttm_bo_mmap_single(struct file *fp, struct drm_device *dev, vm_ooffset_t *of
 int drm_gem_mmap_single(struct drm_device *dev, vm_ooffset_t *offset,
     vm_size_t size, struct vm_object **obj_res, int nprot);
 
-/* XXX: These are here only because of drm_sysctl.c */
-extern int drm_vblank_offdelay;
-extern unsigned int drm_timestamp_precision;
-
 static __inline__ int drm_pci_device_is_agp(struct drm_device *dev)
 {
 	return (pci_find_extcap(dev->pdev->dev.bsddev, PCIY_AGP, NULL) == 0);

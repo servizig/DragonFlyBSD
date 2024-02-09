@@ -1915,9 +1915,7 @@ intel_hdmi_detect(struct drm_connector *connector, bool force)
 {
 	enum drm_connector_status status = connector_status_disconnected;
 	struct drm_i915_private *dev_priv = to_i915(connector->dev);
-#if 0
 	struct intel_hdmi *intel_hdmi = intel_attached_hdmi(connector);
-#endif
 	struct intel_encoder *encoder = &hdmi_to_dig_port(intel_hdmi)->base;
 
 	DRM_DEBUG_KMS("[CONNECTOR:%d:%s]\n",

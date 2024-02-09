@@ -555,7 +555,7 @@ static int drm_atomic_plane_set_property(struct drm_plane *plane,
 		state->pixel_blend_mode = val;
 	} else if (property == plane->rotation_property) {
 		if (!is_power_of_2(val & DRM_MODE_ROTATE_MASK)) {
-			DRM_DEBUG_ATOMIC("[PLANE:%d:%s] bad rotation bitmask: 0x%llx\n",
+			DRM_DEBUG_ATOMIC("[PLANE:%d:%s] bad rotation bitmask: 0x%lx\n",
 					 plane->base.id, plane->name, val);
 			return -EINVAL;
 		}
@@ -1110,7 +1110,7 @@ static int prepare_signaling(struct drm_device *dev,
 			struct drm_out_fence_state *f;
 
 			f = krealloc(*fence_state, sizeof(**fence_state) *
-				     (*num_fences + 1), GFP_KERNEL);
+				     (*num_fences + 1), M_DRM, GFP_KERNEL);
 			if (!f)
 				return -ENOMEM;
 
@@ -1151,7 +1151,7 @@ static int prepare_signaling(struct drm_device *dev,
 			return -ENOMEM;
 
 		f = krealloc(*fence_state, sizeof(**fence_state) *
-			     (*num_fences + 1), GFP_KERNEL);
+			     (*num_fences + 1), M_DRM, GFP_KERNEL);
 		if (!f)
 			return -ENOMEM;
 

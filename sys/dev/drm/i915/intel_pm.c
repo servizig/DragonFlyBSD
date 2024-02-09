@@ -3864,7 +3864,7 @@ skl_ddb_get_pipe_allocation_limits(struct drm_device *dev,
 	const struct drm_crtc_state *crtc_state;
 	const struct drm_crtc *crtc;
 	u32 pipe_width = 0, total_width = 0, width_before_pipe = 0;
-	enum pipe for_pipe = to_intel_crtc(for_crtc)->pipe;
+	enum i915_pipe for_pipe = to_intel_crtc(for_crtc)->pipe;
 	u16 ddb_size;
 	u32 i;
 
@@ -3908,7 +3908,7 @@ skl_ddb_get_pipe_allocation_limits(struct drm_device *dev,
 	for_each_new_crtc_in_state(state, crtc, crtc_state, i) {
 		const struct drm_display_mode *adjusted_mode;
 		int hdisplay, vdisplay;
-		enum pipe pipe;
+		enum i915_pipe pipe;
 
 		if (!crtc_state->enable)
 			continue;
@@ -8239,7 +8239,9 @@ void intel_init_gt_powersave(struct drm_i915_private *dev_priv)
 	 */
 	if (!sanitize_rc6(dev_priv)) {
 		DRM_INFO("RC6 disabled, disabling runtime PM support\n");
+#if 0
 		pm_runtime_get(&dev_priv->drm.pdev->dev);
+#endif
 	}
 
 	mutex_lock(&dev_priv->pcu_lock);
@@ -8290,8 +8292,10 @@ void intel_cleanup_gt_powersave(struct drm_i915_private *dev_priv)
 	if (IS_VALLEYVIEW(dev_priv))
 		valleyview_cleanup_gt_powersave(dev_priv);
 
+#if 0
 	if (!HAS_RC6(dev_priv))
 		pm_runtime_put(&dev_priv->drm.pdev->dev);
+#endif
 }
 
 /**
