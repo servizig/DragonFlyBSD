@@ -26,6 +26,7 @@
 #include <linux/list.h>
 #include <linux/ctype.h>
 #include <drm/drm_mode_object.h>
+#include <linux/sched.h>
 
 struct drm_framebuffer;
 struct drm_file;

@@ -474,6 +474,8 @@ static bool hsw_power_well_enabled(struct drm_i915_private *dev_priv,
 
 static void assert_can_enable_dc9(struct drm_i915_private *dev_priv)
 {
+	WARN_ONCE((I915_READ(DC_STATE_EN) & DC_STATE_EN_DC9),
+		  "DC9 already programmed to be enabled.\n");
 	WARN_ONCE(I915_READ(DC_STATE_EN) & DC_STATE_EN_UPTO_DC5,
 		  "DC5 still not disabled to enable DC9.\n");
 	WARN_ONCE(I915_READ(HSW_PWR_WELL_CTL2) &
@@ -2167,7 +2169,7 @@ static const struct i915_power_well_desc vlv_power_wells[] = {
 		.always_on = 1,
 		.domains = POWER_DOMAIN_MASK,
 		.ops = &i9xx_always_on_power_well_ops,
-		.id = I915_DISP_PW_ALWAYS_ON,
+		.id = DISP_PW_ID_NONE,
 	},
 	{
 		.name = "display",
@@ -3659,7 +3661,7 @@ static void chv_phy_control_init(struct drm_i915_private *dev_priv)
 		dev_priv->chv_phy_assert[DPIO_PHY0] = true;
 	}
 
-	if (cmn_d->ops->is_enabled(dev_priv, cmn_d)) {
+	if (cmn_d->desc->ops->is_enabled(dev_priv, cmn_d)) {
 		uint32_t status = I915_READ(DPIO_PHY_STATUS);
 		unsigned int mask;
 
@@ -4169,6 +4171,7 @@ void intel_runtime_pm_enable(struct drm_i915_private *dev_priv)
 
 void intel_runtime_pm_disable(struct drm_i915_private *dev_priv)
 {
+#if 0
 	struct pci_dev *pdev = dev_priv->drm.pdev;
 	struct device *kdev = &pdev->dev;
 
@@ -4180,4 +4183,5 @@ void intel_runtime_pm_disable(struct drm_i915_private *dev_priv)
 
 	if (!HAS_RUNTIME_PM(dev_priv))
 		pm_runtime_put(kdev);
+#endif
 }

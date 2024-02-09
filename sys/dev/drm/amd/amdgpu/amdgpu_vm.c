@@ -720,9 +720,10 @@ void amdgpu_vm_move_to_lru_tail(struct amdgpu_device *adev,
 		if (!bo->parent)
 			continue;
 
-		ttm_bo_move_to_lru_tail(&bo->tbo);
+		ttm_bo_move_to_lru_tail(&bo->tbo, &vm->lru_bulk_move);
 		if (bo->shadow)
-			ttm_bo_move_to_lru_tail(&bo->shadow->tbo);
+			ttm_bo_move_to_lru_tail(&bo->shadow->tbo,
+						&vm->lru_bulk_move);
 	}
 	lockmgr(&glob->lru_lock, LK_RELEASE);
 

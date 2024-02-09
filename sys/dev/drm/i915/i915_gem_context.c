@@ -138,7 +138,7 @@ static inline int new_hw_id(struct drm_i915_private *i915, gfp_t gfp)
 static int steal_hw_id(struct drm_i915_private *i915)
 {
 	struct i915_gem_context *ctx, *cn;
-	LIST_HEAD(pinned);
+	LINUX_LIST_HEAD(pinned);
 	int id = -ENOSPC;
 
 	lockdep_assert_held(&i915->contexts.mutex);
@@ -514,7 +514,7 @@ i915_gem_context_create_kernel(struct drm_i915_private *i915, int prio)
 
 static void init_contexts(struct drm_i915_private *i915)
 {
-	mutex_init(&i915->contexts.mutex);
+	lockinit(&i915->contexts.mutex, "i915cmx", 0, LK_CANRECURSE);
 	INIT_LIST_HEAD(&i915->contexts.list);
 
 	/* Using the simple ida interface, the max is limited by sizeof(int) */

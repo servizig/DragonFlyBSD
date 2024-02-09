@@ -3051,6 +3051,7 @@ static int drm_fbdev_fb_release(struct fb_info *info, int user)
  * fb_ops.fb_destroy is called by the last put_fb_info() call at the end of
  * unregister_framebuffer() or fb_release().
  */
+#if 0
 static void drm_fbdev_fb_destroy(struct fb_info *info)
 {
 	struct drm_fb_helper *fb_helper = info->par;
@@ -3082,7 +3083,9 @@ static void drm_fbdev_fb_destroy(struct fb_info *info)
 		kfree(fb_helper);
 	}
 }
+#endif
 
+#if 0
 static int drm_fbdev_fb_mmap(struct fb_info *info, struct vm_area_struct *vma)
 {
 	struct drm_fb_helper *fb_helper = info->par;
@@ -3093,7 +3096,6 @@ static int drm_fbdev_fb_mmap(struct fb_info *info, struct vm_area_struct *vma)
 		return -ENODEV;
 }
 
-#if 0
 static struct fb_ops drm_fbdev_fb_ops = {
 	.owner		= THIS_MODULE,
 

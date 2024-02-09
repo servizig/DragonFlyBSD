@@ -1018,7 +1018,7 @@ void intel_psr_flush(struct drm_i915_private *dev_priv,
 		return;
 	}
 
-	crtc = dp_to_dig_port(dev_priv->psr.enabled)->base.base.crtc;
+	crtc = dp_to_dig_port(dev_priv->psr.dp)->base.base.crtc;
 	pipe = to_intel_crtc(crtc)->pipe;
 
 	frontbuffer_bits &= INTEL_FRONTBUFFER_ALL_MASK(pipe);
