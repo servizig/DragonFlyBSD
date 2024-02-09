@@ -1505,10 +1505,15 @@ static int eb_relocate_vma(struct i915_execbuffer *eb, struct i915_vma *vma)
 				 * can read from this userspace address.
 				 */
 				offset = gen8_canonical_addr(offset & ~UPDATE);
+#ifdef __DragonFly__
+				__put_user(offset,
+					   &urelocs[r-stack].presumed_offset);
+#else
 				if (unlikely(__put_user(offset, &urelocs[r-stack].presumed_offset))) {
 					remain = -EFAULT;
 					goto out;
 				}
+#endif
 			}
 		} while (r++, --count);
 		urelocs += ARRAY_SIZE(stack);
