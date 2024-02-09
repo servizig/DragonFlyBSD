@@ -150,8 +150,9 @@ SRCS+= amdgpu_cgs.c
 
 # GPU scheduler
 SRCS+= \
-	gpu_scheduler.c \
+	sched_entity.c \
 	sched_fence.c \
+	sched_main.c \
 	amdgpu_job.c
 
 SRCS+= amdgpu_acpi.c

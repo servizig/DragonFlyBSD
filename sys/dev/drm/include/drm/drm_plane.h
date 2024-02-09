@@ -699,7 +699,9 @@ struct drm_plane {
 
 #define obj_to_plane(x) container_of(x, struct drm_plane, base)
 
+#if 0 /* used with name == NULL */
 __printf(9, 10)
+#endif
 int drm_universal_plane_init(struct drm_device *dev,
 			     struct drm_plane *plane,
 			     uint32_t possible_crtcs,
