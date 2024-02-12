@@ -1,5 +1,7 @@
 KMOD	= i915
 
+KCFLAGS += -g -Og -Wno-error=maybe-uninitialized
+
 # core driver code
 SRCS =	i915_drv.c \
 	i915_irq.c \

@@ -41,11 +41,25 @@
 
 #define IRQF_SHARED	0x00000080
 
+struct tasklet_struct;
+typedef void tasklet_func_t(unsigned long);
+typedef void tasklet_callback_t(struct tasklet_struct *);
+
 struct tasklet_struct {
+#if 0
 	unsigned long state;
 	void (*func)(unsigned long);
 	unsigned long data;
 	atomic_t count;
+#endif
+ 	TAILQ_ENTRY(tasklet_struct) entry;
+ 	tasklet_func_t *func;
+ 	/* Our "state" implementation is different. Avoid same name as Linux. */
+ 	volatile u_int tasklet_state;
+ 	atomic_t count;
+ 	unsigned long data;
+ 	tasklet_callback_t *callback;
+	bool use_callback;
 };
 
 enum {
@@ -70,6 +84,12 @@ void tasklet_schedule(struct tasklet_struct *t);
 void tasklet_hi_schedule(struct tasklet_struct *t);
 void tasklet_kill(struct tasklet_struct *t);
 
+void tasklet_setup(struct tasklet_struct *, tasklet_callback_t *);
+
+
+#define	tasklet_hi_schedule(t)	tasklet_schedule(t)
+
+#if 0
 static inline void
 tasklet_enable(struct tasklet_struct *t)
 {
@@ -81,25 +101,40 @@ tasklet_disable(struct tasklet_struct *t)
 {
 	atomic_inc(&t->count);
 }
+#endif
 
 
 /* TODO: implement me */
+#if 0
 static inline void
 tasklet_unlock_wait(struct tasklet_struct *ts)
 {
         
 }
+#endif
+extern void tasklet_unlock_wait(struct tasklet_struct *ts);
 
+extern void tasklet_unlock(struct tasklet_struct *);
+#if 0
 static inline void
 tasklet_unlock(struct tasklet_struct *ts)
 {
         
 }
+#endif
 
+extern int tasklet_trylock(struct tasklet_struct *);
+
+#if 0
 static inline bool
 tasklet_trylock(struct tasklet_struct *ts)
 {
         return true;
 }
+#endif
+
+extern void tasklet_disable_nosync(struct tasklet_struct *);
+extern void tasklet_disable(struct tasklet_struct *);
+extern void tasklet_enable(struct tasklet_struct *);
 
 #endif	/* _LINUX_INTERRUPT_H_ */

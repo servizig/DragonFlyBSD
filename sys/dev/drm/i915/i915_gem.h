@@ -71,7 +71,9 @@ struct drm_i915_private;
 #define GEM_TRACE_DUMP_ON(expr) \
 	do { if (expr) ftrace_dump(DUMP_ALL); } while (0)
 #else
-#define GEM_TRACE(...) do { } while (0)
+#include <drm/drm.h>
+#include <drm/drm_print.h>
+#define GEM_TRACE(...) DRM_DEBUG(__VA_ARGS__)
 #define GEM_TRACE_DUMP() do { } while (0)
 #define GEM_TRACE_DUMP_ON(expr) BUILD_BUG_ON_INVALID(expr)
 #endif
