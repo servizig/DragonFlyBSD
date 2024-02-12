@@ -934,6 +934,7 @@ static void process_csb(struct intel_engine_cs *engine)
 	head = execlists->csb_head;
 	tail = READ_ONCE(*execlists->csb_write);
 	GEM_TRACE("%s cs-irq head=%d, tail=%d\n", engine->name, head, tail);
+	print_backtrace(-1);
 	if (unlikely(head == tail))
 		return;
 
@@ -2301,7 +2302,7 @@ void intel_logical_ring_cleanup(struct intel_engine_cs *engine)
 	 * so this is just for documentation.
 	 */
 	if (WARN_ON(test_bit(TASKLET_STATE_SCHED,
-			     &engine->execlists.tasklet.state)))
+			     &engine->execlists.tasklet.tasklet_state)))
 		tasklet_kill(&engine->execlists.tasklet);
 
 	dev_priv = engine->i915;

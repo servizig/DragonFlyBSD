@@ -237,6 +237,9 @@ dma_fence_signal_locked(struct dma_fence *fence)
 	fence->timestamp = ktime_get();
 	set_bit(DMA_FENCE_FLAG_TIMESTAMP_BIT, &fence->flags);
 
+	kprintf("fence signaled context=%llx, seqno=%d", fence->context, fence->seqno);
+	print_backtrace(-1);
+
 	list_for_each_entry_safe(cur, tmp, &cb_list, node) {
 		INIT_LIST_HEAD(&cur->node);
 		cur->func(fence, cur);
