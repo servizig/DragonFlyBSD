@@ -1321,7 +1321,7 @@ static void intel_engine_print_registers(const struct intel_engine_cs *engine,
 			   read, write,
 			   GEN8_CSB_WRITE_PTR(I915_READ(RING_CONTEXT_STATUS_PTR(engine))),
 			   yesno(test_bit(TASKLET_STATE_SCHED,
-					  &engine->execlists.tasklet.state)),
+					  &engine->execlists.tasklet.tasklet_state)),
 			   enableddisabled(!atomic_read(&engine->execlists.tasklet.count)));
 		if (read >= GEN8_CSB_ENTRIES)
 			read = 0;

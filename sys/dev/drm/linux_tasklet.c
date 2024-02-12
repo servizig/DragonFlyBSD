@@ -82,14 +82,14 @@ static int tasklet_pending = 0;
 		if (atomic_read(&t->count) != 0)			\
 			continue;					\
 									\
-		/* This tasklet is not scheduled, try the next one */	\
-		if (!test_bit(TASKLET_STATE_SCHED, &t->state))		\
+		/* If tasklet is not scheduled, try the next one */	\
+		if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))		\
 			continue;					\
 									\
-		clear_bit(TASKLET_STATE_SCHED, &t->state);		\
 		set_bit(TASKLET_STATE_RUN, &t->state);			\
 									\
 		lockmgr(&tasklet_lock, LK_RELEASE);			\
+		kprintf("calling tasklet data=%lu\n", t->data);		\
 		if (t->func)						\
 			t->func(t->data);				\
 		lockmgr(&tasklet_lock, LK_EXCLUSIVE);			\
@@ -136,20 +136,22 @@ tasklet_init(struct tasklet_struct *t,
 	struct tasklet_entry *te;				\
 								\
 	lockmgr(&tasklet_lock, LK_EXCLUSIVE);			\
-	set_bit(TASKLET_STATE_SCHED, &t->state);		\
+	if (test_and_set_bit(TASKLET_STATE_SCHED, &t->state))	\
+		goto skip;	/* already scheduled */		\
 								\
 	STAILQ_FOREACH(te, &(list), tasklet_entries) {		\
 		if (te->ts == t)				\
 			goto found_and_done;			\
 	}							\
 								\
-	te = kzalloc(sizeof(struct tasklet_entry), M_WAITOK);	\
+	te = kzalloc(sizeof(struct tasklet_entry), GFP_KERNEL);	\
 	te->ts = t;						\
+found_and_done:							\
 	STAILQ_INSERT_TAIL(&(list), te, tasklet_entries);	\
 								\
-found_and_done:							\
 	tasklet_pending = 1;					\
 	wakeup(&tasklet_runner);				\
+skip:								\
 	lockmgr(&tasklet_lock, LK_RELEASE);			\
 } while (0)
 

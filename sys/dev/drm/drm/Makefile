@@ -1,4 +1,7 @@
 .PATH:	${.CURDIR}/.. ${.CURDIR}/../ttm
+
+KCFLAGS += -g -Og -Wno-error=maybe-uninitialized
+
 KMOD	= drm
 SRCS	= \
 	drm_atomic.c \
@@ -89,7 +92,7 @@ SRCS	= \
 	linux_sched.c \
 	linux_shmem.c \
 	linux_sort.c \
-	linux_tasklet.c \
+	linux_tasklet_v2.c \
 	linux_vmalloc.c \
 	linux_wait.c \
 	linux_workqueue.c \
