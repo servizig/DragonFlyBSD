@@ -1,6 +1,7 @@
 .PATH:	${.CURDIR}/.. ${.CURDIR}/../ttm
 
-KCFLAGS += -g -Og -Wno-error=maybe-uninitialized
+#KCFLAGS += -g -Og -Wno-error=maybe-uninitialized
+KCFLAGS += -g -Wno-error=maybe-uninitialized
 
 KMOD	= drm
 SRCS	= \
