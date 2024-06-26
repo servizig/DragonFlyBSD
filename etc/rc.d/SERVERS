@@ -5,11 +5,10 @@
 #
 
 # PROVIDE: SERVERS
-# REQUIRE: mountcritremote mounttmpfs
+# REQUIRE: NETWORKING
 
 #	This is a dummy dependency, for early-start servers relying on
 #	some basic configuration.
 
 . /etc/rc.subr
 dummy_rc_command "$1"
-

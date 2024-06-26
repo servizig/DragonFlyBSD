@@ -38,6 +38,7 @@ static struct objcache_malloc_args fuse_ipc_args = {
 	sizeof(struct fuse_ipc), M_FUSE_IPC,
 };
 
+#if 0
 static int
 fuse_block_sigs(sigset_t *oldset)
 {
@@ -67,6 +68,7 @@ fuse_restore_sigs(sigset_t *oldset)
 
 	return -1;
 }
+#endif
 
 void
 fuse_buf_alloc(struct fuse_buf *fbp, size_t len)
@@ -92,6 +94,7 @@ fuse_ipc_get(struct fuse_mount *fmp, size_t len)
 	struct fuse_ipc *fip;
 
 	fip = objcache_get(fuse_ipc_objcache, M_WAITOK);
+	bzero(fip, sizeof(*fip));
 	refcount_init(&fip->refcnt, 1);
 	fip->fmp = fmp;
 	fip->unique = atomic_fetchadd_long(&fmp->unique, 1);
@@ -123,6 +126,8 @@ fuse_ipc_remove(struct fuse_ipc *fip)
 	TAILQ_FOREACH(p, &fmp->request_head, request_entry) {
 		if (fip == p) {
 			TAILQ_REMOVE(&fmp->request_head, p, request_entry);
+			if (atomic_swap_int(&fip->sent, 1) == -1)
+				wakeup(fip);
 			break;
 		}
 	}
@@ -153,7 +158,6 @@ fuse_ipc_fill(struct fuse_ipc *fip, int op, uint64_t ino, struct ucred *cred)
 static int
 fuse_ipc_wait(struct fuse_ipc *fip)
 {
-	sigset_t oldset;
 	int error, retry = 0;
 
 	if (fuse_test_dead(fip->fmp)) {
@@ -165,9 +169,10 @@ fuse_ipc_wait(struct fuse_ipc *fip)
 	if (fuse_ipc_test_replied(fip))
 		return 0;
 again:
-	fuse_block_sigs(&oldset);
-	error = tsleep(fip, 0, "ftxp", 5 * hz);
-	fuse_restore_sigs(&oldset);
+	tsleep_interlock(fip, 0);
+	if (fuse_ipc_test_replied(fip))
+		return 0;
+	error = tsleep(fip, PINTERLOCKED, "ftxp", 5 * hz);
 	if (!error)
 		KKASSERT(fuse_ipc_test_replied(fip));
 
@@ -198,6 +203,46 @@ again:
 	return 0;
 }
 
+static int
+fuse_ipc_wait_sent(struct fuse_ipc *fip)
+{
+	int error, retry = 0;
+
+	if (fuse_test_dead(fip->fmp)) {
+		KKASSERT(!fuse_ipc_test_replied(fip));
+		fuse_ipc_remove(fip);
+		fuse_ipc_set_replied(fip);
+		return ENOTCONN;
+	}
+
+	error = 0;
+
+	for (;;) {
+		tsleep_interlock(fip, 0);
+		if (atomic_swap_int(&fip->sent, -1) == 1) {
+			error = 0;
+			break;
+		}
+		error = tsleep(fip, PINTERLOCKED, "ftxp", 5 * hz);
+		if (error == EWOULDBLOCK) {
+			++retry;
+			if (retry == 6) {
+				fuse_print("timeout\n");
+				error = ETIMEDOUT;
+				break;
+			}
+			fuse_print("timeout/retry\n");
+		}
+	}
+	if (fuse_test_dead(fip->fmp))
+		error = ENOTCONN;
+	if (error) {
+		fuse_ipc_remove(fip);
+		fuse_ipc_set_replied(fip);
+	}
+	return error;
+}
+
 int
 fuse_ipc_tx(struct fuse_ipc *fip)
 {
@@ -210,8 +255,6 @@ fuse_ipc_tx(struct fuse_ipc *fip)
 		return ENOTCONN;
 	}
 
-	mtx_lock(&fmp->mnt_lock);
-
 	mtx_lock(&fmp->ipc_lock);
 	TAILQ_INSERT_TAIL(&fmp->reply_head, fip, reply_entry);
 	TAILQ_INSERT_TAIL(&fmp->request_head, fip, request_entry);
@@ -219,7 +262,6 @@ fuse_ipc_tx(struct fuse_ipc *fip)
 
 	wakeup(fmp);
 	KNOTE(&fmp->kq.ki_note, 0);
-	mtx_unlock(&fmp->mnt_lock);
 
 	error = fuse_ipc_wait(fip);
 	KKASSERT(fuse_ipc_test_replied(fip));
@@ -242,6 +284,30 @@ fuse_ipc_tx(struct fuse_ipc *fip)
 	fuse_dbgipc(fip, 0, "done");
 
 	return 0;
+}
+
+int
+fuse_ipc_tx_noreply(struct fuse_ipc *fip)
+{
+	struct fuse_mount *fmp = fip->fmp;
+	int error;
+
+	if (fuse_test_dead(fmp)) {
+		fuse_ipc_put(fip);
+		return ENOTCONN;
+	}
+
+	mtx_lock(&fmp->ipc_lock);
+	TAILQ_INSERT_TAIL(&fmp->request_head, fip, request_entry);
+	mtx_unlock(&fmp->ipc_lock);
+
+	wakeup(fmp);
+	KNOTE(&fmp->kq.ki_note, 0);
+
+	error = fuse_ipc_wait_sent(fip);
+	if (error)
+		fuse_ipc_put(fip);
+	return error;
 }
 
 void

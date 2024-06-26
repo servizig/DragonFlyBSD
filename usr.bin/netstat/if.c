@@ -150,7 +150,7 @@ intpr(int interval1, u_long ifnetaddr, void (*pfunc)(char *), u_long ncpusaddr)
 		return;
 
 	if (!pfunc) {
-		printf("%-7.7s %-5.5s %-13.13s %-15.15s %8.8s %5.5s",
+		printf("%-9.9s %-5.5s %-13.13s %-15.15s %8.8s %5.5s",
 		       "Name", "Mtu", "Network", "Address", "Ipkts", "Ierrs");
 		if (bflag)
 			printf(" %10.10s","Ibytes");
@@ -193,7 +193,7 @@ intpr(int interval1, u_long ifnetaddr, void (*pfunc)(char *), u_long ncpusaddr)
 				continue;
 			}
 
-			if ((ifnet.if_flags&IFF_UP) == 0)
+			if ((ifnet.if_flags & IFF_UP) == 0)
 				*cp++ = '*';
 			*cp = '\0';
 
@@ -201,8 +201,7 @@ intpr(int interval1, u_long ifnetaddr, void (*pfunc)(char *), u_long ncpusaddr)
 				  (char *)&head, sizeof(head)))
 				return;
 
-			ifaddrcont_addr =
-				(u_long)TAILQ_FIRST(&head);
+			ifaddrcont_addr = (u_long)TAILQ_FIRST(&head);
 			if (ifaddrcont_addr == 0) {
 				ifaddraddr = 0;
 			} else {
@@ -247,7 +246,7 @@ intpr(int interval1, u_long ifnetaddr, void (*pfunc)(char *), u_long ncpusaddr)
 		timer = ifnet.if_timer;
 
 		if (ifaddraddr == 0) {
-			printf("%-7.7s %-5lu ", name, ifnet.if_mtu);
+			printf("%-9.9s %-5lu ", name, ifnet.if_mtu);
 			printf("%-13.13s ", "none");
 			printf("%-15.15s ", "none");
 		} else {

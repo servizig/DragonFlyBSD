@@ -24,12 +24,10 @@
 # SUCH DAMAGE.
 #
 # $FreeBSD: src/etc/rc.d/nisdomain,v 1.1 2003/04/18 17:51:54 mtm Exp $
-# $DragonFly: src/etc/rc.d/nisdomain,v 1.5 2005/11/19 21:47:32 swildner Exp $
 #
 
 # PROVIDE: nisdomain
-# REQUIRE: SERVERS rpcbind
-# BEFORE:  ypbind ypserv ypxfrd
+# REQUIRE: rpcbind
 
 . /etc/rc.subr
 

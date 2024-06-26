@@ -151,7 +151,7 @@ struct	ip6_pktopts {
 
 	/* Next-hop address information */
 	struct	ip6po_nhinfo ip6po_nhinfo;
-	
+
 	struct	ip6_hbh *ip6po_hbh; /* Hop-by-Hop options header */
 
 	/* Destination options header (before a routing header) */
@@ -308,7 +308,7 @@ extern int	ip6_maxfragpackets; /* Maximum packets in reassembly queue */
 extern int	ip6_maxfrags;	/* Maximum fragments in reassembly queue */
 extern int	ip6_sourcecheck;	/* Verify source interface */
 extern int	ip6_sourcecheck_interval; /* Interval between log messages */
-extern int	ip6_accept_rtadv;	/* Acts as a host not a router */
+extern int	ip6_accept_rtadv;
 extern int	ip6_log_interval;
 extern time_t	ip6_log_time;
 extern int	ip6_hdrnestlimit; /* upper limit of # of extension headers */

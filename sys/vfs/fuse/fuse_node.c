@@ -34,253 +34,156 @@ static struct objcache_malloc_args fuse_node_args = {
 	sizeof(struct fuse_node), M_FUSE_NODE,
 };
 
-static MALLOC_DEFINE(M_FUSE_DENT, "fuse_dent", "FUSE dent");
-
-static struct objcache *fuse_dent_objcache = NULL;
-static struct objcache_malloc_args fuse_dent_args = {
-	sizeof(struct fuse_dent), M_FUSE_DENT,
-};
-
 static int
-fuse_dent_cmp(struct fuse_dent *p1, struct fuse_dent *p2)
+fuse_node_cmp(struct fuse_node *p1, struct fuse_node *p2)
 {
-	return strcmp(p1->name, p2->name);
+	if (p1->ino < p2->ino)
+		return -1;
+	if (p1->ino > p2->ino)
+		return 1;
+	return 0;
 }
 
-RB_PROTOTYPE_STATIC(fuse_dent_tree, fuse_dent, entry, fuse_dent_cmp);
-RB_GENERATE_STATIC(fuse_dent_tree, fuse_dent, dent_entry, fuse_dent_cmp);
+RB_PROTOTYPE2(fuse_node_tree, fuse_node, entry, fuse_node_cmp, uint64_t);
+RB_GENERATE2(fuse_node_tree, fuse_node, node_entry, fuse_node_cmp,
+		uint64_t, ino);
 
 void
 fuse_node_new(struct fuse_mount *fmp, uint64_t ino, enum vtype vtyp,
-    struct fuse_node **fnpp)
+	      struct fuse_node **fnpp)
 {
 	struct fuse_node *fnp;
 
 	fnp = objcache_get(fuse_node_objcache, M_WAITOK);
-	KKASSERT(fnp);
+	bzero(fnp, sizeof(*fnp));
 
-	memset(fnp, 0, sizeof(*fnp));
-	fnp->vp = NULL;
 	fnp->fmp = fmp;
-	fnp->pfnp = NULL;
 
 	mtx_init(&fnp->node_lock, "fuse_node_lock");
-	RB_INIT(&fnp->dent_head);
 
 	fnp->ino = ino;
 	fnp->type = vtyp;
-	fnp->nlink = 0;
 	fnp->size = 0;
 	fnp->nlookup = 0;
 	fnp->fh = 0;
 	fnp->closed = false;
 
+	if (RB_INSERT(fuse_node_tree, &fmp->node_head, fnp)) {
+		panic("fuse_node_new: cannot insert %p\n", fnp);
+	}
+
 	*fnpp = fnp;
-	KKASSERT(*fnpp);
 }
 
 void
-fuse_node_free(struct fuse_node *fnp)
+fuse_node_free(struct fuse_mount *fmp, struct fuse_node *fnp)
 {
-	struct fuse_node *dfnp = fnp->pfnp;
-	struct fuse_dent *fep;
-
 	fuse_dbg("free ino=%ju\n", fnp->ino);
 
-	if (dfnp) {
-		KKASSERT(dfnp->type == VDIR);
-		mtx_lock(&dfnp->node_lock);
-		RB_FOREACH(fep, fuse_dent_tree, &dfnp->dent_head) {
-			if (fep->fnp == fnp) {
-				fuse_dent_detach(dfnp, fep);
-				fuse_dent_free(fep);
-				break;
-			}
-		}
-		mtx_unlock(&dfnp->node_lock);
-	}
-
-	mtx_lock(&fnp->node_lock);
-	if (fnp->type == VDIR) {
-		while ((fep = RB_ROOT(&fnp->dent_head))) {
-			fuse_dent_detach(fnp, fep);
-			fuse_dent_free(fep);
-		}
-	}
-	fnp->vp->v_data = NULL;
-	fnp->vp = NULL;
-	fnp->nlink = -123; /* debug */
-	mtx_unlock(&fnp->node_lock);
+	mtx_lock(&fmp->ino_lock);
+	RB_REMOVE(fuse_node_tree, &fmp->node_head, fnp);
+	mtx_unlock(&fmp->ino_lock);
 
 	objcache_put(fuse_node_objcache, fnp);
 }
 
-void
-fuse_dent_new(struct fuse_node *fnp, const char *name, int namelen,
-    struct fuse_dent **fepp)
-{
-	struct fuse_dent *fep;
-
-	fep = objcache_get(fuse_dent_objcache, M_WAITOK);
-	KKASSERT(fep);
-
-	if (namelen >= 0)
-		fep->name = kstrndup(name, namelen, M_TEMP);
-	else
-		fep->name = kstrdup(name, M_TEMP);
-	KKASSERT(fep->name);
-	fep->fnp = fnp;
-
-	KASSERT(fnp->nlink >= 0, ("new ino=%ju nlink=%d dent=\"%s\"",
-	    fnp->ino, fnp->nlink, fep->name));
-	KKASSERT(fnp->nlink < LINK_MAX);
-	fnp->nlink++;
-
-	*fepp = fep;
-	KKASSERT(*fepp);
-}
-
-void
-fuse_dent_free(struct fuse_dent *fep)
-{
-	struct fuse_node *fnp = fep->fnp;
-
-	fuse_dbg("free dent=\"%s\"\n", fep->name);
-
-	KASSERT(fnp->nlink > 0, ("free ino=%ju nlink=%d dent=\"%s\"",
-	    fnp->ino, fnp->nlink, fep->name));
-
-	if (fep->name) {
-		kfree(fep->name, M_TEMP);
-		fep->name = NULL;
-	}
-
-	KKASSERT(fnp->nlink <= LINK_MAX);
-	fnp->nlink--;
-
-	fep->fnp = NULL;
-	objcache_put(fuse_dent_objcache, fep);
-}
-
-void
-fuse_dent_attach(struct fuse_node *dfnp, struct fuse_dent *fep)
-{
-	KKASSERT(dfnp);
-	KKASSERT(dfnp->type == VDIR);
-	KKASSERT(mtx_islocked_ex(&dfnp->node_lock));
-
-	RB_INSERT(fuse_dent_tree, &dfnp->dent_head, fep);
-}
-
-void
-fuse_dent_detach(struct fuse_node *dfnp, struct fuse_dent *fep)
-{
-	KKASSERT(dfnp);
-	KKASSERT(dfnp->type == VDIR);
-	KKASSERT(mtx_islocked_ex(&dfnp->node_lock));
-
-	RB_REMOVE(fuse_dent_tree, &dfnp->dent_head, fep);
-}
-
+/*
+ * Allocate or find the fuse node for the specified inode number and assign
+ * its vnode.
+ */
 int
-fuse_dent_find(struct fuse_node *dfnp, const char *name, int namelen,
-    struct fuse_dent **fepp)
+fuse_alloc_node(struct fuse_mount *fmp, struct fuse_node *dfnp,
+	        uint64_t ino, enum vtype vtyp, struct vnode **vpp)
 {
-	struct fuse_dent *fep, find;
+	struct fuse_node *fnp;
 	int error;
-
-	if (namelen >= 0)
-		find.name = kstrndup(name, namelen, M_TEMP);
-	else
-		find.name = kstrdup(name, M_TEMP);
-	KKASSERT(find.name);
-
-	fep = RB_FIND(fuse_dent_tree, &dfnp->dent_head, &find);
-	if (fep) {
-		error = 0;
-		if (fepp)
-			*fepp = fep;
-	} else {
-		error = ENOENT;
-		fuse_dbg("dent=\"%s\" not found\n", find.name);
-	}
-
-	kfree(find.name, M_TEMP);
-
-	return error;
-}
-
-int
-fuse_alloc_node(struct fuse_node *dfnp, uint64_t ino, const char *name,
-    int namelen, enum vtype vtyp, struct vnode **vpp)
-{
-	struct fuse_node *fnp = NULL;
-	struct fuse_dent *fep = NULL;
-	int error;
+	int allocated = 0;
 
 	KKASSERT(dfnp->type == VDIR);
 	if (vtyp == VBLK || vtyp == VCHR || vtyp == VFIFO)
 		return EINVAL;
 
-	mtx_lock(&dfnp->node_lock);
-	error = fuse_dent_find(dfnp, name, namelen, &fep);
-	if (!error) {
-		mtx_unlock(&dfnp->node_lock);
-		return EEXIST;
-	} else if (error == ENOENT) {
-		fuse_node_new(dfnp->fmp, ino, vtyp, &fnp);
-		mtx_lock(&fnp->node_lock);
-		fnp->pfnp = dfnp;
-		fuse_dent_new(fnp, name, namelen, &fep);
-		fuse_dent_attach(dfnp, fep);
-		mtx_unlock(&fnp->node_lock);
-	} else
-		KKASSERT(0);
-	mtx_unlock(&dfnp->node_lock);
-
-	error = fuse_node_vn(fnp, LK_EXCLUSIVE, vpp);
-	if (error) {
-		mtx_lock(&dfnp->node_lock);
-		fuse_dent_detach(dfnp, fep);
-		fuse_dent_free(fep);
-		mtx_unlock(&dfnp->node_lock);
-		fuse_node_free(fnp);
-		return error;
+	mtx_lock(&fmp->ino_lock);
+	fnp = RB_LOOKUP(fuse_node_tree, &fmp->node_head, ino);
+	if (fnp == NULL) {
+		fuse_node_new(fmp, ino, vtyp, &fnp);
+		allocated = 1;
 	}
-	KKASSERT(*vpp);
+	mtx_unlock(&fmp->ino_lock);
 
-	fuse_dbg("fnp=%p ino=%ju dent=\"%s\"\n", fnp, fnp->ino, fep->name);
-
-	return 0;
+	error = fuse_node_vn(fnp, vpp);
+	if (error) {
+		if (allocated)
+			fuse_node_free(fmp, fnp);
+	}
+	return error;
 }
 
+/*
+ * Returns exclusively locked vp
+ */
 int
-fuse_node_vn(struct fuse_node *fnp, int flags, struct vnode **vpp)
+fuse_node_vn(struct fuse_node *fnp, struct vnode **vpp)
 {
 	struct mount *mp = fnp->fmp->mp;
 	struct vnode *vp;
+	struct vnode *newvp;
 	int error;
+
+	newvp = NULL;
 retry:
+	error = 0;
+	if (fnp->vp == NULL && newvp == NULL) {
+		error = getnewvnode(VT_FUSE, mp, &newvp,
+				    VLKTIMEOUT, LK_CANRECURSE);
+		if (error)
+			return error;
+	}
+
 	mtx_lock(&fnp->node_lock);
+
+	/*
+	 * Check case where vp is already assigned
+	 */
 	vp = fnp->vp;
 	if (vp) {
 		vhold(vp);
 		mtx_unlock(&fnp->node_lock);
+		error = vget(vp, LK_EXCLUSIVE | LK_RETRY);
+		vdrop(vp);
 
-		error = vget(vp, flags | LK_RETRY);
-		if (error) {
-			vdrop(vp);
+		if (error)
+			goto retry;
+		if (fnp->vp != vp) {
+			vput(vp);
 			goto retry;
 		}
-		vdrop(vp);
+
 		*vpp = vp;
+
+		if (newvp) {
+			newvp->v_type = VBAD;
+			vx_put(newvp);
+		}
+
 		return 0;
 	}
-	mtx_unlock(&fnp->node_lock);
 
-	error = getnewvnode(VT_FUSE, mp, &vp, VLKTIMEOUT, LK_CANRECURSE);
-	if (error)
-		return error;
+	/*
+	 * Assign new vp, release the node lock
+	 */
+	if (newvp == NULL) {
+		mtx_unlock(&fnp->node_lock);
+		goto retry;
+	}
+
+	fnp->vp = newvp;
+	mtx_unlock(&fnp->node_lock);
+	vp = newvp;
+
+	/*
+	 * Finish setting up vp (vp is held exclusively + vx)
+	 */
 	vp->v_type = fnp->type;
 	vp->v_data = fnp;
 
@@ -308,13 +211,11 @@ retry:
 		KKASSERT(0);
 	}
 
-	vx_downgrade(vp);
-	KKASSERT(vn_islocked(vp) == LK_EXCLUSIVE);
-	KASSERT(!fnp->vp, ("lost race"));
-	fnp->vp = vp;
+	vx_downgrade(vp);	/* VX to normal, is still exclusive */
+
 	*vpp = vp;
 
-	return 0;
+	return error;
 }
 
 int
@@ -342,15 +243,10 @@ fuse_node_init(void)
 	fuse_node_objcache = objcache_create("fuse_node", 0, 0,
 	    NULL, NULL, NULL,
 	    objcache_malloc_alloc_zero, objcache_malloc_free, &fuse_node_args);
-
-	fuse_dent_objcache = objcache_create("fuse_dent", 0, 0,
-	    NULL, NULL, NULL,
-	    objcache_malloc_alloc_zero, objcache_malloc_free, &fuse_dent_args);
 }
 
 void
 fuse_node_cleanup(void)
 {
 	objcache_destroy(fuse_node_objcache);
-	objcache_destroy(fuse_dent_objcache);
 }

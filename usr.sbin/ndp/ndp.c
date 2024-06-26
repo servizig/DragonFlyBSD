@@ -923,9 +923,9 @@ ifinfo(int argc, char **argv)
 	bzero(&nd, sizeof(nd));
 	strcpy(nd.ifname, ifname);
 	if (ioctl(s, SIOCGIFINFO_IN6, (caddr_t)&nd) < 0) {
- 		perror("ioctl (SIOCGIFINFO_IN6)");
- 		exit(1);
- 	}
+		perror("ioctl (SIOCGIFINFO_IN6)");
+		exit(1);
+	}
 #define ND nd.ndi
 	newflags = ND.flags;
 	for (i = 1; i < argc; i++) {
@@ -949,6 +949,9 @@ ifinfo(int argc, char **argv)
 		SETFLAG("nud", ND6_IFF_PERFORMNUD);
 #ifdef ND6_IFF_ACCEPT_RTADV
 		SETFLAG("accept_rtadv", ND6_IFF_ACCEPT_RTADV);
+#endif
+#ifdef ND6_IFF_AUTO_LINKLOCAL
+		SETFLAG("auto_linklocal", ND6_IFF_AUTO_LINKLOCAL);
 #endif
 		ND.flags = newflags;
 		if (ioctl(s, SIOCSIFINFO_FLAGS, (caddr_t)&nd) < 0) {
@@ -998,10 +1001,14 @@ ifinfo(int argc, char **argv)
 		if ((ND.flags & ND6_IFF_ACCEPT_RTADV))
 			printf("accept_rtadv ");
 #endif
+#ifdef ND6_IFF_AUTO_LINKLOCAL
+		if ((ND.flags & ND6_IFF_AUTO_LINKLOCAL))
+			printf("auto_linklocal ");
+#endif
 	}
 	putc('\n', stdout);
 #undef ND
-	
+
 	close(s);
 }
 
@@ -1041,7 +1048,7 @@ rtrlist(void)
 		    p->rtaddr.sin6_len, host_buf, sizeof(host_buf), NULL, 0,
 		    NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0)) != 0)
 			strlcpy(host_buf, "?", sizeof(host_buf));
-		
+
 		printf("%s if=%s", host_buf,
 		       if_indextoname(p->if_index, ifix_buf));
 		printf(", flags=%s%s",
@@ -1049,7 +1056,7 @@ rtrlist(void)
 		       p->flags & ND_RA_FLAG_OTHER   ? "O" : "");
 		rtpref = ((p->flags & ND_RA_FLAG_RTPREF_MASK) >> 3) & 0xff;
 		printf(", pref=%s", rtpref_str[rtpref]);
-		
+
 		gettimeofday(&time, 0);
 		if (p->expire == 0)
 			printf(", expire=Never\n");
@@ -1084,7 +1091,7 @@ rtrlist(void)
 		getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len, host_buf,
 			    sizeof(host_buf), NULL, 0,
 			    NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0));
-		
+
 		printf("%s if=%s", host_buf,
 		       if_indextoname(DR.if_index, ifix_buf));
 		printf(", flags=%s%s",

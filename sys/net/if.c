@@ -117,7 +117,6 @@ static int	ifconf(u_long, caddr_t, struct ucred *);
 static void	ifinit(void *);
 static void	ifnetinit(void *);
 static void	if_slowtimo(void *);
-static void	link_rtrequest(int, struct rtentry *);
 static int	if_rtdel(struct radix_node *, void *);
 static void	if_slowtimo_dispatch(netmsg_t);
 
@@ -561,7 +560,6 @@ if_attach(struct ifnet *ifp, lwkt_serialize_t serializer)
 	sdl->sdl_type = ifp->if_type;
 	ifp->if_lladdr = ifa;
 	ifa->ifa_ifp = ifp;
-	ifa->ifa_rtrequest = link_rtrequest;
 	ifa->ifa_addr = (struct sockaddr *)sdl;
 	sdl = (struct sockaddr_dl *)(socksize + (caddr_t)sdl);
 	ifa->ifa_netmask = (struct sockaddr *)sdl;
@@ -1356,6 +1354,81 @@ failed:
 	return error;
 }
 
+static int
+ifa_maintain_loopback_route(int cmd, struct ifaddr *ifa, struct sockaddr *ia)
+{
+	struct sockaddr_dl null_sdl;
+	struct rt_addrinfo info;
+	struct ifaddr *rti_ifa;
+	struct ifnet *ifp;
+	int error;
+
+	/* RTM_CHANGE is unsupported in rtrequest1() yet. */
+	KKASSERT(cmd == RTM_DELETE || cmd == RTM_ADD);
+
+	rti_ifa = NULL;
+	ifp = ifa->ifa_ifp;
+
+	bzero(&null_sdl, sizeof(null_sdl));
+	null_sdl.sdl_len = sizeof(null_sdl);
+	null_sdl.sdl_family = AF_LINK;
+	null_sdl.sdl_index = ifp->if_index;
+	null_sdl.sdl_type = ifp->if_type;
+
+	bzero(&info, sizeof(info));
+	if (cmd != RTM_DELETE)
+		info.rti_ifp = loif;
+	if (cmd == RTM_ADD) {
+		/*
+		 * Explicitly specify the loopback IFA.
+		 */
+		rti_ifa = ifaof_ifpforaddr(ifa->ifa_addr, info.rti_ifp);
+		if (rti_ifa != NULL) {
+			/*
+			 * The loopback IFA wouldn't disappear, but ref it
+			 * for safety.
+			 */
+			IFAREF(rti_ifa);
+			info.rti_ifa = rti_ifa;
+		}
+	}
+	info.rti_info[RTAX_DST] = ia;
+	info.rti_info[RTAX_GATEWAY] = (struct sockaddr *)&null_sdl;
+	/*
+	 * Manually set RTF_LOCAL so that the IFA and IFP wouldn't be
+	 * overrided to be the owner of the destination address (ia)
+	 * by in_addroute().
+	 */
+	info.rti_flags = ifa->ifa_flags | RTF_HOST | RTF_LOCAL;
+
+	error = rtrequest1_global(cmd, &info, NULL, NULL, RTREQ_PRIO_NORM);
+
+	if (rti_ifa != NULL)
+		IFAFREE(rti_ifa);
+
+	if (error == 0 ||
+	    (cmd == RTM_ADD && error == EEXIST) ||
+	    (cmd == RTM_DELETE && (error == ESRCH || error == ENOENT)))
+		return (error);
+
+	log(LOG_DEBUG, "%s: %s failed for interface %s: %d\n",
+	    __func__, (cmd == RTM_ADD ? "insertion" : "deletion"),
+	    ifp->if_xname, error);
+	return (error);
+}
+
+int
+ifa_add_loopback_route(struct ifaddr *ifa, struct sockaddr *ia)
+{
+	return ifa_maintain_loopback_route(RTM_ADD, ifa, ia);
+}
+
+int
+ifa_del_loopback_route(struct ifaddr *ifa, struct sockaddr *ia)
+{
+	return ifa_maintain_loopback_route(RTM_DELETE, ifa, ia);
+}
+
 /*
  * Delete Routes for a Network Interface
  *
@@ -1399,18 +1472,39 @@ if_rtdel(struct radix_node *rn, void *arg)
 }
 
 static __inline boolean_t
+ifa_match_withmask(const struct ifaddr *ifa, const struct sockaddr *addr)
+{
+	const char *cp, *cp2, *cp3, *cplim;
+
+	KKASSERT(ifa->ifa_addr->sa_family == addr->sa_family);
+
+	cp = addr->sa_data;
+	cp2 = ifa->ifa_addr->sa_data;
+	cp3 = ifa->ifa_netmask->sa_data;
+	cplim = (const char *)ifa->ifa_netmask + ifa->ifa_netmask->sa_len;
+
+	while (cp3 < cplim) {
+		if ((*cp++ ^ *cp2++) & *cp3++)
+			return (FALSE);
+	}
+
+	return (TRUE);
+}
+
+static __inline boolean_t
 ifa_prefer(const struct ifaddr *cur_ifa, const struct ifaddr *old_ifa)
 {
 	if (old_ifa == NULL)
-		return TRUE;
+		return (TRUE);
 
 	if ((old_ifa->ifa_ifp->if_flags & IFF_UP) == 0 &&
 	    (cur_ifa->ifa_ifp->if_flags & IFF_UP))
-		return TRUE;
+		return (TRUE);
 	if ((old_ifa->ifa_flags & IFA_ROUTE) == 0 &&
 	    (cur_ifa->ifa_flags & IFA_ROUTE))
-		return TRUE;
-	return FALSE;
+		return (TRUE);
+
+	return (FALSE);
 }
 
 /*
@@ -1446,7 +1540,7 @@ ifa_ifwithaddr(struct sockaddr *addr)
 }
 
 /*
- * Locate the point to point interface with a given destination address.
+ * Locate the point-to-point interface with a given destination address.
  */
 struct ifaddr *
 ifa_ifwithdstaddr(struct sockaddr *addr)
@@ -1484,7 +1578,6 @@ ifa_ifwithnet(struct sockaddr *addr)
 {
 	struct ifaddr *ifa_maybe = NULL;
 	u_int af = addr->sa_family;
-	char *addr_data = addr->sa_data, *cplim;
 	const struct ifnet_array *arr;
 	int i;
 
@@ -1510,10 +1603,9 @@ ifa_ifwithnet(struct sockaddr *addr)
 
 		TAILQ_FOREACH(ifac, &ifp->if_addrheads[mycpuid], ifa_link) {
 			struct ifaddr *ifa = ifac->ifa;
-			char *cp, *cp2, *cp3;
 
 			if (ifa->ifa_addr->sa_family != af)
-next:				continue;
+				continue;
 			if (af == AF_INET && ifp->if_flags & IFF_POINTOPOINT) {
 				/*
 				 * This is a bit broken as it doesn't
@@ -1528,7 +1620,7 @@ next:				continue;
 					return (ifa);
 			} else {
 				/*
-				 * if we have a special address handler,
+				 * If we have a special address handler,
 				 * then use it instead of the generic one.
 				 */
 				if (ifa->ifa_claim_addr) {
@@ -1539,23 +1631,10 @@ next:				continue;
 					}
 				}
 
-				/*
-				 * Scan all the bits in the ifa's address.
-				 * If a bit dissagrees with what we are
-				 * looking for, mask it with the netmask
-				 * to see if it really matters.
-				 * (A byte at a time)
-				 */
-				if (ifa->ifa_netmask == 0)
+				if (ifa->ifa_netmask == NULL ||
+				    !ifa_match_withmask(ifa, addr))
 					continue;
-				cp = addr_data;
-				cp2 = ifa->ifa_addr->sa_data;
-				cp3 = ifa->ifa_netmask->sa_data;
-				cplim = ifa->ifa_netmask->sa_len +
-					(char *)ifa->ifa_netmask;
-				while (cp3 < cplim)
-					if ((*cp++ ^ *cp2++) & *cp3++)
-						goto next; /* next address! */
+
 				/*
 				 * If the netmask of what we just found
 				 * is more specific than what we had before
@@ -1575,6 +1654,7 @@ next:				continue;
 			}
 		}
 	}
+
 	return (ifa_maybe);
 }
 
@@ -1586,13 +1666,12 @@ struct ifaddr *
 ifaof_ifpforaddr(struct sockaddr *addr, struct ifnet *ifp)
 {
 	struct ifaddr_container *ifac;
-	char *cp, *cp2, *cp3;
-	char *cplim;
 	struct ifaddr *ifa_maybe = NULL;
 	u_int af = addr->sa_family;
 
 	if (af >= AF_MAX)
-		return (0);
+		return (NULL);
+
 	TAILQ_FOREACH(ifac, &ifp->if_addrheads[mycpuid], ifa_link) {
 		struct ifaddr *ifa = ifac->ifa;
 
@@ -1611,43 +1690,12 @@ ifaof_ifpforaddr(struct sockaddr *addr, struct ifnet *ifp)
 			if (sa_equal(addr, ifa->ifa_dstaddr))
 				return (ifa);
 		} else {
-			cp = addr->sa_data;
-			cp2 = ifa->ifa_addr->sa_data;
-			cp3 = ifa->ifa_netmask->sa_data;
-			cplim = ifa->ifa_netmask->sa_len + (char *)ifa->ifa_netmask;
-			for (; cp3 < cplim; cp3++)
-				if ((*cp++ ^ *cp2++) & *cp3)
-					break;
-			if (cp3 == cplim)
+			if (ifa_match_withmask(ifa, addr))
 				return (ifa);
 		}
 	}
+
 	return (ifa_maybe);
-}
-
-/*
- * Default action when installing a route with a Link Level gateway.
- * Lookup an appropriate real ifa to point to.
- * This should be moved to /sys/net/link.c eventually.
- */
-static void
-link_rtrequest(int cmd, struct rtentry *rt)
-{
-	struct ifaddr *ifa;
-	struct sockaddr *dst;
-	struct ifnet *ifp;
-
-	if (cmd != RTM_ADD || (ifa = rt->rt_ifa) == NULL ||
-	    (ifp = ifa->ifa_ifp) == NULL || (dst = rt_key(rt)) == NULL)
-		return;
-	ifa = ifaof_ifpforaddr(dst, ifp);
-	if (ifa != NULL) {
-		IFAFREE(rt->rt_ifa);
-		IFAREF(ifa);
-		rt->rt_ifa = ifa;
-		if (ifa->ifa_rtrequest && ifa->ifa_rtrequest != link_rtrequest)
-			ifa->ifa_rtrequest(cmd, rt);
-	}
 }
 
 struct netmsg_if {
@@ -2863,6 +2911,43 @@ if_setlladdr(struct ifnet *ifp, const u_char *lladdr, int len)
 #endif
 	}
 	ifnet_deserialize_all(ifp);
+	return (0);
+}
+
+
+/*
+ * Tunnel interfaces can nest, also they may cause infinite recursion
+ * calls when misconfigured.  Introduce an upper limit to prevent infinite
+ * recursions, as well as to constrain the nesting depth.
+ *
+ * Return 0, if tunnel nesting count is equal or less than limit.
+ */
+int
+if_tunnel_check_nesting(struct ifnet *ifp, struct mbuf *m, uint32_t cookie,
+			int limit)
+{
+	struct m_tag *mtag;
+	int count;
+
+	count = 1;
+	mtag = m_tag_locate(m, cookie, 0 /* type */, NULL);
+	if (mtag != NULL)
+		count += *(int *)(mtag + 1);
+	if (count > limit) {
+		log(LOG_NOTICE,
+		    "%s: packet looped too many times (%d), limit %d\n",
+		    ifp->if_xname, count, limit);
+		return (ELOOP);
+	}
+
+	if (mtag == NULL) {
+		mtag = m_tag_alloc(cookie, 0, sizeof(int), M_NOWAIT);
+		if (mtag == NULL)
+			return (ENOMEM);
+		m_tag_prepend(m, mtag);
+	}
+
+	*(int *)(mtag + 1) = count;
 	return (0);
 }
 

@@ -62,6 +62,7 @@
 #include <netinet/in.h>
 #include <netinet/if_ether.h>
 #include <netinet6/in6_var.h>
+#include <netinet6/in6_ifattach.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
@@ -191,8 +192,7 @@ nd6_ifattach(struct ifnet *ifp)
 {
 	struct nd_ifinfo *nd;
 
-	nd = (struct nd_ifinfo *)kmalloc(sizeof(*nd), M_IP6NDP,
-	    M_WAITOK | M_ZERO);
+	nd = kmalloc(sizeof(*nd), M_IP6NDP, M_WAITOK | M_ZERO);
 
 	nd->initialized = 1;
 
@@ -201,15 +201,17 @@ nd6_ifattach(struct ifnet *ifp)
 	nd->reachable = ND_COMPUTE_RTIME(nd->basereachable);
 	nd->retrans = RETRANS_TIMER;
 
-	/*
-	 * Note that the default value of ip6_accept_rtadv is 0, which means
-	 * we won't accept RAs by default even if we set ND6_IFF_ACCEPT_RTADV
-	 * here.
-	 */
-	nd->flags = (ND6_IFF_PERFORMNUD | ND6_IFF_ACCEPT_RTADV);
+	nd->flags = ND6_IFF_PERFORMNUD;
+	/* A loopback interface always has link-local address. */
+	if (ip6_auto_linklocal || (ifp->if_flags & IFF_LOOPBACK))
+		nd->flags |= ND6_IFF_AUTO_LINKLOCAL;
+	/* A loopback interface does not need to accept RAs. */
+	if (ip6_accept_rtadv && !(ifp->if_flags & IFF_LOOPBACK))
+		nd->flags |= ND6_IFF_ACCEPT_RTADV;
 
 	/* XXX: we cannot call nd6_setmtu since ifp is not fully initialized */
 	nd6_setmtu0(ifp, nd);
+
 	return nd;
 }
 
@@ -822,7 +824,8 @@ nd6_purge(struct ifnet *ifp)
 	if (nd6_defifindex == ifp->if_index)
 		nd6_setdefaultiface(0);
 
-	if (!ip6_forwarding && ip6_accept_rtadv) { /* XXX: too restrictive? */
+	if (!ip6_forwarding &&
+	    (ND_IFINFO(ifp)->flags & ND6_IFF_ACCEPT_RTADV)) {
 		/* refresh default router list */
 		bzero(&drany, sizeof(drany));
 		defrouter_delreq(&drany, 0);
@@ -1037,7 +1040,9 @@ nd6_free(struct rtentry *rt)
 	 * even though it is not harmful, it was not really necessary.
 	 */
 
-	if (!ip6_forwarding && ip6_accept_rtadv) { /* XXX: too restrictive? */
+	/* XXX: this condition too restrictive? */
+	if (!ip6_forwarding &&
+	    (ND_IFINFO(rt->rt_ifp)->flags & ND6_IFF_ACCEPT_RTADV)) {
 		mtx_lock(&nd6_mtx);
 		dr = defrouter_lookup(
 		    &((struct sockaddr_in6 *)rt_key(rt))->sin6_addr,
@@ -1419,7 +1424,7 @@ nd6_rtrequest(int req, struct rtentry *rt)
 }
 
 int
-nd6_ioctl(u_long cmd, caddr_t	data, struct ifnet *ifp)
+nd6_ioctl(u_long cmd, caddr_t data, struct ifnet *ifp)
 {
 	struct in6_drlist *drl = (struct in6_drlist *)data;
 	struct in6_prlist *prl = (struct in6_prlist *)data;
@@ -1558,6 +1563,12 @@ nd6_ioctl(u_long cmd, caddr_t	data, struct ifnet *ifp)
 			ND_IFINFO(ifp)->chlim = ndi->ndi.chlim;
 		/* FALLTHROUGH */
 	case SIOCSIFINFO_FLAGS:
+		if ((ndi->ndi.flags & ND6_IFF_AUTO_LINKLOCAL) &&
+		    !(ND_IFINFO(ifp)->flags & ND6_IFF_AUTO_LINKLOCAL)) {
+			/* auto_linklocal 0->1 transision */
+			ND_IFINFO(ifp)->flags |= ND6_IFF_AUTO_LINKLOCAL;
+			in6_ifattach(ifp, NULL);
+		}
 		ND_IFINFO(ifp)->flags = ndi->ndi.flags;
 		break;
 	case SIOCSNDFLUSH_IN6:	/* XXX: the ioctl name is confusing... */
@@ -1891,7 +1902,8 @@ fail:
 	 * for those are not autoconfigured hosts, we explicitly avoid such
 	 * cases for safety.
 	 */
-	if (do_update && ln->ln_router && !ip6_forwarding && ip6_accept_rtadv)
+	if (do_update && ln->ln_router && !ip6_forwarding &&
+	    (ND_IFINFO(ifp)->flags & ND6_IFF_ACCEPT_RTADV))
 		defrouter_select();
 
 	return rt;

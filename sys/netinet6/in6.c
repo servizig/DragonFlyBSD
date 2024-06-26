@@ -1161,9 +1161,8 @@ in6_update_ifa(struct ifnet *ifp, struct in6_aliasreq *ifra,
 		/*
 		 * join node information group address
 		 */
-#define hostnamelen	strlen(hostname)
-		if (in6_nigroup(ifp, hostname, hostnamelen, &mltaddr.sin6_addr)
-		    == 0) {
+		if (in6_nigroup(ifp, hostname, strlen(hostname),
+				&mltaddr.sin6_addr) == 0) {
 			in6m = IN6_LOOKUP_MULTI(&mltaddr.sin6_addr, ifp);
 			if (in6m == NULL && ia != NULL) {
 				in6_addmulti(&mltaddr.sin6_addr, ifp, &error);
@@ -1176,7 +1175,6 @@ in6_update_ifa(struct ifnet *ifp, struct in6_aliasreq *ifra,
 				}
 			}
 		}
-#undef hostnamelen
 
 		/*
 		 * join node-local all-nodes address, on loopback.
@@ -1619,7 +1617,7 @@ in6_lifaddr_ioctl(u_long cmd, caddr_t data, struct ifnet *ifp,
 }
 
 /*
- * Initialize an interface's intetnet6 address
+ * Initialize an interface's internet6 address
  * and routing table entry.
  */
 static int
@@ -2424,10 +2422,7 @@ in6_if_up_dispatch(netmsg_t nmsg)
 
 	ASSERT_NETISR0;
 
-	/*
-	 * special cases, like 6to4, are handled in in6_ifattach
-	 */
-	in6_ifattach(ifp, NULL);
+	in6_ifattach(ifp, NULL); /* will handle special cases */
 
 	dad_delay = 0;
 	TAILQ_FOREACH(ifac, &ifp->if_addrheads[mycpuid], ifa_link) {
@@ -2464,28 +2459,25 @@ in6if_do_dad(struct ifnet *ifp)
 {
 	if (ifp->if_flags & IFF_LOOPBACK)
 		return (0);
-
-	switch (ifp->if_type) {
-#ifdef IFT_DUMMY
-	case IFT_DUMMY:
+	if (!(ifp->if_flags & IFF_MULTICAST))
 		return (0);
-#endif
-	default:
-		/*
-		 * Our DAD routine requires the interface up and running.
-		 * However, some interfaces can be up before the RUNNING
-		 * status.  Additionaly, users may try to assign addresses
-		 * before the interface becomes up (or running).
-		 * We simply skip DAD in such a case as a work around.
-		 * XXX: we should rather mark "tentative" on such addresses,
-		 * and do DAD after the interface becomes ready.
-		 */
-		if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) !=
-		    (IFF_UP|IFF_RUNNING))
-			return (0);
 
-		return (1);
-	}
+	/*
+	 * Our DAD routine requires the interface up and running.
+	 * However, some interfaces can be up before the RUNNING
+	 * status.  Additionally, users may try to assign addresses
+	 * before the interface becomes up (or running).
+	 * We simply skip DAD in such a case as a workaround.
+	 * XXX: we should rather mark "tentative" on such addresses,
+	 * and do DAD after the interface becomes ready.
+	 */
+	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
+		return (0);
+
+	if (ND_IFINFO(ifp)->flags & ND6_IFF_NO_DAD)
+		return (0);
+
+	return (1);
 }
 
 /*

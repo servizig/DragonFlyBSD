@@ -85,7 +85,7 @@
 #define	FLOOD_BACKOFF	20000		/* usecs to back off if F_FLOOD mode */
 					/* runs out of buffer space */
 #define	MAXIPLEN	(sizeof(struct ip) + MAX_IPOPTLEN)
-#define	MAXICMPLEN	(ICMP_ADVLENMIN + MAX_IPOPTLEN)
+#define	MAXPAYLOAD	(IP_MAXPACKET - MAXIPLEN - ICMP_MINLEN)
 #define	MAXWAIT		10000		/* max ms to wait for response */
 #define	MAXALARM	(60 * 60)	/* max seconds for alarm timeout */
 #define	MAXTOS		255
@@ -164,7 +164,7 @@ long sntransmitted;		/* # of packets we sent in this sweep */
 int sweepmax;			/* max value of payload in sweep */
 int sweepmin = 0;		/* start value of payload in sweep */
 int sweepincr = 1;		/* payload increment in sweep */
-int interval = 1000;		/* interval between packets, ms */
+long interval = 1000000;	/* interval between packets, usec */
 int waittime = MAXWAIT;		/* timeout for each packet */
 long nrcvtimeout = 0;		/* # of packets we got back after waittime */
 
@@ -317,13 +317,14 @@ main(int argc, char **argv)
 			options |= F_MIF;
 			break;
 		case 'i':		/* wait between sending packets */
-			t = strtod(optarg, &ep) * 1000.0;
-			if (*ep || ep == optarg || t > (double)INT_MAX)
+			t = strtod(optarg, &ep) * 1000000.0; /* sec -> usec */
+			if (*ep || ep == optarg ||
+			    t > (double)LONG_MAX || t <= 0)
 				errx(EX_USAGE, "invalid timing interval: `%s'",
 				    optarg);
 			options |= F_INTERVAL;
-			interval = (int)t;
-			if (uid && interval < 1000) {
+			interval = (long)t;
+			if (uid != 0 && interval < 2000 /* 2 ms */) {
 				errno = EPERM;
 				err(EX_NOPERM, "-i interval too short");
 			}
@@ -337,14 +338,14 @@ main(int argc, char **argv)
 			if (*ep || ep == optarg || ultmp > INT_MAX)
 				errx(EX_USAGE,
 				    "invalid preload value: `%s'", optarg);
-			if (uid) {
+			if (uid != 0) {
 				errno = EPERM;
 				err(EX_NOPERM, "-l flag");
 			}
 			preload = ultmp;
 			break;
 		case 'M':
-			switch(optarg[0]) {
+			switch (optarg[0]) {
 			case 'M':
 			case 'm':
 				options |= F_MASK;
@@ -395,12 +396,10 @@ main(int argc, char **argv)
 			if (*ep || ep == optarg)
 				errx(EX_USAGE, "invalid packet size: `%s'",
 				    optarg);
-			if (uid != 0 && ultmp > DEFDATALEN) {
-				errno = EPERM;
-				err(EX_NOPERM,
-				    "packet size too large: %lu > %u",
-				    ultmp, DEFDATALEN);
-			}
+			if (ultmp > MAXPAYLOAD)
+				errx(EX_USAGE,
+				    "packet size too large: %lu > %lu",
+				    ultmp, MAXPAYLOAD);
 			datalen = ultmp;
 			break;
 		case 'T':		/* multicast TTL */
@@ -426,8 +425,9 @@ main(int argc, char **argv)
 			break;
 		case 'W':		/* wait ms for answer */
 			t = strtod(optarg, &ep);
-			if (*ep || ep == optarg || t > (double)INT_MAX)
-				errx(EX_USAGE, "invalid timing interval: `%s'",
+			if (*ep || ep == optarg ||
+			    t > (double)INT_MAX || t <= 0)
+				errx(EX_USAGE, "invalid wait timeout: `%s'",
 				    optarg);
 			options |= F_WAITTIME;
 			waittime = (int)t;
@@ -641,7 +641,7 @@ main(int argc, char **argv)
 		datalen = sweepmin;
 		send_len = icmp_len + sweepmin;
 	}
-	if (options & F_SWEEP && !sweepmax) 
+	if (options & F_SWEEP && !sweepmax)
 		errx(EX_USAGE, "Maximum sweep size must be specified");
 
 	/*
@@ -671,9 +671,9 @@ main(int argc, char **argv)
 		if (sweepmax)
 			printf(": (%d ... %d) data bytes\n",
 			    sweepmin, sweepmax);
-		else 
+		else
 			printf(": %d data bytes\n", datalen);
-		
+
 	} else {
 		if (sweepmax)
 			printf("PING %s: (%d ... %d) data bytes\n",
@@ -730,8 +730,8 @@ main(int argc, char **argv)
 		intvl.tv_sec = 0;
 		intvl.tv_usec = 10000;
 	} else {
-		intvl.tv_sec = interval / 1000;
-		intvl.tv_usec = interval % 1000 * 1000;
+		intvl.tv_sec = interval / 1000000;
+		intvl.tv_usec = interval % 1000000;
 	}
 
 	almost_done = 0;
@@ -795,14 +795,14 @@ main(int argc, char **argv)
 		}
 		if (n == 0 || options & F_FLOOD) {
 			if (sweepmax && sntransmitted == snpackets) {
-				for (i = 0; i < sweepincr ; ++i) 
+				for (i = 0; i < sweepincr ; ++i)
 					*datap++ = i;
 				datalen += sweepincr;
 				if (datalen > sweepmax)
 					break;
 				send_len = icmp_len + datalen;
 				sntransmitted = 0;
-			} 
+			}
 			if (!npackets || ntransmitted < npackets)
 				pinger();
 			else {
@@ -1006,7 +1006,7 @@ pr_pack(char *buf, int cc, struct sockaddr_in *from, struct timeval *tv)
 
 		if (options & F_QUIET)
 			return;
-	
+
 		if (options & F_WAITTIME && triptime > waittime) {
 			++nrcvtimeout;
 			return;

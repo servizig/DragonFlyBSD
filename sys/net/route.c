@@ -492,8 +492,8 @@ rtredirect_msghandler(netmsg_t msg)
 }
 
 /*
-* Routing table ioctl interface.
-*/
+ * Routing table ioctl interface.
+ */
 int
 rtioctl(u_long req, caddr_t data, struct ucred *cred)
 {
@@ -528,7 +528,7 @@ ifa_ifwithroute(int flags, struct sockaddr *dst, struct sockaddr *gateway)
 		/*
 		 * If we are adding a route to a remote net
 		 * or host, the gateway may still be on the
-		 * other end of a pt to pt link.
+		 * other end of a point-to-point link.
 		 */
 		ifa = ifa_ifwithdstaddr(gateway);
 	}
@@ -564,6 +564,10 @@ struct rtfc_arg {
 
 /*
  * Set rtinfo->rti_ifa and rtinfo->rti_ifp.
+ *
+ * Assume that the caller did basic checks to ensure:
+ * - RTAX_DST exists
+ * - RTAX_GATEWAY exists if RTF_GATEWAY is set
  */
 int
 rt_getifa(struct rt_addrinfo *rtinfo)
@@ -580,6 +584,10 @@ rt_getifa(struct rt_addrinfo *rtinfo)
 	if (rtinfo->rti_ifp == NULL) {
 		struct sockaddr *ifpaddr;
 
+		/*
+		 * If we have interface specified by RTAX_IFP address,
+		 * try to use it.
+		 */
 		ifpaddr = rtinfo->rti_info[RTAX_IFP];
 		if (ifpaddr != NULL && ifpaddr->sa_family == AF_LINK) {
 			struct ifaddr *ifa;
@@ -590,19 +598,55 @@ rt_getifa(struct rt_addrinfo *rtinfo)
 		}
 	}
 
+	/*
+	 * If we have source address specified, try to find it.
+	 */
 	if (rtinfo->rti_ifa == NULL && ifaaddr != NULL)
 		rtinfo->rti_ifa = ifa_ifwithaddr(ifaaddr);
 	if (rtinfo->rti_ifa == NULL) {
 		struct sockaddr *sa;
 
-		sa = ifaaddr != NULL ? ifaaddr :
-		    (gateway != NULL ? gateway : dst);
-		if (sa != NULL && rtinfo->rti_ifp != NULL)
+		/*
+		 * Most common use case for the userland-supplied routes.
+		 *
+		 * The IFA is determined by:
+		 * + If ifp is set, try the followings in order:
+		 *   1. IFA address
+		 *   2. Gateway address
+		 *      Note: For interface routes link-level gateway address
+		 *            is specified to indicate the interface index
+		 *            without specifying RTF_GATEWAY.  Ignore the
+		 *            gateway in this case.
+		 *      Note: The gateway may have different AF as the dst.
+		 *            Also ignore the gateway in this case.
+		 *   3. Final destination
+		 *   4. Try to get at least link-level IFA.
+		 *      Note: This allows to add directly-reachable interface
+		 *            prefix to an interface without any IP address.
+		 * + Else:
+		 *   Try to lookup gateway or dst in the routing table to get
+		 *   the IFA.
+		 */
+		if (ifaaddr != NULL)
+			sa = ifaaddr;
+		else if ((flags & RTF_GATEWAY) != 0 &&
+			 gateway->sa_family == dst->sa_family)
+			sa = gateway;
+		else
+			sa = dst;
+		KKASSERT(sa != NULL);
+
+		if (rtinfo->rti_ifp != NULL) {
 			rtinfo->rti_ifa = ifaof_ifpforaddr(sa, rtinfo->rti_ifp);
-		else if (dst != NULL && gateway != NULL)
+			if (rtinfo->rti_ifa == NULL &&
+			    gateway != NULL && gateway != sa)
+				rtinfo->rti_ifa =
+				    ifaof_ifpforaddr(gateway, rtinfo->rti_ifp);
+		} else if (dst != NULL && gateway != NULL) {
 			rtinfo->rti_ifa = ifa_ifwithroute(flags, dst, gateway);
-		else if (sa != NULL)
+		} else {
 			rtinfo->rti_ifa = ifa_ifwithroute(flags, sa, sa);
+		}
 	}
 	if (rtinfo->rti_ifa == NULL)
 		return (ENETUNREACH);
@@ -831,8 +875,8 @@ rtrequest1(int req, struct rt_addrinfo *rtinfo, struct rtentry **ret_nrt)
 			gotoerr(ENETDOWN);
 
 		KASSERT(rt->rt_cpuid == mycpuid,
-		    ("rt resolve rt_cpuid %d, mycpuid %d",
-		     rt->rt_cpuid, mycpuid));
+			("rt resolve rt_cpuid %d, mycpuid %d",
+			 rt->rt_cpuid, mycpuid));
 
 		ifa = rt->rt_ifa;
 		rtinfo->rti_flags =
@@ -847,20 +891,20 @@ rtrequest1(int req, struct rt_addrinfo *rtinfo, struct rtentry **ret_nrt)
 		goto makeroute;
 
 	case RTM_ADD:
-		KASSERT(!(rtinfo->rti_flags & RTF_GATEWAY) ||
-			rtinfo->rti_info[RTAX_GATEWAY] != NULL,
-		    ("rtrequest: GATEWAY but no gateway"));
+		KASSERT((!(rtinfo->rti_flags & RTF_GATEWAY) ||
+			 rtinfo->rti_info[RTAX_GATEWAY] != NULL),
+			("rtrequest: GATEWAY but no gateway"));
 
-		if (rtinfo->rti_ifa == NULL && (error = rt_getifa(rtinfo)))
+		if (rtinfo->rti_ifa == NULL &&
+		    (error = rt_getifa(rtinfo)) != 0)
 			gotoerr(error);
 		ifa = rtinfo->rti_ifa;
 makeroute:
 		R_Malloc(rt, struct rtentry *, sizeof(struct rtentry));
 		if (rt == NULL) {
-			if (req == RTM_ADD) {
-				kprintf("rtrequest1: alloc rtentry failed on "
-				    "cpu%d\n", mycpuid);
-			}
+			if (req == RTM_ADD)
+				kprintf("%s: alloc rtentry failed on cpu%d\n",
+					__func__, mycpuid);
 			gotoerr(ENOBUFS);
 		}
 		bzero(rt, sizeof(struct rtentry));
@@ -886,7 +930,7 @@ makeroute:
 		/*
 		 * Note that we now have a reference to the ifa.
 		 * This moved from below so that rnh->rnh_addaddr() can
-		 * examine the ifa and  ifa->ifa_ifp if it so desires.
+		 * examine the ifa and ifa->ifa_ifp if it so desires.
 		 */
 		IFAREF(ifa);
 		rt->rt_ifa = ifa;
@@ -1352,17 +1396,17 @@ rt_setshims(struct rtentry *rt, struct sockaddr **rt_shim){
  * Print out a route table entry
  */
 void
-rt_print(struct rt_addrinfo *rtinfo, struct rtentry *rn)
+rt_print(struct rt_addrinfo *rtinfo, struct rtentry *rt)
 {
 	kprintf("rti %p cpu %d route %p flags %08lx: ",
-		rtinfo, mycpuid, rn, rn->rt_flags);
-	sockaddr_print(rt_key(rn));
+		rtinfo, mycpuid, rt, rt->rt_flags);
+	sockaddr_print(rt_key(rt));
 	kprintf(" mask ");
-	sockaddr_print(rt_mask(rn));
+	sockaddr_print(rt_mask(rt));
 	kprintf(" gw ");
-	sockaddr_print(rn->rt_gateway);
-	kprintf(" ifc \"%s\"", rn->rt_ifp ? rn->rt_ifp->if_dname : "?");
-	kprintf(" ifa %p\n", rn->rt_ifa);
+	sockaddr_print(rt->rt_gateway);
+	kprintf(" ifp \"%s\"", rt->rt_ifp ? rt->rt_ifp->if_xname : "?");
+	kprintf(" ifa %p\n", rt->rt_ifa);
 }
 
 void
@@ -1390,13 +1434,13 @@ rt_addrinfo_print(int cmd, struct rt_addrinfo *rti)
 		kprintf("C%02d ", cmd);
 		break;
 	}
-	kprintf("rti %p cpu %d ", rti, mycpuid);
-	for (i = 0; i < rti->rti_addrs; ++i) {
+	kprintf("rti %p cpu %d flags %08x ", rti, mycpuid, rti->rti_flags);
+	for (i = 0; i < RTAX_MAX; ++i) {
 		if (rti->rti_info[i] == NULL)
 			continue;
 		if (didit)
-			kprintf(" ,");
-		switch(i) {
+			kprintf(", ");
+		switch (i) {
 		case RTAX_DST:
 			kprintf("(DST ");
 			break;
@@ -1429,7 +1473,8 @@ rt_addrinfo_print(int cmd, struct rt_addrinfo *rti)
 		kprintf(")");
 		didit = 1;
 	}
-	kprintf("\n");
+	kprintf(" ifp \"%s\"", rti->rti_ifp ? rti->rti_ifp->if_xname : "?");
+	kprintf(" ifa %p\n", rti->rti_ifa);
 }
 
 void
@@ -1445,49 +1490,42 @@ sockaddr_print(const struct sockaddr *sa)
 		return;
 	}
 
-	len = sa->sa_len - offsetof(struct sockaddr, sa_data[0]);
-
-	switch(sa->sa_family) {
+	switch (sa->sa_family) {
 	case AF_INET:
+		sa4 = (const struct sockaddr_in *)sa;
+		kprintf("INET %d %d.%d.%d.%d",
+			ntohs(sa4->sin_port),
+			(ntohl(sa4->sin_addr.s_addr) >> 24) & 255,
+			(ntohl(sa4->sin_addr.s_addr) >> 16) & 255,
+			(ntohl(sa4->sin_addr.s_addr) >> 8) & 255,
+			(ntohl(sa4->sin_addr.s_addr) >> 0) & 255
+		);
+		break;
 	case AF_INET6:
+		sa6 = (const struct sockaddr_in6 *)sa;
+		kprintf("INET6 %d %04x:%04x%04x:%04x:%04x:%04x:%04x:%04x",
+			ntohs(sa6->sin6_port),
+			ntohs(sa6->sin6_addr.s6_addr16[0]),
+			ntohs(sa6->sin6_addr.s6_addr16[1]),
+			ntohs(sa6->sin6_addr.s6_addr16[2]),
+			ntohs(sa6->sin6_addr.s6_addr16[3]),
+			ntohs(sa6->sin6_addr.s6_addr16[4]),
+			ntohs(sa6->sin6_addr.s6_addr16[5]),
+			ntohs(sa6->sin6_addr.s6_addr16[6]),
+			ntohs(sa6->sin6_addr.s6_addr16[7])
+		);
+		break;
 	default:
-		switch(sa->sa_family) {
-		case AF_INET:
-			sa4 = (const struct sockaddr_in *)sa;
-			kprintf("INET %d %d.%d.%d.%d",
-				ntohs(sa4->sin_port),
-				(ntohl(sa4->sin_addr.s_addr) >> 24) & 255,
-				(ntohl(sa4->sin_addr.s_addr) >> 16) & 255,
-				(ntohl(sa4->sin_addr.s_addr) >> 8) & 255,
-				(ntohl(sa4->sin_addr.s_addr) >> 0) & 255
-			);
-			break;
-		case AF_INET6:
-			sa6 = (const struct sockaddr_in6 *)sa;
-			kprintf("INET6 %d %04x:%04x%04x:%04x:%04x:%04x:%04x:%04x",
-				ntohs(sa6->sin6_port),
-				ntohs(sa6->sin6_addr.s6_addr16[0]),
-				ntohs(sa6->sin6_addr.s6_addr16[1]),
-				ntohs(sa6->sin6_addr.s6_addr16[2]),
-				ntohs(sa6->sin6_addr.s6_addr16[3]),
-				ntohs(sa6->sin6_addr.s6_addr16[4]),
-				ntohs(sa6->sin6_addr.s6_addr16[5]),
-				ntohs(sa6->sin6_addr.s6_addr16[6]),
-				ntohs(sa6->sin6_addr.s6_addr16[7])
-			);
-			break;
-		default:
-			kprintf("AF%d ", sa->sa_family);
-			while (len > 0 && sa->sa_data[len-1] == 0)
-				--len;
-
-			for (i = 0; i < len; ++i) {
-				if (i)
-					kprintf(".");
-				kprintf("%d", (unsigned char)sa->sa_data[i]);
-			}
-			break;
+		kprintf("AF%d ", sa->sa_family);
+		len = sa->sa_len - offsetof(struct sockaddr, sa_data[0]);
+		while (len > 0 && sa->sa_data[len-1] == 0)
+			--len;
+		for (i = 0; i < len; ++i) {
+			if (i)
+				kprintf(".");
+			kprintf("%d", (unsigned char)sa->sa_data[i]);
 		}
+		break;
 	}
 }
 

@@ -327,8 +327,9 @@ arp_rtrequest(int req, struct rtentry *rt)
 		if (SIN(rt_key(rt))->sin_addr.s_addr ==
 		    (IA_SIN(rt->rt_ifa))->sin_addr.s_addr) {
 			rt->rt_expire = 0;
+			SDL(gate)->sdl_alen = rt->rt_ifp->if_addrlen;
 			bcopy(IF_LLADDR(rt->rt_ifp), LLADDR(SDL(gate)),
-			      SDL(gate)->sdl_alen = rt->rt_ifp->if_addrlen);
+			      rt->rt_ifp->if_addrlen);
 			if (useloopback)
 				rt->rt_ifp = loif;
 		}
@@ -792,7 +793,7 @@ arp_update_oncpu(struct mbuf *m, in_addr_t saddr, boolean_t create,
 					    hexstr[0], HEX_NCPYLEN(ifp->if_addrlen), ":");
 					hexncpy((u_char *)ar_sha(ah), ifp->if_addrlen,
 					    hexstr[1], HEX_NCPYLEN(ifp->if_addrlen), ":");
-			    		log(LOG_INFO,
+					log(LOG_INFO,
 					    "arp: %s moved from %s to %s on %s\n",
 					    kinet_ntoa(isaddr, sbuf), hexstr[0], hexstr[1],
 					    ifp->if_xname);

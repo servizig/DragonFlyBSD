@@ -26,20 +26,23 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * @(#) Copyright (c) 1980, 1989, 1993 The Regents of the University of California.  All rights reserved.
  * @(#)umount.c	8.8 (Berkeley) 5/8/95
  * $FreeBSD: src/sbin/umount/umount.c,v 1.28 2001/10/13 02:04:54 iedowse Exp $
  */
 
 #include <sys/param.h>
+#include <sys/ioctl.h>
 #include <sys/mount.h>
 #include <sys/socket.h>
+#include <sys/vnioctl.h>
 
 #include <netdb.h>
 #include <rpc/rpc.h>
 #include <vfs/nfs/rpcv2.h>
 
 #include <err.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <fstab.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -55,13 +58,12 @@ typedef enum { MNTON, MNTFROM, NOTHING } mntwhat;
 typedef enum { MARK, UNMARK, NAME, COUNT, FREE } dowhat;
 
 struct  addrinfo *nfshost_ai = NULL;
-int	fflag, vflag;
+int	all, dflag, fflag, vflag;
 char   *nfshost;
 
 void	 checkmntlist (char *, char **, char **, char **);
 int	 checkvfsname (const char *, char **);
-char	*getmntname (const char *, const char *,
-	 mntwhat, char **, dowhat);
+char	*getmntname (const char *, const char *, mntwhat, char **, dowhat);
 char 	*getrealname(char *, char *resolved_path);
 char   **makevfslist (const char *);
 int	 mntinfo (struct statfs **);
@@ -71,25 +73,29 @@ int	 umountall (char **);
 int	 checkname (char *, char **);
 int	 umountfs (char *, char *, char *);
 void	 usage (void) __dead2;
+int	 vn_detach (const char *);
 int	 xdr_dir (XDR *, char *);
 
 int
 main(int argc, char *argv[])
 {
-	int all, errs, ch, mntsize, error;
+	int errs, ch, mntsize, error;
 	char **typelist = NULL, *mntonname, *mntfromname;
 	char *type, *mntfromnamerev, *mntonnamerev;
 	struct statfs *mntbuf;
 	struct addrinfo hints;
 
 	all = errs = 0;
-	while ((ch = getopt(argc, argv, "AaF:fh:t:v")) != -1) {
+	while ((ch = getopt(argc, argv, "AadF:fh:t:v")) != -1) {
 		switch (ch) {
 		case 'A':
 			all = 2;
 			break;
 		case 'a':
 			all = 1;
+			break;
+		case 'd':
+			dflag = 1;
 			break;
 		case 'F':
 			setfstab(optarg);
@@ -266,7 +272,7 @@ checkname(char *name, char **typelist)
 	 */
 	if (mntfromname == NULL && mntonname == NULL) {
 		speclen = strlen(name);
-		for (speclen = strlen(name); 
+		for (speclen = strlen(name);
 		    speclen > 1 && name[speclen - 1] == '/';
 		    speclen--)
 			name[speclen - 1] = '\0';
@@ -286,7 +292,7 @@ checkname(char *name, char **typelist)
 				if (*hostp != '\0') {
 					/*
 					 * Make both '@' and ':'
-					 * notations equal 
+					 * notations equal
 					 */
 					char *host = strdup(hostp);
 					len = strlen(hostp);
@@ -298,7 +304,7 @@ checkname(char *name, char **typelist)
 					memmove(name, host, len);
 					free(host);
 				}
-				for (speclen = strlen(name); 
+				for (speclen = strlen(name);
 				    speclen > 1 && name[speclen - 1] == '/';
 				    speclen--)
 					name[speclen - 1] = '\0';
@@ -372,7 +378,7 @@ checkname(char *name, char **typelist)
 	 * If several equal mounts are in the mounttable, check the order
 	 * and warn the user if necessary.
 	 */
-	if (strcmp(mntfromnamerev, mntfromname ) != 0 &&
+	if (strcmp(mntfromnamerev, mntfromname) != 0 &&
 	    strcmp(resolved, mntonname) != 0) {
 		warnx("cannot umount %s, %s\n        "
 		    "is mounted there, umount it first",
@@ -431,7 +437,7 @@ umountfs(char *mntfromname, char *mntonname, char *type)
 		 * mount from mntfromname that is still mounted.
 		 */
 		if (getmntname(mntfromname, NULL, NOTHING, &type, COUNT)
-		     != NULL)
+		    != NULL)
 			do_rpc = 1;
 	}
 
@@ -443,6 +449,13 @@ umountfs(char *mntfromname, char *mntonname, char *type)
 	}
 	if (vflag)
 		printf("%s: unmount from %s\n", mntfromname, mntonname);
+	if (dflag) {
+		if (vn_detach(mntfromname) != 0 && !all) {
+			warnx("detach of %s failed", mntfromname);
+			return (1);
+		}
+	}
+
 	/*
 	 * Report to mountd-server which nfsname
 	 * has been unmounted.
@@ -478,6 +491,47 @@ umountfs(char *mntfromname, char *mntonname, char *type)
 		auth_destroy(clp->cl_auth);
 		clnt_destroy(clp);
 	}
+
+	return (0);
+}
+
+int
+vn_detach(const char *fromname)
+{
+	struct vn_ioctl vnio;
+	char *p, device[MAXPATHLEN];
+	int fd;
+
+	if (strncmp(fromname, "/dev/vn", sizeof("/dev/vn") - 1) != 0) {
+		if (!all)
+			warnx("invalid vn device: %s", fromname);
+		return (-1);
+	}
+
+	/* Strip the slice/partition part (e.g., /dev/vn4s1a -> /dev/vn4) */
+	snprintf(device, sizeof(device), "%s", fromname);
+	p = device + sizeof("/dev/vn");
+	while (*p >= '0' && *p <= '9')
+		p++;
+	*p = '\0';
+
+	fd = open(device, O_RDONLY);
+	if (fd < 0) {
+		warn("open: %s", device);
+		return (-1);
+	}
+
+	memset(&vnio, 0, sizeof(vnio));
+	if (ioctl(fd, VNIOCDETACH, &vnio) < 0) {
+		warn("VNIOCDETACH: %s", device);
+		close(fd);
+		return (-1);
+	}
+
+	close(fd);
+	if (vflag)
+		printf("%s: detached\n", device);
+
 	return (0);
 }
 
@@ -675,7 +729,7 @@ getrealname(char *name, char *realname)
 	int havedir;
 	size_t baselen;
 	size_t dirlen;
-	
+
 	dirname = NULL;
 	havedir = 0;
 	if (*name == '/') {
@@ -694,7 +748,7 @@ getrealname(char *name, char *realname)
 			if ((dirname = strrchr(name, '/')) == NULL) {
 				if ((realpath(name, realname)) == NULL)
 					return (NULL);
-			} else 
+			} else
 				havedir = 1;
 		}
 	}
@@ -744,7 +798,7 @@ usage(void)
 {
 
 	fprintf(stderr, "%s\n%s\n",
-	    "usage: umount [-fv] special | node",
-	    "       umount -a | -A [-F fstab] [-fv] [-h host] [-t type]");
+	    "usage: umount [-dfv] special | node",
+	    "       umount -a | -A [-F fstab] [-dfv] [-h host] [-t type]");
 	exit(1);
 }

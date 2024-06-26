@@ -5,7 +5,7 @@
 
 # note: bgfsk and lomac left out (from 5.0)
 #
-FILES=	DAEMON LOGIN NETWORKING SERVERS \
+FILES=	DAEMON FILESYSTEMS LOGIN NETWORKING SERVERS \
 	accounting addswap adjkerntz automount automountd autounmountd \
 	bootconf bootparams btconfig bthcid ccd cleanvar cryptdisks \
 	cleartmp cron cryptdisks \
@@ -25,7 +25,7 @@ FILES=	DAEMON LOGIN NETWORKING SERVERS \
 	sysctl syslogd sysvipcd \
 	ttys udevd udevd_early \
 	varsym vfs_quota vinum virecover vkernel vknetd \
-	watchdogd wpa_supplicant \
+	watchdogd wg wpa_supplicant \
 	ypbind yppasswdd ypserv ypset ypupdated ypxfrd
 
 FILESDIR=	/etc/rc.d

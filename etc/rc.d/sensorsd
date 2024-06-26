@@ -1,9 +1,7 @@
 #!/bin/sh
-#
-# $DragonFly: src/etc/rc.d/sensorsd,v 1.1 2007/10/02 12:57:00 hasso Exp $
 
 # PROVIDE: sensorsd
-# REQUIRE: syslogd
+# REQUIRE: DAEMON
 
 . /etc/rc.subr
 

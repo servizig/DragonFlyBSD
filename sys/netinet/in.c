@@ -100,18 +100,17 @@ in_localaddr(struct in_addr in)
 	if (subnetsarelocal) {
 		TAILQ_FOREACH(iac, &in_ifaddrheads[mycpuid], ia_link) {
 			ia = iac->ia;
-
 			if ((i & ia->ia_netmask) == ia->ia_net)
 				return (1);
 		}
 	} else {
 		TAILQ_FOREACH(iac, &in_ifaddrheads[mycpuid], ia_link) {
 			ia = iac->ia;
-
 			if ((i & ia->ia_subnetmask) == ia->ia_subnet)
 				return (1);
 		}
 	}
+
 	return (0);
 }
 
@@ -142,14 +141,15 @@ in_canforward(struct in_addr in)
 static void
 in_socktrim(struct sockaddr_in *ap)
 {
-    char *cplim = (char *) &ap->sin_addr;
-    char *cp = (char *) (&ap->sin_addr + 1);
+	char *cplim = (char *) &ap->sin_addr;
+	char *cp = (char *) (&ap->sin_addr + 1);
 
-    ap->sin_len = 0;
-    while (--cp >= cplim)
-	if (*cp) {
-	    (ap)->sin_len = cp - (char *) (ap) + 1;
-	    break;
+	ap->sin_len = 0;
+	while (--cp >= cplim) {
+		if (*cp) {
+			(ap)->sin_len = cp - (char *) (ap) + 1;
+			break;
+		}
 	}
 }
 
@@ -194,7 +194,7 @@ in_control_dispatch(netmsg_t msg)
 	int error;
 
 	error = in_control(msg->control.nm_cmd, msg->control.nm_data,
-	    msg->control.nm_ifp, msg->control.nm_td);
+			   msg->control.nm_ifp, msg->control.nm_td);
 	lwkt_replymsg(&msg->lmsg, error);
 }
 
@@ -236,7 +236,7 @@ in_control(u_long cmd, caddr_t data, struct ifnet *ifp, struct thread *td)
 		 * Dispatch these SIOCs to netisr0.
 		 */
 		netmsg_init(&msg.base, NULL, &curthread->td_msgport, 0,
-		    in_control_internal_dispatch);
+			    in_control_internal_dispatch);
 		msg.nm_cmd = cmd;
 		msg.nm_data = data;
 		msg.nm_ifp = ifp;
@@ -449,7 +449,7 @@ in_control_internal(u_long cmd, caddr_t data, struct ifnet *ifp,
 	 * Find address for this interface, if it exists.
 	 *
 	 * If an alias address was specified, find that one instead of
-	 * the first one on the interface, if possible
+	 * the first one on the interface, if possible.
 	 */
 	if (ifp) {
 		struct in_ifaddr *iap;
@@ -824,11 +824,11 @@ in_lifaddr_ioctl(u_long cmd, caddr_t data, struct ifnet *ifp, struct thread *td)
 		if (iflr->addr.ss_len != sizeof(struct sockaddr_in))
 			return EINVAL;
 		/* XXX need improvement */
-		if (iflr->dstaddr.ss_family
-		 && iflr->dstaddr.ss_family != AF_INET)
+		if (iflr->dstaddr.ss_family &&
+		    iflr->dstaddr.ss_family != AF_INET)
 			return EINVAL;
-		if (iflr->dstaddr.ss_family
-		 && iflr->dstaddr.ss_len != sizeof(struct sockaddr_in))
+		if (iflr->dstaddr.ss_family &&
+		    iflr->dstaddr.ss_len != sizeof(struct sockaddr_in))
 			return EINVAL;
 		break;
 	default: /*shouldn't happen*/
@@ -1028,7 +1028,7 @@ in_ifinit(struct ifnet *ifp, struct in_ifaddr *ia,
 		ia->ia_netmask = IN_CLASSC_NET;
 	/*
 	 * The subnet mask usually includes at least the standard network part,
-	 * but may may be smaller in the case of supernetting.
+	 * but may be smaller in the case of supernetting.
 	 * If it is set, we believe it.
 	 */
 	if (ia->ia_subnetmask == 0) {
@@ -1051,9 +1051,9 @@ in_ifinit(struct ifnet *ifp, struct in_ifaddr *ia,
 			ia->ia_netbroadcast.s_addr = INADDR_BROADCAST;
 		} else {
 			ia->ia_broadaddr.sin_addr.s_addr =
-				htonl(ia->ia_subnet | ~ia->ia_subnetmask);
+			    htonl(ia->ia_subnet | ~ia->ia_subnetmask);
 			ia->ia_netbroadcast.s_addr =
-				htonl(ia->ia_net | ~ ia->ia_netmask);
+			    htonl(ia->ia_net | ~ia->ia_netmask);
 		}
 	} else if (ifp->if_flags & IFF_LOOPBACK) {
 		ia->ia_dstaddr = ia->ia_addr;
@@ -1064,18 +1064,10 @@ in_ifinit(struct ifnet *ifp, struct in_ifaddr *ia,
 		flags |= RTF_HOST;
 	}
 
-	/*-
-	 * Don't add host routes for interface addresses of
-	 * 0.0.0.0 --> 0.255.255.255 netmask 255.0.0.0.  This makes it
-	 * possible to assign several such address pairs with consistent
-	 * results (no host route) and is required by BOOTP.
-	 *
-	 * XXX: This is ugly !  There should be a way for the caller to
-	 *      say that they don't want a host route.
+	/*
+	 * Ignore the INADDR_ANY address added by DHCP/BOOTP.
 	 */
-	if (ia->ia_addr.sin_addr.s_addr != INADDR_ANY ||
-	    ia->ia_netmask != IN_CLASSA_NET ||
-	    ia->ia_dstaddr.sin_addr.s_addr != htonl(IN_CLASSA_HOST)) {
+	if (ia->ia_addr.sin_addr.s_addr != INADDR_ANY) {
 		error = in_addprefix(ia, flags);
 		if (error)
 			goto fail;
@@ -1091,11 +1083,12 @@ in_ifinit(struct ifnet *ifp, struct in_ifaddr *ia,
 		addr.s_addr = htonl(INADDR_ALLHOSTS_GROUP);
 		in_addmulti(&addr, ifp);
 	}
+
 	return (0);
+
 fail:
 	if (ifac->ifa_listmask & IFA_LIST_IN_IFADDRHASH)
 		in_iahash_remove(ia);
-
 	ia->ia_addr = oldaddr;
 	if (was_hash)
 		in_iahash_insert(ia);
@@ -1128,6 +1121,13 @@ in_addprefix(struct in_ifaddr *target, int flags)
 	if (target->ia_ifp->if_type == IFT_CARP)
 		return 0;
 #endif
+
+	/*
+	 * Add a loopback route to the interface address.
+	 */
+	if ((target->ia_ifp->if_flags & IFF_LOOPBACK) == 0)
+		ifa_add_loopback_route(&target->ia_ifa,
+		    (struct sockaddr *)&target->ia_addr);
 
 	mask = target->ia_sockmask.sin_addr;
 	if (flags & RTF_HOST) {
@@ -1205,6 +1205,41 @@ in_scrubprefix(struct in_ifaddr *target)
 	if (target->ia_ifp->if_type == IFT_CARP)
 		return;
 #endif
+
+	/*
+	 * Remove or change the loopback route to the interface address.
+	 */
+	if (target->ia_addr.sin_addr.s_addr != INADDR_ANY &&
+	    (target->ia_ifp->if_flags & IFF_LOOPBACK) == 0) {
+		struct in_ifaddr *ia;
+		struct in_addr addr;
+
+		/*
+		 * rtrequest1() doesn't yet support to change a route (i.e.,
+		 * RTM_CHANGE), so always delete the old one and then add
+		 * the new one if needed.
+		 */
+		ifa_del_loopback_route(&target->ia_ifa,
+		    (struct sockaddr *)&target->ia_addr);
+
+		/*
+		 * Check whether the host address is still bound to another
+		 * interface address.  If yes, then re-add a loopback route
+		 * for it.
+		 */
+		addr = target->ia_addr.sin_addr;
+		LIST_FOREACH(iac, INADDR_HASH(addr.s_addr), ia_hash) {
+			ia = iac->ia;
+			if (ia != target &&
+			    ia->ia_addr.sin_addr.s_addr == addr.s_addr) {
+				IFAREF(&ia->ia_ifa);
+				ifa_add_loopback_route(&ia->ia_ifa,
+				    (struct sockaddr *)&target->ia_addr);
+				IFAFREE(&ia->ia_ifa);
+				break;
+			}
+		}
+	}
 
 	if ((target->ia_flags & IFA_ROUTE) == 0)
 		return;

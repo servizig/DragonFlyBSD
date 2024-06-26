@@ -1,13 +1,13 @@
 /*
  * Copyright (c) 2003,2004 The DragonFly Project.  All rights reserved.
- * 
+ *
  * This code is derived from software contributed to The DragonFly Project
  * by Matthew Dillon <dillon@backplane.com>
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
@@ -17,7 +17,7 @@
  * 3. Neither the name of The DragonFly Project nor the names of its
  *    contributors may be used to endorse or promote products derived
  *    from this software without specific, prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -30,7 +30,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- * 
+ *
  * Copyright (c) 1997, 1998 Poul-Henning Kamp <phk@FreeBSD.org>
  * Copyright (c) 1982, 1986, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -242,7 +242,7 @@ __read_mostly time_t time_uptime;	/* read-only 'passive' ut in seconds */
 
 /*
  * basetime is used to calculate the compensated real time of day.  The
- * basetime can be modified on a per-tick basis by the adjtime(), 
+ * basetime can be modified on a per-tick basis by the adjtime(),
  * ntp_adjtime(), and sysctl-based time correction APIs.
  *
  * Note that frequency corrections can also be made by adjusting
@@ -518,7 +518,7 @@ set_timeofday(struct timespec *ts)
 	 * Note that basetime diverges from boottime as the clock drift is
 	 * compensated for, so we cannot do away with boottime.  When setting
 	 * the absolute time of day the drift is 0 (for an instant) and we
-	 * can simply assign boottime to basetime.  
+	 * can simply assign boottime to basetime.
 	 *
 	 * Note that nanouptime() is based on gd_time_seconds which is drift
 	 * compensated up to a point (it is guaranteed to remain monotonically
@@ -540,7 +540,7 @@ set_timeofday(struct timespec *ts)
 
 	crit_exit();
 }
-	
+
 /*
  * Each cpu has its own hardclock, but we only increment ticks and softticks
  * on cpu #0.
@@ -631,7 +631,7 @@ hardclock(systimer_t info, int in_ipi, struct intrframe *frame)
 	    atomic_add_int_nonlocked(&ticktime_update, 1);
 
 #if 0
-	    if (tco->tc_poll_pps) 
+	    if (tco->tc_poll_pps)
 		tco->tc_poll_pps(tco);
 #endif
 
@@ -985,7 +985,7 @@ statclock(systimer_t info, int in_ipi, struct intrframe *frame)
 		 * so that we know how much of its real time was spent
 		 * in ``non-process'' (i.e., interrupt) work.
 		 *
-		 * XXX assume system if frame is NULL.  A NULL frame 
+		 * XXX assume system if frame is NULL.  A NULL frame
 		 * can occur if ipi processing is done from a crit_exit().
 		 */
 		if ((frame && CLKF_INTR(intr_nest)) ||
@@ -1068,7 +1068,7 @@ do_pctrack(struct intrframe *frame, int which)
 	struct kinfo_pctrack *pctrack;
 
 	pctrack = &cputime_pctrack[mycpu->gd_cpuid][which];
-	pctrack->pc_array[pctrack->pc_index & PCTRACK_ARYMASK] = 
+	pctrack->pc_array[pctrack->pc_index & PCTRACK_ARYMASK] =
 		(void *)CLKF_PC(frame);
 	++pctrack->pc_index;
 }
@@ -1153,7 +1153,7 @@ schedclock(systimer_t info, int in_ipi __unused, struct intrframe *frame)
 }
 
 /*
- * Compute number of ticks for the specified amount of time.  The 
+ * Compute number of ticks for the specified amount of time.  The
  * return value is intended to be used in a clock interrupt timed
  * operation and guaranteed to meet or exceed the requested time.
  * If the representation overflows, return INT_MAX.  The minimum return
@@ -1603,6 +1603,36 @@ get_approximate_time_t(void)
 	return(gd->gd_time_seconds + bt->tv_sec);
 }
 
+static int
+pps_fetch_timeout(struct timespec *timeout, struct pps_state *pps)
+{
+	int to, err;
+	pps_seq_t *ap, *cp;
+	pps_seq_t a, c;
+
+	to = INT_MAX;
+	if (timeout->tv_sec > -1)
+		to = tstohz_low(timeout);
+
+	ap = &pps->ppsinfo.assert_sequence;
+	cp = &pps->ppsinfo.clear_sequence;
+	a = atomic_load_acq_int(ap);
+	c = atomic_load_acq_int(cp);
+
+	while (a == atomic_load_acq_int(ap) && c == atomic_load_acq_int(cp)) {
+		err = tsleep(pps, PCATCH, "ppsfch", to);
+		if (err == EWOULDBLOCK) {
+			if (timeout->tv_sec < 0)
+				continue;
+			return (ETIMEDOUT);
+		}
+		if (err != 0)
+			return (err);
+	}
+
+	return (0);
+}
+
 int
 pps_ioctl(u_long cmd, caddr_t data, struct pps_state *pps)
 {
@@ -1611,6 +1641,7 @@ pps_ioctl(u_long cmd, caddr_t data, struct pps_state *pps)
 #ifdef PPS_SYNC
 	struct pps_kcbind_args *kapi;
 #endif
+	int err;
 
 	switch (cmd) {
 	case PPS_IOC_CREATE:
@@ -1621,7 +1652,7 @@ pps_ioctl(u_long cmd, caddr_t data, struct pps_state *pps)
 		app = (pps_params_t *)data;
 		if (app->mode & ~pps->ppscap)
 			return (EINVAL);
-		pps->ppsparam = *app;         
+		pps->ppsparam = *app;
 		return (0);
 	case PPS_IOC_GETPARAMS:
 		app = (pps_params_t *)data;
@@ -1635,9 +1666,12 @@ pps_ioctl(u_long cmd, caddr_t data, struct pps_state *pps)
 		fapi = (struct pps_fetch_args *)data;
 		if (fapi->tsformat && fapi->tsformat != PPS_TSFMT_TSPEC)
 			return (EINVAL);
-		if (fapi->timeout.tv_sec || fapi->timeout.tv_nsec)
-			return (EOPNOTSUPP);
-		pps->ppsinfo.current_mode = pps->ppsparam.mode;         
+		if (fapi->timeout.tv_sec != 0 || fapi->timeout.tv_nsec != 0) {
+			err = pps_fetch_timeout(&fapi->timeout, pps);
+			if (err != 0)
+				return (err);
+		}
+		pps->ppsinfo.current_mode = pps->ppsparam.mode;
 		fapi->pps_info_buf = pps->ppsinfo;
 		return (0);
 	case PPS_IOC_KCBIND:
@@ -1663,7 +1697,7 @@ pps_ioctl(u_long cmd, caddr_t data, struct pps_state *pps)
 void
 pps_init(struct pps_state *pps)
 {
-	pps->ppscap |= PPS_TSFMT_TSPEC;
+	pps->ppscap |= PPS_TSFMT_TSPEC | PPS_CANWAIT;
 	if (pps->ppscap & PPS_CAPTUREASSERT)
 		pps->ppscap |= PPS_OFFSETASSERT;
 	if (pps->ppscap & PPS_CAPTURECLEAR)
@@ -1739,7 +1773,7 @@ pps_event(struct pps_state *pps, sysclock_t count, int event)
 		++ts.tv_sec;
 	}
 
-	(*pseq)++;
+	atomic_add_rel_int(pseq, 1);
 	*tsp = ts;
 
 	if (foff) {
@@ -1756,7 +1790,7 @@ pps_event(struct pps_state *pps, sysclock_t count, int event)
 		pps->ppscount[2] = count;
 		if (tcount >= sys_cputimer->freq) {
 			delta = (1000000000 * (tcount / sys_cputimer->freq) +
-				 sys_cputimer->freq64_nsec * 
+				 sys_cputimer->freq64_nsec *
 				 (tcount % sys_cputimer->freq)) >> 32;
 		} else {
 			delta = muldivu64(sys_cputimer->freq64_nsec,
@@ -1765,6 +1799,7 @@ pps_event(struct pps_state *pps, sysclock_t count, int event)
 		hardpps(tsp, delta);
 	}
 #endif
+	wakeup(pps);
 }
 
 /*

@@ -208,10 +208,10 @@ pr_family(int af1)
 #ifndef INET6
 #define	WID_DST_DEFAULT(af) 	18	/* width of destination column */
 #define	WID_GW_DEFAULT(af)	18	/* width of gateway column */
-#define	WID_IF_DEFAULT(af)	(Wflag ? 8 : 6)	/* width of netif column */
+#define	WID_IF_DEFAULT(af)	(Wflag ? 10 : 8) /* width of netif column */
 #else
 #define	WID_DST_DEFAULT(af) \
-	((af) == AF_INET6 ? (numeric_addr ? 33: 18) : 18)
+	((af) == AF_INET6 ? (numeric_addr ? 33 : 18) : 18)
 #define	WID_GW_DEFAULT(af) \
 	((af) == AF_INET6 ? (numeric_addr ? 29 : 18) : 18)
 #define	WID_IF_DEFAULT(af)	((af) == AF_INET6 ? 8 : (Wflag ? 8 :6))

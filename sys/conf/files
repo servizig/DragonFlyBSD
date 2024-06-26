@@ -1584,6 +1584,9 @@ net/tun/if_tun.c		optional tun
 net/tap/if_tap.c		optional tap
 net/vlan/if_vlan.c		optional vlan
 net/vlan/if_vlan_ether.c	optional ether
+net/wg/if_wg.c			optional wg
+net/wg/wg_cookie.c		optional wg
+net/wg/wg_noise.c		optional wg
 net/net_osdep.c		standard
 net/netisr.c		standard
 net/radix.c		standard
@@ -2048,7 +2051,6 @@ vfs/autofs/autofs.c		optional autofs
 vfs/autofs/autofs_vfsops.c	optional autofs
 vfs/autofs/autofs_vnops.c	optional autofs
 vfs/fuse/fuse_device.c		optional fuse
-vfs/fuse/fuse_file.c		optional fuse
 vfs/fuse/fuse_io.c		optional fuse
 vfs/fuse/fuse_ipc.c		optional fuse
 vfs/fuse/fuse_node.c		optional fuse
