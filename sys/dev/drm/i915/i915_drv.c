@@ -411,7 +411,6 @@ static int i915_getparam_ioctl(struct drm_device *dev, void *data,
 	case I915_PARAM_HAS_SCHEDULER:
 		value = dev_priv->caps.scheduler;
 		break;
-
 	case I915_PARAM_MMAP_VERSION:
 		/* Remember to bump this if the version changes! */
 	case I915_PARAM_HAS_GEM:

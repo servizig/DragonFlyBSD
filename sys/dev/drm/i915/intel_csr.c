@@ -34,27 +34,27 @@
  * low-power state and comes back to normal.
  */
 
-#define I915_CSR_ICL "i915/icl_dmc_ver1_07.bin"
+#define I915_CSR_ICL "i915fw_icl_dmc_ver1_07"
 MODULE_FIRMWARE(I915_CSR_ICL);
 #define ICL_CSR_VERSION_REQUIRED	CSR_VERSION(1, 7)
 
-#define I915_CSR_GLK "i915/glk_dmc_ver1_04.bin"
+#define I915_CSR_GLK "i915fw_glk_dmc_ver1_04"
 MODULE_FIRMWARE(I915_CSR_GLK);
 #define GLK_CSR_VERSION_REQUIRED	CSR_VERSION(1, 4)
 
-#define I915_CSR_CNL "i915/cnl_dmc_ver1_07.bin"
+#define I915_CSR_CNL "i915fw_cnl_dmc_ver1_07"
 MODULE_FIRMWARE(I915_CSR_CNL);
 #define CNL_CSR_VERSION_REQUIRED	CSR_VERSION(1, 7)
 
-#define I915_CSR_KBL "i915/kbl_dmc_ver1_04.bin"
+#define I915_CSR_KBL "i915fw_kbl_dmc_ver1_04"
 MODULE_FIRMWARE(I915_CSR_KBL);
 #define KBL_CSR_VERSION_REQUIRED	CSR_VERSION(1, 4)
 
-#define I915_CSR_SKL "i915/skl_dmc_ver1_27.bin"
+#define I915_CSR_SKL "i915fw_skl_dmc_ver1_27"
 MODULE_FIRMWARE(I915_CSR_SKL);
 #define SKL_CSR_VERSION_REQUIRED	CSR_VERSION(1, 27)
 
-#define I915_CSR_BXT "i915/bxt_dmc_ver1_07.bin"
+#define I915_CSR_BXT "i915fw_bxt_dmc_ver1_07"
 MODULE_FIRMWARE(I915_CSR_BXT);
 #define BXT_CSR_VERSION_REQUIRED	CSR_VERSION(1, 7)
 

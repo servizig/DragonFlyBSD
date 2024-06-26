@@ -75,6 +75,8 @@ EXPORT_SYMBOL(__drm_puts_coredump);
 
 void __drm_printfn_coredump(struct drm_printer *p, struct va_format *vaf)
 {
+	kvprintf(vaf->fmt, *vaf->va);
+#if 0
 	struct drm_print_iterator *iterator = p->arg;
 	size_t len;
 	char *buf;
@@ -116,6 +118,7 @@ void __drm_printfn_coredump(struct drm_printer *p, struct va_format *vaf)
 	__drm_puts_coredump(p, (const char *) buf);
 
 	kfree(buf);
+#endif
 }
 EXPORT_SYMBOL(__drm_printfn_coredump);
 
@@ -143,7 +146,8 @@ EXPORT_SYMBOL(__drm_printfn_info);
 
 void __drm_printfn_debug(struct drm_printer *p, struct va_format *vaf)
 {
-	pr_debug("%s %pV", p->prefix, vaf);
+	pr_debug("%s ", p->prefix);
+	kvprintf(vaf->fmt, *vaf->va);
 }
 EXPORT_SYMBOL(__drm_printfn_debug);
 
