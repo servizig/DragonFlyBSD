@@ -933,8 +933,7 @@ static void process_csb(struct intel_engine_cs *engine)
 	 */
 	head = execlists->csb_head;
 	tail = READ_ONCE(*execlists->csb_write);
-	GEM_TRACE("%s cs-irq head=%d, tail=%d\n", engine->name, head, tail);
-	print_backtrace(-1);
+	GEM_TRACE("%s cs-irq head=%d, tail=%d, csb_write=%p\n", engine->name, head, tail, execlists->csb_write);
 	if (unlikely(head == tail))
 		return;
 
@@ -988,8 +987,9 @@ static void process_csb(struct intel_engine_cs *engine)
 			execlists_clear_active(execlists,
 					       EXECLISTS_ACTIVE_HWACK);
 
-		if (!(status & GEN8_CTX_STATUS_COMPLETED_MASK))
+		if (!(status & GEN8_CTX_STATUS_COMPLETED_MASK)) {
 			continue;
+		}
 
 		/* We should never get a COMPLETED | IDLE_ACTIVE! */
 		GEM_BUG_ON(status & GEN8_CTX_STATUS_IDLE_ACTIVE);
@@ -1003,8 +1003,10 @@ static void process_csb(struct intel_engine_cs *engine)
 
 		if (status & GEN8_CTX_STATUS_PREEMPTED &&
 		    execlists_is_active(execlists,
-					EXECLISTS_ACTIVE_PREEMPT))
+					EXECLISTS_ACTIVE_PREEMPT)) {
+			DRM_DEBUG("preempted and EXECLISTS_ACTIVE_PREEMPT\n");
 			continue;
+		}
 
 		GEM_BUG_ON(!execlists_is_active(execlists,
 						EXECLISTS_ACTIVE_USER));
@@ -2115,12 +2117,14 @@ static void gen8_logical_ring_enable_irq(struct intel_engine_cs *engine)
 	I915_WRITE_IMR(engine,
 		       ~(engine->irq_enable_mask | engine->irq_keep_mask));
 	POSTING_READ_FW(RING_IMR(engine->mmio_base));
+DRM_DEBUG("%s\n", engine->name);
 }
 
 static void gen8_logical_ring_disable_irq(struct intel_engine_cs *engine)
 {
 	struct drm_i915_private *dev_priv = engine->i915;
 	I915_WRITE_IMR(engine, ~engine->irq_keep_mask);
+DRM_DEBUG("%s\n", engine->name);
 }
 
 static int gen8_emit_flush(struct i915_request *request, u32 mode)

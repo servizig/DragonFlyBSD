@@ -250,7 +250,7 @@ static int intelfb_create(struct drm_fb_helper *helper,
 	info->height = sizes->fb_height;
 	info->stride = fb->pitches[0];
 	info->depth = sizes->surface_bpp;
-	info->paddr = ggtt->mappable_base + vma->node.start;
+	info->paddr = ggtt->gmadr.start + vma->node.start;
 	info->is_vga_boot_display = vga_pci_is_boot_display(vga_dev);
 	info->fbops = intelfb_ops;
 

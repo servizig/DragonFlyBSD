@@ -673,6 +673,7 @@ static int eb_reserve(struct i915_execbuffer *eb)
 	do {
 		list_for_each_entry(vma, &eb->unbound, exec_link) {
 			err = eb_reserve_vma(eb, vma);
+			DRM_DEBUG("vma=%p, err=%d\n", vma, err);
 			if (err)
 				break;
 		}
@@ -817,6 +818,7 @@ add_vma:
 		err = eb_add_vma(eb, i, batch, vma);
 		if (unlikely(err))
 			goto err_vma;
+		DRM_DEBUG("handle=%d, i=%d, vma=%p\n", handle, i, eb->vma[i]);
 
 		GEM_BUG_ON(vma != eb->vma[i]);
 		GEM_BUG_ON(vma->exec_flags != &eb->flags[i]);
@@ -1025,6 +1027,7 @@ static void *reloc_iomap(struct drm_i915_gem_object *obj,
 
 	if (cache->vaddr) {
 		io_mapping_unmap_atomic((void __force __iomem *) unmask_page(cache->vaddr));
+		DRM_DEBUG("io_mapping_unmap_atomic\n");
 	} else {
 		struct i915_vma *vma;
 		int err;
@@ -1033,6 +1036,7 @@ static void *reloc_iomap(struct drm_i915_gem_object *obj,
 			return NULL;
 
 		err = i915_gem_object_set_to_gtt_domain(obj, true);
+		DRM_DEBUG("i915_gem_object_set_to_gtt_domain=%d\n", err);
 		if (err)
 			return ERR_PTR(err);
 
@@ -1040,6 +1044,7 @@ static void *reloc_iomap(struct drm_i915_gem_object *obj,
 					       PIN_MAPPABLE |
 					       PIN_NONBLOCK |
 					       PIN_NONFAULT);
+		DRM_DEBUG("i915_gem_object_ggtt_pin\n");
 		if (IS_ERR(vma)) {
 			memset(&cache->node, 0, sizeof(cache->node));
 			err = drm_mm_insert_node_in_range
@@ -1047,10 +1052,12 @@ static void *reloc_iomap(struct drm_i915_gem_object *obj,
 				 PAGE_SIZE, 0, I915_COLOR_UNEVICTABLE,
 				 0, ggtt->mappable_end,
 				 DRM_MM_INSERT_LOW);
+			DRM_DEBUG("drm_mm_insert_node_in_range=%d\n", err);
 			if (err) /* no inactive aperture space, use cpu reloc */
 				return NULL;
 		} else {
 			err = i915_vma_put_fence(vma);
+			DRM_DEBUG("i915_vma_put_fence=%d\n", err);
 			if (err) {
 				i915_vma_unpin(vma);
 				return ERR_PTR(err);
@@ -1067,12 +1074,14 @@ static void *reloc_iomap(struct drm_i915_gem_object *obj,
 		ggtt->vm.insert_page(&ggtt->vm,
 				     i915_gem_object_get_dma_address(obj, page),
 				     offset, I915_CACHE_NONE, 0);
+		DRM_DEBUG("ggtt->vm.insert_page\n");
 	} else {
 		offset += page << PAGE_SHIFT;
 	}
 
 	vaddr = (void __force *)io_mapping_map_atomic_wc(&ggtt->iomap,
 							 offset);
+	DRM_DEBUG("io_mapping_map_atomic_wc\n");
 	cache->page = page;
 	cache->vaddr = (unsigned long)vaddr;
 
@@ -1089,10 +1098,12 @@ static void *reloc_vaddr(struct drm_i915_gem_object *obj,
 		vaddr = unmask_page(cache->vaddr);
 	} else {
 		vaddr = NULL;
-		if ((cache->vaddr & KMAP) == 0)
+		if ((cache->vaddr & KMAP) == 0) {
 			vaddr = reloc_iomap(obj, cache, page);
-		if (!vaddr)
+		}
+		if (!vaddr) {
 			vaddr = reloc_kmap(obj, cache, page);
+		}
 	}
 
 	return vaddr;
@@ -1316,8 +1327,10 @@ relocate_entry(struct i915_vma *vma,
 
 repeat:
 	vaddr = reloc_vaddr(vma->obj, &eb->reloc_cache, offset >> PAGE_SHIFT);
-	if (IS_ERR(vaddr))
+	if (IS_ERR(vaddr)) {
+		DRM_DEBUG("PTR_ERR(vaddr)=%ld\n", PTR_ERR(vaddr));
 		return PTR_ERR(vaddr);
+	}
 
 	clflush_write32(vaddr + offset_in_page(offset),
 			lower_32_bits(target_offset),
@@ -1447,10 +1460,10 @@ static int eb_relocate_vma(struct i915_execbuffer *eb, struct i915_vma *vma)
 	 * to read. However, if the array is not writable the user loses
 	 * the updated relocation values.
 	 */
-#if 0
-	if (unlikely(!access_ok(VERIFY_READ, urelocs, remain*sizeof(*urelocs))))
+	if (unlikely(!access_ok(urelocs, remain*sizeof(*urelocs)))) {
+		DRM_DEBUG("!access_ok\n");
 		return -EFAULT;
-#endif
+	}
 
 	do {
 		struct drm_i915_gem_relocation_entry *r = stack;
@@ -1476,6 +1489,8 @@ static int eb_relocate_vma(struct i915_execbuffer *eb, struct i915_vma *vma)
 
 		remain -= count;
 		do {
+			DRM_DEBUG("\ttarget_handle=%u, delta=%u, offset=0x%llx, presumed_offset=0x%llx, read_domains=%u, write_domain=%u\n",
+				r->target_handle, r->delta, r->offset, r->presumed_offset, r->read_domains, r->write_domain);
 			u64 offset = eb_relocate_entry(eb, vma, r);
 
 			if (likely(offset == 0)) {
@@ -1504,16 +1519,14 @@ static int eb_relocate_vma(struct i915_execbuffer *eb, struct i915_vma *vma)
 				 * having already demonstrated that we
 				 * can read from this userspace address.
 				 */
+				DRM_DEBUG("eb_relocate_entry offset=0x%llx\n", offset);
 				offset = gen8_canonical_addr(offset & ~UPDATE);
-#ifdef __DragonFly__
-				__put_user(offset,
-					   &urelocs[r-stack].presumed_offset);
-#else
+				DRM_DEBUG("__put_user(0x%llx, %p)\n", offset, &urelocs[r-stack].presumed_offset);
 				if (unlikely(__put_user(offset, &urelocs[r-stack].presumed_offset))) {
 					remain = -EFAULT;
+					DRM_DEBUG("-EFAULT\n");
 					goto out;
 				}
-#endif
 			}
 		} while (r++, --count);
 		urelocs += ARRAY_SIZE(stack);
@@ -1790,6 +1803,7 @@ static int eb_relocate(struct i915_execbuffer *eb)
 		struct i915_vma *vma;
 
 		list_for_each_entry(vma, &eb->relocs, reloc_link) {
+			DRM_DEBUG("relocating eb=%p, vma=%p\n", eb, vma);
 			if (eb_relocate_vma(eb, vma))
 				goto slow;
 		}
@@ -1798,6 +1812,7 @@ static int eb_relocate(struct i915_execbuffer *eb)
 	return 0;
 
 slow:
+	DRM_DEBUG("slow:\n");
 	return eb_relocate_slow(eb);
 }
 
@@ -2223,13 +2238,21 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 	eb.i915 = to_i915(dev);
 	eb.file = file;
 	eb.args = args;
-	if (DBG_FORCE_RELOC || !(args->flags & I915_EXEC_NO_RELOC))
+	DRM_DEBUG("before args->flags=%lld\n", args->flags);
+	if (DBG_FORCE_RELOC || !(args->flags & I915_EXEC_NO_RELOC)) {
+		DRM_DEBUG("appending __EXEC_HAS_RELOC\n");
 		args->flags |= __EXEC_HAS_RELOC;
+	}
+
+	DRM_DEBUG("after args->flags=%lld\n", args->flags);
+	DRM_DEBUG("args->buffer_count=%u, args->batch_start_offset=%u, args->batch_len=%u\n", args->buffer_count, args->batch_start_offset, args->batch_len);
 
 	eb.exec = exec;
 	eb.vma = (struct i915_vma **)(exec + args->buffer_count + 1);
 	eb.vma[0] = NULL;
 	eb.flags = (unsigned int *)(eb.vma + args->buffer_count + 1);
+
+	DRM_DEBUG("eb.vma=%p\n", eb.vma);
 
 	eb.invalid_flags = __EXEC_OBJECT_UNKNOWN_FLAGS;
 	reloc_cache_init(&eb.reloc_cache, eb.i915);
@@ -2247,6 +2270,8 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 	}
 	if (args->flags & I915_EXEC_IS_PINNED)
 		eb.batch_flags |= I915_DISPATCH_PINNED;
+
+	DRM_DEBUG("eb.batch_flags=%u\n", eb.batch_flags);
 
 	eb.engine = eb_select_engine(eb.i915, file, args);
 	if (!eb.engine)
@@ -2301,6 +2326,27 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 		args->flags &= ~__EXEC_HAS_RELOC;
 		goto err_vma;
 	}
+#if 0
+	for (int i = 0; i < eb.buffer_count; i++) {
+		struct i915_vma *vma = eb.vma[i];
+		DRM_DEBUG("vma=%p\n", vma);
+		vm_object_t vm_obj = vma->obj.base->filp;
+		struct i915_ggtt *ggtt = eb.i915->ggtt;
+
+		vm_page_t m = vm_phys_fictitious_to_vm_page(ggtt->gmadr.start +
+			vma->node.start);
+		if (m == NULL) {
+			kprintf("i915: caught bug() (phys_fict_to_vm)\n");
+		}
+		KASSERT((m->flags & PG_FICTITIOUS) != 0, ("not fictitious %p", m));
+		KASSERT(m->wire_count == 1, ("wire_count not 1 %p", m));
+
+		if (vm_page_busy_try(m, false)) {
+			kprintf("i915_gem_execbuffer: BUSY(2)\n");
+		}
+
+	}
+#endif
 
 	if (unlikely(*eb.batch->exec_flags & EXEC_OBJECT_WRITE)) {
 		DRM_DEBUG("Attempting to use self-modifying batch buffer\n");
@@ -2406,6 +2452,10 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 	 * to explicitly hold another reference here.
 	 */
 	eb.request->batch = eb.batch;
+#if 0
+	struct drm_printer p = drm_debug_printer(__func__);
+	drm_mm_print(&eb.vma[0]->vm->mm, &p);
+#endif
 
 	trace_i915_request_queue(eb.request, eb.batch_flags);
 	err = eb_submit(&eb);
@@ -2604,6 +2654,26 @@ i915_gem_execbuffer2_ioctl(struct drm_device *dev, void *data,
 		}
 	}
 
+	DRM_DEBUG("exec2_list=%p, eb_element_size=0x%zx\n", exec2_list, eb_element_size());
+	DRM_DEBUG("[in] batch_start_offset=0x%x, batch_len=%d, DR1=%u, DR4=%u, flags=%llu, rsdv1(ctx)=%llu\n",
+			args->batch_start_offset, args->batch_len, args->DR1, args->DR4, args->flags, args->rsvd1);
+	for (int i = 0; i < count; i++) {
+		struct drm_i915_gem_exec_object2 *o = &exec2_list[i];
+		DRM_DEBUG("[in] buffer[%d]: handle=%u, relocation_count=%u, relocs_ptr=0x%llx, alignment=0x%llx, offset=0x%llx, flags=%lld\n",
+			i, o->handle, o->relocation_count, o->relocs_ptr, o->alignment, o->offset, o->flags);
+		/*
+		if (o->relocation_count) {
+			DRM_DEBUG("\tRelocations:\n");
+			struct drm_i915_gem_relocation_entry *urelocs = u64_to_user_ptr(o->relocs_ptr);
+			for (int j = 0; j < o->relocation_count; j++) {
+				struct drm_i915_gem_relocation_entry *rel = &urelocs[j];
+				DRM_DEBUG("\ttarget_handle=%u, delta=%u, offset=0x%llx, presumed_offset=0x%llx, read_domains=%u, write_domain=%u\n",
+						rel->target_handle, rel->delta, rel->offset, rel->presumed_offset, rel->read_domains, rel->write_domain);
+			}
+		}
+		*/
+	}
+
 	err = i915_gem_do_execbuffer(dev, file, args, exec2_list, fences);
 
 	/*
@@ -2618,23 +2688,24 @@ i915_gem_execbuffer2_ioctl(struct drm_device *dev, void *data,
 		unsigned int i;
 
 		/* Copy the new buffer offsets back to the user's exec list. */
-		user_access_begin();
-		for (i = 0; i < args->buffer_count; i++) {
-			if (!(exec2_list[i].offset & UPDATE))
-				continue;
+               user_access_begin();
+               for (i = 0; i < args->buffer_count; i++) {
+                       if (!(exec2_list[i].offset & UPDATE))
+                               continue;
 
-			exec2_list[i].offset =
-				gen8_canonical_addr(exec2_list[i].offset & PIN_OFFSET_MASK);
-			unsafe_put_user(exec2_list[i].offset,
-					&user_exec_list[i].offset,
-					end_user);
-		}
+                       exec2_list[i].offset =
+                               gen8_canonical_addr(exec2_list[i].offset & PIN_OFFSET_MASK);
+                       unsafe_put_user(exec2_list[i].offset,
+                                       &user_exec_list[i].offset,
+                                       end_user);
+               }
 end_user:
-		user_access_end();
-	}
+               user_access_end();
+       }
 
-	args->flags &= ~__I915_EXEC_UNKNOWN_FLAGS;
-	put_fence_array(args, fences);
-	kvfree(exec2_list);
-	return err;
+       args->flags &= ~__I915_EXEC_UNKNOWN_FLAGS;
+       put_fence_array(args, fences);
+       kvfree(exec2_list);
+       return err;
 }
+

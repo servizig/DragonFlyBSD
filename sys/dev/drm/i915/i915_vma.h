@@ -296,6 +296,7 @@ i915_vma_pin(struct i915_vma *vma, u64 size, u64 alignment, u64 flags)
 	 * our vma as we insert and bind.
 	 */
 	if (likely(((++vma->flags ^ flags) & I915_VMA_BIND_MASK) == 0)) {
+		DRM_DEBUG("(++vma->flags ^ flags) & I915_VMA_BIND_MASK) == 0\n");
 		GEM_BUG_ON(!drm_mm_node_allocated(&vma->node));
 		GEM_BUG_ON(i915_vma_misplaced(vma, size, alignment, flags));
 		return 0;

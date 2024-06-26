@@ -66,7 +66,7 @@ __copy_from_user(void *to, const void *from, unsigned len)
 static inline int
 __copy_from_user_inatomic(void *dst, const void __user *src, unsigned size)
 {
-	if (copyin_nofault(src, dst, size))
+	if (copyin(src, dst, size))
 		return size;
 	return 0;
 }
@@ -74,7 +74,7 @@ __copy_from_user_inatomic(void *dst, const void __user *src, unsigned size)
 static inline int
 __copy_to_user_inatomic(void __user *to, const void *from, unsigned n)
 {
-	return (copyout_nofault(from, to, n) != 0 ? n : 0);
+	return (copyout(from, to, n) != 0 ? n : 0);
 }
 
 static inline unsigned long

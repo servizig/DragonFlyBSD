@@ -1210,6 +1210,44 @@ static void print_request(struct drm_printer *m,
 		   name);
 }
 
+static int
+hex_dump_to_buffer(const void *buf, size_t len, int rowsize, int groupsize,
+    char *linebuf, size_t linebuflen, bool ascii __unused)
+{
+	int i, j, c;
+
+	i = j = 0;
+
+	while (i < len && j <= linebuflen) {
+		c = ((const char *)buf)[i];
+
+		if (i != 0) {
+			if (i % rowsize == 0) {
+				/* Newline required. */
+				sprintf(linebuf + j, "\n");
+				++j;
+			} else if (i % groupsize == 0) {
+				/* Space required. */
+				sprintf(linebuf + j, " ");
+				++j;
+			}
+		}
+
+		if (j > linebuflen - 4)
+			break;
+
+		sprintf(linebuf + j, "%02X", c);
+		j += 2;
+
+		++i;
+	}
+
+	if (j <= linebuflen)
+		sprintf(linebuf + j, "\n");
+
+	return 0;
+}
+
 static void linux_hexdump(struct drm_printer *m, const void *buf, size_t len)
 {
 	const size_t rowsize = 8 * sizeof(u32);
@@ -1228,12 +1266,10 @@ static void linux_hexdump(struct drm_printer *m, const void *buf, size_t len)
 			continue;
 		}
 
-#ifdef __linux__
 		WARN_ON_ONCE(hex_dump_to_buffer(buf + pos, len - pos,
 						rowsize, sizeof(u32),
 						line, sizeof(line),
 						false) >= sizeof(line));
-#endif
 		drm_printf(m, "[%04zx] %s\n", pos, line);
 
 		prev = buf + pos;
@@ -1375,10 +1411,11 @@ static void print_request_ring(struct drm_printer *m, struct i915_request *rq)
 	int size;
 
 	drm_printf(m,
-		   "[head %04x, postfix %04x, tail %04x, batch 0x%08x_%08x]:\n",
+		   "[head %04x, postfix %04x, tail %04x, batch 0x%08x_%08x batch size 0x%llx]:\n",
 		   rq->head, rq->postfix, rq->tail,
 		   rq->batch ? upper_32_bits(rq->batch->node.start) : ~0u,
-		   rq->batch ? lower_32_bits(rq->batch->node.start) : ~0u);
+		   rq->batch ? lower_32_bits(rq->batch->node.start) : ~0u,
+		   rq->batch ? rq->batch->node.size : ~0u);
 
 	size = rq->tail - rq->head;
 	if (rq->tail < rq->head)
