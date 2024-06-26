@@ -2285,7 +2285,6 @@ retry:
 				   I915_WAIT_INTERRUPTIBLE,
 				   MAX_SCHEDULE_TIMEOUT,
 				   NULL);
-	kprintf("i915_gem_fault: #=%d, ret=%d\n", obj->base.name, ret);
 	if (ret)
 		goto err;
 
