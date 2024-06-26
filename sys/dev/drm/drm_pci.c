@@ -151,6 +151,14 @@ EXPORT_SYMBOL(drm_pci_alloc);
  */
 void __drm_legacy_pci_free(struct drm_device * dev, drm_dma_handle_t * dmah)
 {
+#ifdef __DragonFly__
+	if (dmah == NULL)
+		return;
+
+	bus_dmamap_unload(dmah->tag, dmah->map);
+	bus_dmamem_free(dmah->tag, dmah->vaddr, dmah->map);
+	bus_dma_tag_destroy(dmah->tag);
+#else
 	unsigned long addr;
 	size_t sz;
 
@@ -166,6 +174,7 @@ void __drm_legacy_pci_free(struct drm_device * dev, drm_dma_handle_t * dmah)
 		dma_free_coherent(&dev->pdev->dev, dmah->size, dmah->vaddr,
 				  dmah->busaddr);
 	}
+#endif
 }
 
 /**
