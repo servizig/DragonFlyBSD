@@ -31,6 +31,20 @@
 #include "drm_internal.h"
 #include "drm_legacy.h"
 
+#include <sys/bus.h>
+
+static void
+drm_pci_busdma_callback(void *arg, bus_dma_segment_t *segs, int nsegs, int error)
+{
+	drm_dma_handle_t *dmah = arg;
+
+	if (error != 0)
+		return;
+
+	KASSERT(nsegs == 1, ("drm_pci_busdma_callback: bad dma segment count"));
+	dmah->busaddr = segs[0].ds_addr;
+}
+
 /**
  * drm_pci_alloc - Allocate a PCI consistent memory block, for DMA.
  * @dev: DRM device
@@ -45,6 +59,51 @@
  */
 drm_dma_handle_t *drm_pci_alloc(struct drm_device * dev, size_t size, size_t align)
 {
+#ifdef __DragonFly__
+	drm_dma_handle_t *dmah;
+	int ret;
+
+	/* Need power-of-two alignment, so fail the allocation if it isn't. */
+	if ((align & (align - 1)) != 0) {
+		DRM_ERROR("drm_pci_alloc with non-power-of-two alignment %d\n",
+		    (int)align);
+		return NULL;
+	}
+
+	dmah = kmalloc(sizeof(drm_dma_handle_t), M_DRM, M_ZERO | M_NOWAIT);
+	if (dmah == NULL)
+		return NULL;
+
+	ret = bus_dma_tag_create(
+	    bus_get_dma_tag(dev->dev->bsddev), /* parent */
+	    align, 0, /* align, boundary */
+	    BUS_SPACE_MAXADDR, BUS_SPACE_MAXADDR, /* lowaddr, highaddr */
+	    size, 1, size, /* maxsize, nsegs, maxsegsize */
+	    0, /* flags */
+	    &dmah->tag);
+	if (ret != 0) {
+		kfree(dmah);
+		return NULL;
+	}
+
+	ret = bus_dmamem_alloc(dmah->tag, (void **)&dmah->vaddr,
+	    BUS_DMA_WAITOK | BUS_DMA_ZERO | BUS_DMA_NOCACHE, &dmah->map);
+	if (ret != 0) {
+		bus_dma_tag_destroy(dmah->tag);
+		kfree(dmah);
+		return NULL;
+	}
+
+	ret = bus_dmamap_load(dmah->tag, dmah->map, dmah->vaddr, size,
+	    drm_pci_busdma_callback, dmah, BUS_DMA_NOWAIT);
+	if (ret != 0) {
+		bus_dmamem_free(dmah->tag, dmah->vaddr, dmah->map);
+		bus_dma_tag_destroy(dmah->tag);
+		kfree(dmah);
+		return NULL;
+	}
+	return dmah;
+#else
 	drm_dma_handle_t *dmah;
 	unsigned long addr;
 	size_t sz;
@@ -80,6 +139,7 @@ drm_dma_handle_t *drm_pci_alloc(struct drm_device * dev, size_t size, size_t ali
 	}
 
 	return dmah;
+#endif
 }
 
 EXPORT_SYMBOL(drm_pci_alloc);

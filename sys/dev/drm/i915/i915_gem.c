@@ -546,6 +546,7 @@ i915_gem_object_wait_reservation(struct reservation_object *resv,
 			return ret;
 
 		for (i = 0; i < count; i++) {
+			DRM_DEBUG("wait fence[%d] context=%llx, seqno=%d\n", i, shared[i]->context, shared[i]->seqno);
 			timeout = i915_gem_object_wait_fence(shared[i],
 							     flags, timeout,
 							     rps_client);
@@ -573,9 +574,11 @@ i915_gem_object_wait_reservation(struct reservation_object *resv,
 		excl = reservation_object_get_excl_rcu(resv);
 	}
 
-	if (excl && timeout >= 0)
+	if (excl && timeout >= 0) {
+		DRM_DEBUG("wait fence context=%llx, seqno=%d\n", excl->context, excl->seqno);
 		timeout = i915_gem_object_wait_fence(excl, flags, timeout,
 						     rps_client);
+	}
 
 	dma_fence_put(excl);
 
@@ -741,6 +744,7 @@ i915_gem_create(struct drm_file *file,
 	int ret;
 	u32 handle;
 
+	DRM_DEBUG("[in] size=0x%lx\n", size);
 	size = roundup(size, PAGE_SIZE);
 	if (size == 0)
 		return -EINVAL;
@@ -756,6 +760,7 @@ i915_gem_create(struct drm_file *file,
 	if (ret)
 		return ret;
 
+	DRM_DEBUG("[out] handle=%u, size=0x%lx\n", handle, size);
 	*handle_p = handle;
 	return 0;
 }
@@ -1885,7 +1890,8 @@ __vma_matches(struct vm_area_struct *vma, struct file *filp,
 static int
 vm_object_map_wc_callback(vm_page_t p, void *data)
 {
-	pmap_page_set_memattr(p, VM_MEMATTR_WRITE_COMBINING);
+	//pmap_page_set_memattr(p, VM_MEMATTR_WRITE_COMBINING);
+	DRM_DEBUG("phys_addr=0x%lx, fake=%d\n", p->phys_addr, p->flags & PG_FICTITIOUS);
 
 	return 0;
 }
@@ -1927,21 +1933,30 @@ i915_gem_mmap_ioctl(struct drm_device *dev, void *data,
 	struct rb_vm_page_scan_info info;
 #endif
 
-	if (args->flags & ~(I915_MMAP_WC))
+	if (args->flags & ~(I915_MMAP_WC)) {
+		DRM_DEBUG("args->flags & ~(I915_MMAP_WC)\n");
 		return -EINVAL;
+	}
 
-	if (args->flags & I915_MMAP_WC && !boot_cpu_has(X86_FEATURE_PAT))
+	if (args->flags & I915_MMAP_WC && !boot_cpu_has(X86_FEATURE_PAT)) {
+		DRM_DEBUG("!boot_cpu_has\n");
 		return -ENODEV;
+	}
 
 	obj = i915_gem_object_lookup(file, args->handle);
-	if (!obj)
+	if (!obj) {
+		DRM_DEBUG("!obj\n");
 		return -ENOENT;
+	}
+
+	DRM_DEBUG("[in] handle=%u, offset=0x%llx, size=0x%llx, flags=%lld, gem_obj=%p\n", args->handle, args->offset, args->size, args->flags, obj);
 
 	/* prime objects have no backing filp to GEM mmap
 	 * pages from.
 	 */
 	if (!obj->base.filp) {
 		i915_gem_object_put(obj);
+		DRM_DEBUG("!obj->base.filp\n");
 		return -ENXIO;
 	}
 
@@ -1951,6 +1966,7 @@ i915_gem_mmap_ioctl(struct drm_device *dev, void *data,
 
 	size = round_page(args->size);
 	if (map->size + size > p->p_rlimit[RLIMIT_VMEM].rlim_cur) {
+		DRM_DEBUG("map->size=0x%lx, rlim_cur=0x%lx\n", map->size, p->p_rlimit[RLIMIT_VMEM].rlim_cur);
 		error = -ENOMEM;
 		goto out;
 	}
@@ -1961,7 +1977,10 @@ i915_gem_mmap_ioctl(struct drm_device *dev, void *data,
 	 * fixed low address as the start point instead to avoid the NULL
 	 * return issue.
 	 */
-	addr = PAGE_SIZE;
+	//addr = PAGE_SIZE;
+	addr = round_page((vm_offset_t)p->p_vmspace->vm_taddr +
+				       maxtsiz + maxdsiz);
+	DRM_DEBUG("initial_addr=0x%lx\n", addr);
 
 	/*
 	 * Use 256KB alignment.  It is unclear why this matters for a
@@ -1981,9 +2000,11 @@ i915_gem_mmap_ioctl(struct drm_device *dev, void *data,
 			 VM_PROT_READ | VM_PROT_WRITE, /* prot */
 			 VM_PROT_READ | VM_PROT_WRITE, /* max */
 			 MAP_SHARED /* cow */);
+	DRM_DEBUG("rv=%d\n", rv);
 	if (rv != KERN_SUCCESS) {
 		vm_object_deallocate(obj->base.filp);
 		error = -vm_mmap_to_errno(rv);
+		DRM_DEBUG("error=%d\n", error);
 	} else {
 		args->addr_ptr = (uint64_t)addr;
 	}
@@ -2000,6 +2021,7 @@ i915_gem_mmap_ioctl(struct drm_device *dev, void *data,
 
 		if (down_write_killable(&mm->mmap_sem)) {
 			i915_gem_object_put(obj);
+			DRM_DEBUG("down_write_killable\n");
 			return -EINTR;
 		}
 #ifdef __DragonFly__
@@ -2032,12 +2054,16 @@ i915_gem_mmap_ioctl(struct drm_device *dev, void *data,
 
 out:
 	i915_gem_object_put(obj);
-	if (IS_ERR((void *)addr))
+	if (IS_ERR((void *)addr)) {
+		DRM_DEBUG("PTR_ERR=%ld\n", PTR_ERR((void *)addr));
 		return addr;
+	}
 
 	args->addr_ptr = (uint64_t) addr;
 
-	return 0;
+	DRM_DEBUG("[out] handle=%u, addr_ptr=0x%lx\n", args->handle, addr);
+
+	return error;
 }
 
 static unsigned int tile_row_pages(const struct drm_i915_gem_object *obj)
@@ -2228,8 +2254,9 @@ int i915_gem_fault(vm_object_t vm_obj, vm_ooffset_t offset, int prot, vm_page_t 
 #endif
 
 	/* Sanity check that we allow writing into this object */
-	if (i915_gem_object_is_readonly(obj) && write)
+	if (i915_gem_object_is_readonly(obj) && write) {
 		return VM_FAULT_SIGBUS;
+	}
 
 	/* We don't use vmf->pgoff since that has the fake offset */
 	page_offset = (unsigned long)offset >> PAGE_SHIFT;
@@ -2258,6 +2285,7 @@ retry:
 				   I915_WAIT_INTERRUPTIBLE,
 				   MAX_SCHEDULE_TIMEOUT,
 				   NULL);
+	kprintf("i915_gem_fault: #=%d, ret=%d\n", obj->base.name, ret);
 	if (ret)
 		goto err;
 

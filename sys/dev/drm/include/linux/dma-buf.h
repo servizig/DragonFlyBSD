@@ -100,6 +100,7 @@ dma_buf_attach(struct dma_buf *dmabuf, struct device *dev)
 	struct dma_buf_attachment *attach;
 
 	attach = kmalloc(sizeof(struct dma_buf_attachment), M_DRM, M_WAITOK | M_ZERO);
+STUB();
 
 	return attach;
 }
@@ -107,6 +108,7 @@ dma_buf_attach(struct dma_buf *dmabuf, struct device *dev)
 static inline void
 get_dma_buf(struct dma_buf *dmabuf)
 {
+STUB();
 	fhold(dmabuf->file);
 }
 
@@ -119,6 +121,7 @@ dma_buf_put(struct dma_buf *dmabuf)
 	if (dmabuf->file == NULL)
 		return;
 
+STUB();
 	fdrop(dmabuf->file);
 }
 

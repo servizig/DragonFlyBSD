@@ -758,6 +758,7 @@ static void i9xx_submit_request(struct i915_request *request)
 	struct drm_i915_private *dev_priv = request->i915;
 
 	i915_request_submit(request);
+	wmb();
 
 	I915_WRITE_TAIL(request->engine,
 			intel_ring_set_tail(request->ring, request->tail));

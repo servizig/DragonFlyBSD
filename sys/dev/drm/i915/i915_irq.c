@@ -2895,13 +2895,17 @@ static irqreturn_t gen8_irq_handler(int irq, void *arg)
 	u32 master_ctl;
 	u32 gt_iir[4];
 
-	if (!intel_irqs_enabled(dev_priv))
+	if (!intel_irqs_enabled(dev_priv)) {
+		DRM_DEBUG("!intel_irqs_enabled\n");
 		return IRQ_NONE;
+	}
 
 	master_ctl = I915_READ_FW(GEN8_MASTER_IRQ);
 	master_ctl &= ~GEN8_MASTER_IRQ_CONTROL;
-	if (!master_ctl)
+	if (!master_ctl) {
+		DRM_DEBUG("!master_ctl\n");
 		return IRQ_NONE;
+	}
 
 	I915_WRITE_FW(GEN8_MASTER_IRQ, 0);
 
@@ -2917,6 +2921,7 @@ static irqreturn_t gen8_irq_handler(int irq, void *arg)
 
 	I915_WRITE_FW(GEN8_MASTER_IRQ, GEN8_MASTER_IRQ_CONTROL);
 
+	//DRM_DEBUG("master_ctl=%u, gt_iir: [0]=%u, [1]=%u, [2]=%u, [3]=%u\n", master_ctl, gt_iir[0], gt_iir[1], gt_iir[2], gt_iir[3]);
 	gen8_gt_irq_handler(dev_priv, master_ctl, gt_iir);
 
 	return IRQ_HANDLED;
