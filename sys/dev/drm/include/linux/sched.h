@@ -146,7 +146,13 @@ schedule_timeout(signed long timeout)
 			ret = 0;
 		break;
 	case TASK_UNINTERRUPTIBLE:
+		time_before = ticks;
 		ssleep(current, &current->kt_spin, 0, "lstim", timo);
+		time_after = ticks;
+		slept = time_after - time_before;
+		ret = timeout - slept;
+		if (ret < 0)
+			ret = 0;
 		break;
 	default:
 		/*
@@ -158,6 +164,7 @@ schedule_timeout(signed long timeout)
 		 * up the task->state.
 		 */
 		ssleep(current, &current->kt_spin, 0, "lst1", 1);
+		ret = timeout;
 		break;
 	}
 
