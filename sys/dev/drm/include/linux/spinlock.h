@@ -74,6 +74,7 @@ static inline void spin_unlock_irq(spinlock_t *lock)
 	preempt_enable();
 }
 
+#if 0
 #define spin_lock_irqsave(lock, flags)	\
 ({					\
 	local_irq_save(flags);		\
@@ -87,6 +88,22 @@ spin_unlock_irqrestore(spinlock_t *lock, unsigned long flags)
 	lockmgr(lock, LK_RELEASE);
 	local_irq_restore(flags);
 	preempt_enable();
+}
+#endif
+
+#define spin_lock_irqsave(lock, flags)  \
+({                                      \
+        local_irq_save(flags);          \
+        crit_enter();             	 \
+        lockmgr(lock, LK_EXCLUSIVE);    \
+})
+
+static inline void
+spin_unlock_irqrestore(spinlock_t *lock, unsigned long flags)
+{
+	lockmgr(lock, LK_RELEASE);
+	local_irq_restore(flags);
+	crit_exit();
 }
 
 /*

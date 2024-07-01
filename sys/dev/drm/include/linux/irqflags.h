@@ -28,17 +28,20 @@
 #define _LINUX_IRQFLAGS_H_
 
 #include <linux/typecheck.h>
+#include <sys/thread2.h>
 
 static inline void
 local_irq_disable(void)
 {
-	__asm __volatile("cli": : :"memory");
+//	__asm __volatile("cli": : :"memory");
+	crit_enter();
 }
 
 static inline void
 local_irq_enable(void)
 {
-	__asm __volatile("sti": : :"memory");
+//	__asm __volatile("sti": : :"memory");
+	crit_exit();
 }
 
 static inline bool
@@ -57,6 +60,7 @@ irqs_disabled(void)
 	return (1);
 }
 
+#if 0
 #define local_irq_save(flags)	\
 ({				\
 	flags = read_rflags();	\
@@ -67,6 +71,11 @@ static inline void
 local_irq_restore(unsigned long flags)
 {
 	write_rflags(flags);
+	local_irq_enable();
 }
+#endif
+
+#define local_irq_save(flags) (flags = 0)
+#define local_irq_restore(flags) (flags = 0)
 
 #endif	/* _LINUX_IRQFLAGS_H_ */
