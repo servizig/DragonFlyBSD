@@ -176,7 +176,7 @@ static inline void
 write_seqlock_irqsave(seqlock_t *sl, unsigned long flags)
 {
 	local_irq_save(flags);
-	preempt_disable();
+	crit_enter();
 	lockmgr(&sl->lock, LK_EXCLUSIVE);
 	sl->sequence++;
 }
@@ -188,7 +188,7 @@ write_sequnlock_irqrestore(seqlock_t *sl, unsigned long flags)
 	sl->sequence--;
 	lockmgr(&sl->lock, LK_RELEASE);
 	local_irq_restore(flags);
-	preempt_enable();
+	crit_exit();
 }
 
 #endif	/* _LINUX_SEQLOCK_H_ */
