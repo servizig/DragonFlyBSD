@@ -4152,8 +4152,9 @@ static long wait_for_timeline(struct i915_timeline *tl,
 	struct i915_request *rq;
 
 	rq = i915_gem_active_get_unlocked(&tl->last_request);
-	if (!rq)
+	if (!rq) {
 		return timeout;
+	}
 
 	/*
 	 * "Race-to-idle".
@@ -4203,10 +4204,13 @@ int i915_gem_wait_for_idle(struct drm_i915_private *i915,
 
 		lockdep_assert_held(&i915->drm.struct_mutex);
 
+
 		list_for_each_entry(tl, &i915->gt.timelines, link) {
 			timeout = wait_for_timeline(tl, flags, timeout);
-			if (timeout < 0)
+			if (timeout < 0) {
+				kprintf("timeout=%ld\n", timeout);
 				return timeout;
+			}
 		}
 		if (GEM_SHOW_DEBUG() && !timeout) {
 			/* Presume that timeout was non-zero to begin with! */
@@ -4216,8 +4220,10 @@ int i915_gem_wait_for_idle(struct drm_i915_private *i915,
 		}
 
 		err = wait_for_engines(i915);
-		if (err)
+		if (err) {
+			kprintf("wait_for_engines=%d\n", err);
 			return err;
+		}
 
 		i915_retire_requests(i915);
 		GEM_BUG_ON(i915->gt.active_requests);
@@ -4229,8 +4235,10 @@ int i915_gem_wait_for_idle(struct drm_i915_private *i915,
 			struct i915_timeline *tl = &engine->timeline;
 
 			timeout = wait_for_timeline(tl, flags, timeout);
-			if (timeout < 0)
+			if (timeout < 0) {
+				kprintf("wait_for_timeline#2, timeout=%ld\n", timeout);
 				return timeout;
+			}
 		}
 	}
 
@@ -5802,6 +5810,7 @@ static int __intel_engines_record_defaults(struct drm_i915_private *i915)
 		goto err_active;
 
 	if (i915_gem_wait_for_idle(i915, I915_WAIT_LOCKED, HZ / 5)) {
+		kprintf("i915_gem_wait_for_idle\n");
 		i915_gem_set_wedged(i915);
 		err = -EIO; /* Caller will declare us wedged */
 		goto err_active;
@@ -5964,8 +5973,10 @@ int i915_gem_init(struct drm_i915_private *dev_priv)
 		return ret;
 
 	ret = intel_wopcm_init(&dev_priv->wopcm);
-	if (ret)
+	if (ret) {
+		kprintf("intel_wopcm_init\n");
 		goto err_uc_misc;
+	}
 
 	/* This is just a security blanket to placate dragons.
 	 * On some systems, we very sporadically observe that the first TLBs
@@ -5979,24 +5990,28 @@ int i915_gem_init(struct drm_i915_private *dev_priv)
 	ret = i915_gem_init_ggtt(dev_priv);
 	if (ret) {
 		GEM_BUG_ON(ret == -EIO);
+		kprintf("i915_gem_init_ggtt\n");
 		goto err_unlock;
 	}
 
 	ret = i915_gem_init_scratch(dev_priv,
 				    IS_GEN2(dev_priv) ? SZ_256K : PAGE_SIZE);
 	if (ret) {
+		kprintf("i915_gem_init_scratch\n");
 		GEM_BUG_ON(ret == -EIO);
 		goto err_ggtt;
 	}
 
 	ret = i915_gem_contexts_init(dev_priv);
 	if (ret) {
+		kprintf("i915_gem_contexts_init\n");
 		GEM_BUG_ON(ret == -EIO);
 		goto err_scratch;
 	}
 
 	ret = intel_engines_init(dev_priv);
 	if (ret) {
+		kprintf("intel_engines_init\n");
 		GEM_BUG_ON(ret == -EIO);
 		goto err_context;
 	}
@@ -6004,12 +6019,16 @@ int i915_gem_init(struct drm_i915_private *dev_priv)
 	intel_init_gt_powersave(dev_priv);
 
 	ret = intel_uc_init(dev_priv);
-	if (ret)
+	if (ret) {
+		kprintf("intel_uc_init\n");
 		goto err_pm;
+	}
 
 	ret = i915_gem_init_hw(dev_priv);
-	if (ret)
+	if (ret) {
+		kprintf("i915_gem_init_hw\n");
 		goto err_uc_init;
+	}
 
 	/*
 	 * Despite its name intel_init_clock_gating applies both display
@@ -6023,15 +6042,18 @@ int i915_gem_init(struct drm_i915_private *dev_priv)
 	intel_init_clock_gating(dev_priv);
 
 	ret = __intel_engines_record_defaults(dev_priv);
-	if (ret)
+	if (ret) {
 		goto err_init_hw;
+	}
 
 	if (i915_inject_load_failure()) {
+		kprintf("i915_inject_load_failure#1\n");
 		ret = -ENODEV;
 		goto err_init_hw;
 	}
 
 	if (i915_inject_load_failure()) {
+		kprintf("i915_inject_load_failure#2\n");
 		ret = -EIO;
 		goto err_init_hw;
 	}

@@ -111,6 +111,7 @@ do {						\
  * schedule_timeout: puts the current thread to sleep until timeout
  * if its state allows it to.
  */
+#if 0
 static inline long
 schedule_timeout(signed long timeout)
 {
@@ -177,6 +178,83 @@ done:
 	current->state = TASK_RUNNING;
 	return ret;
 }
+#endif
+
+static inline long
+schedule_timeout(signed long timeout)
+{
+	if (timeout < 0) {
+		kprintf("schedule_timeout(): timeout cannot be negative\n");
+		current->state = TASK_RUNNING;
+		return 0;
+	}
+
+	/*
+	 * Indefinite wait if timeout is MAX_SCHEDULE_TIMEOUT, but we are
+	 * also translating to an integer.  The first conditional will
+	 * cover both but to code defensively test both.
+	 */
+	int timo = timeout >= INT_MAX || timeout == MAX_SCHEDULE_TIMEOUT
+		? 0
+		: timeout;
+
+	spin_lock(&current->kt_spin);
+
+	int flags;
+	switch (current->state) {
+	case TASK_INTERRUPTIBLE:
+		flags = PCATCH;
+		break;
+	case TASK_UNINTERRUPTIBLE:
+		flags = 0;
+		break;
+
+	case TASK_RUNNING:
+		/* bail early, timeout strictly >= 0 */
+		kprintf("TASK_RUNNING\n");
+		ssleep(current, &current->kt_spin, 0, "lst1", 1);
+		spin_unlock(&current->kt_spin);
+		return timeout;
+
+	default:
+		/*
+		 * do not handle currently not ported:
+		 * __TASK_STOPPED and __TASK_TRACED
+		 */
+		panic("unreachable state %ld\n", current->state);
+	}
+	unsigned long time_before = ticks;
+	int error = ssleep(current, &current->kt_spin, flags, "lstim", timo);
+	unsigned long time_after = ticks;
+
+	/* assume timeout actually expired */
+	long ret = 0;
+
+	/*
+	 * timeout is not expired
+	 * ERESTART, EINTR, or wakeup have to result in non-zero return code
+	 */
+	if (error != EWOULDBLOCK) {
+		if (timeout == MAX_SCHEDULE_TIMEOUT) {
+			ret = MAX_SCHEDULE_TIMEOUT;
+		} else {
+			long slept = time_after - time_before;
+			ret = timeout - slept;
+
+			/*
+			 * differentiate between timeout expiration and
+			 * signal/wakeup delivery
+			 */
+			if (ret <= 0)
+				ret = 1;
+		}
+	}
+
+	spin_unlock(&current->kt_spin);
+
+	current->state = TASK_RUNNING;
+	return ret;
+}
 
 static inline void
 schedule(void)
@@ -229,8 +307,8 @@ wake_up_process(struct task_struct *tsk)
 	ostate = tsk->state;
 	tsk->state = TASK_RUNNING;
 	spin_unlock(&tsk->kt_spin);
-	/* if (ostate != TASK_RUNNING) */
-	wakeup(tsk);
+	if (ostate != TASK_RUNNING)
+		wakeup(tsk);
 
 	return 1;	/* Always indicate the process was woken up */
 }
