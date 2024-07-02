@@ -57,7 +57,7 @@ struct drm_printer;
 	param(unsigned int, inject_load_failure, 0) \
 	/* leave bools at the end to not create holes */ \
 	param(bool, alpha_support, IS_ENABLED(CONFIG_DRM_I915_ALPHA_SUPPORT)) \
-	param(bool, enable_hangcheck, false) \
+	param(bool, enable_hangcheck, true) \
 	param(bool, fastboot, false) \
 	param(bool, prefault_disable, false) \
 	param(bool, load_detect_test, false) \

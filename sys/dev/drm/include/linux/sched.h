@@ -211,8 +211,8 @@ schedule_timeout(signed long timeout)
 
 	case TASK_RUNNING:
 		/* bail early, timeout strictly >= 0 */
-		kprintf("TASK_RUNNING\n");
-		ssleep(current, &current->kt_spin, 0, "lst1", 1);
+		//kprintf("TASK_RUNNING\n");
+		//ssleep(current, &current->kt_spin, 0, "lst1", 1);
 		spin_unlock(&current->kt_spin);
 		return timeout;
 

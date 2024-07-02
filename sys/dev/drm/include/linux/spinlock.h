@@ -56,7 +56,6 @@
 static inline void spin_lock_irq(spinlock_t *lock)
 {
 	local_irq_disable();
-	preempt_disable();
 	lockmgr(lock, LK_EXCLUSIVE);
 }
 
@@ -71,7 +70,6 @@ static inline void spin_unlock_irq(spinlock_t *lock)
 {
 	lockmgr(lock, LK_RELEASE);
 	local_irq_enable();
-	preempt_enable();
 }
 
 #if 0
