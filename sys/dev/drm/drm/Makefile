@@ -2,6 +2,7 @@
 
 #KCFLAGS += -g -Og -Wno-error=maybe-uninitialized
 KCFLAGS += -g -Wno-error=maybe-uninitialized
+#KCFLAGS += -DINVARIANTS
 
 KMOD	= drm
 SRCS	= \

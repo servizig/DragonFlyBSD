@@ -2,6 +2,7 @@ KMOD	= i915
 
 #KCFLAGS += -g -Og -Wno-error=maybe-uninitialized
 KCFLAGS += -g -Wno-error=maybe-uninitialized
+#KCFLAGS += -DINVARIANTS
 
 # core driver code
 SRCS =	i915_drv.c \
