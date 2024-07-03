@@ -86,20 +86,20 @@
  * is not of a scalar type.
  */
 static inline void
-__volatile_read(const volatile void *x, int size, void *result)
+__volatile_read(volatile void *x, int size, void *result)
 {
 	switch(size) {
 	case 8:
-		*(uint64_t *)result = *(const volatile uint64_t *)x;
+		*(uint64_t *)result = *(volatile uint64_t *)x;
 		break;
 	case 4:
-		*(uint32_t *)result = *(const volatile uint32_t *)x;
+		*(uint32_t *)result = *(volatile uint32_t *)x;
 		break;
 	case 2:
-		*(uint16_t *)result = *(const volatile uint16_t *)x;
+		*(uint16_t *)result = *(volatile uint16_t *)x;
 		break;
 	case 1:
-		*(uint8_t *)result = *(const volatile uint8_t *)x;
+		*(uint8_t *)result = *(volatile uint8_t *)x;
 		break;
 	default:
 		panic("__volatile_read called with size %d\n", size);

@@ -63,10 +63,16 @@ llist_del_first(struct llist_head *head)
 static inline bool
 llist_add(struct llist_node *new, struct llist_head *head)
 {
-	struct llist_node *first = READ_ONCE(head->first);
+	struct llist_node *first;
+	int counter = 0;
 
 	do {
+		first = READ_ONCE(head->first);
 		new->next = first;
+		counter++;
+		if (counter > 100000000) {
+			panic("boom");
+		}
 	} while (cmpxchg(&head->first, first, new) != first);
 
 	return (first == NULL);
