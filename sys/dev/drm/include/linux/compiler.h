@@ -70,13 +70,16 @@
 
 #define __printf(a,b)			__printflike(a,b)
 
-
+#if 0
 #define barrier()	cpu_ccfence()
+#endif
+#define	barrier()			__asm__ __volatile__("": : :"memory")
 
 #ifdef _KERNEL		/* This file is included by kdump(1) */
 
 #include <sys/param.h>
 
+#if 0
 /*
  * The READ_ONCE() and WRITE_ONCE() macros force volatile accesses to
  * various data types.
@@ -86,20 +89,20 @@
  * is not of a scalar type.
  */
 static inline void
-__volatile_read(volatile void *x, int size, void *result)
+__volatile_read(const volatile void *x, int size, void *result)
 {
 	switch(size) {
 	case 8:
-		*(uint64_t *)result = *(volatile uint64_t *)x;
+		*(uint64_t *)result = *(const volatile uint64_t *)x;
 		break;
 	case 4:
-		*(uint32_t *)result = *(volatile uint32_t *)x;
+		*(uint32_t *)result = *(const volatile uint32_t *)x;
 		break;
 	case 2:
-		*(uint16_t *)result = *(volatile uint16_t *)x;
+		*(uint16_t *)result = *(const volatile uint16_t *)x;
 		break;
 	case 1:
-		*(uint8_t *)result = *(volatile uint8_t *)x;
+		*(uint8_t *)result = *(const volatile uint8_t *)x;
 		break;
 	default:
 		panic("__volatile_read called with size %d\n", size);
@@ -149,6 +152,23 @@ __volatile_write(volatile void *var, int size, void *value)
 	__volatile_write(&(var), sizeof(var), &result.nc_type);	\
 	result.initial_type;					\
 })
+#endif
+
+#define	WRITE_ONCE(x,v) do {		\
+	barrier();			\
+	(*(volatile __typeof(x) *)(uintptr_t)&(x)) = (v); \
+	barrier();			\
+} while (0)
+
+#define	READ_ONCE(x) ({			\
+	__typeof(x) __var = ({		\
+		barrier();		\
+		(*(const volatile __typeof(x) *)&(x)); \
+	});				\
+	barrier();			\
+	__var;				\
+})
+
 
 #define __rcu
 

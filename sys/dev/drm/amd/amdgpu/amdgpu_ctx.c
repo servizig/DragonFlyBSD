@@ -505,11 +505,9 @@ void amdgpu_ctx_priority_override(struct amdgpu_ctx *ctx,
 			ctx->init_priority : ctx->override_priority;
 
 	for (i = 0; i < num_entities; i++) {
-#if 0 /* XXX: enable when upgrade drm to 4.20 */
 		struct drm_sched_entity *entity = &ctx->entities[0][i].entity;
 
 		drm_sched_entity_set_priority(entity, ctx_prio);
-#endif
 	}
 }
 

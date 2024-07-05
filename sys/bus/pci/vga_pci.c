@@ -85,8 +85,6 @@ vga_pci_is_boot_display(device_t dev)
 	if ((pci_get_class(dev) != PCIC_DISPLAY &&
 	    (pci_get_class(dev) != PCIC_OLD ||
 	     pci_get_subclass(dev) != PCIS_OLD_VGA))) {
-		kprintf("pci_get_class(dev) = %#x\n", pci_get_class(dev));
-		kprintf("pci_get_subclass(dev) = %#x\n", pci_get_subclass(dev));
 		return (0);
 	}
 
@@ -99,8 +97,6 @@ vga_pci_is_boot_display(device_t dev)
 		 * call to this function, or the user forced it using
 		 * the hw.pci.default_vgapci_unit tunable.
 		 */
-		kprintf("vga_pci_default_unit = %d\n", vga_pci_default_unit);
-		kprintf("unit = %d\n", unit);
 		return (vga_pci_default_unit == unit);
 	}
 
@@ -122,7 +118,6 @@ vga_pci_is_boot_display(device_t dev)
 		 * value of the "VGA Enable" bit.
 		 */
 		config = pci_read_config(pcib, PCIR_BRIDGECTL_1, 2);
-		kprintf("(PCIB_BCR_VGA_ENABLE) config = %#x\n", config);
 		if ((config & PCIB_BCR_VGA_ENABLE) == 0) {
 			return (0);
 		}
@@ -130,7 +125,6 @@ vga_pci_is_boot_display(device_t dev)
 
 	config = pci_read_config(dev, PCIR_COMMAND, 2);
 	if ((config & (PCIM_CMD_PORTEN | PCIM_CMD_MEMEN)) == 0) {
-		kprintf("(PCIM_CMD_PORTEN | PCIM_CMD_MEMEN) config = %#x\n", config);
 		return (0);
 	}
 
@@ -196,16 +190,13 @@ vga_pci_map_bios(device_t dev, size_t *size)
 	pcib = device_get_parent(device_get_parent(dev));
 	if (device_get_devclass(device_get_parent(pcib)) ==
 	    devclass_find("pci")) {
-kprintf("vga_pci_map_bios: pcib\n");
 		/*
 		 * The parent bridge is a PCI-to-PCI bridge: check the
 		 * value of the "VGA Enable" bit.
 		 */
 		config = pci_read_config(pcib, PCIR_BRIDGECTL_1, 2);
-kprintf("vga_pci_map_bios: config#1: %d\n", config);
 		if ((config & PCIB_BCR_VGA_ENABLE) == 0) {
 			config |= PCIB_BCR_VGA_ENABLE;
-kprintf("vga_pci_map_bios: config#2: %d\n", config);
 			pci_write_config(pcib, PCIR_BRIDGECTL_1, config, 2);
 		}
 	}
@@ -259,7 +250,7 @@ kprintf("vga_pci_map_bios: config#2: %d\n", config);
 	vr = lookup_res(device_get_softc(dev), rid);
 	vga_pci_release_resource(dev, NULL, SYS_RES_MEMORY, rid,
 	    vr->vr_res);
- 
+
 	/*
 	 * re-allocate
 	 */
@@ -383,7 +374,7 @@ vga_pci_suspend(device_t dev)
 static int
 vga_pci_detach(device_t dev)
 {
-	int error; 
+	int error;
 
 	error = bus_generic_detach(dev);
 	if (error == 0)
