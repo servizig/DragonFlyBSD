@@ -333,7 +333,7 @@ static signed long  amdgpu_kiq_reg_write_reg_wait(struct amdgpu_device *adev,
 
 	r = amdgpu_fence_wait_polling(ring, seq, MAX_KIQ_REG_WAIT);
 
-#if 0
+#if 0 /* DFly TODO: implement in_interrupt */
 	/* don't wait anymore for IRQ context */
 	if (r < 1 && in_interrupt())
 		goto failed_kiq;

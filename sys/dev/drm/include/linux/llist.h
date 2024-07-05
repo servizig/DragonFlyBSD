@@ -64,16 +64,10 @@ static inline bool
 llist_add(struct llist_node *new, struct llist_head *head)
 {
 	struct llist_node *first;
-	int counter = 0;
 
 	do {
-		first = READ_ONCE(head->first);
-		new->next = first;
-		counter++;
-		if (counter > 100000000) {
-			panic("boom");
-		}
-	} while (cmpxchg(&head->first, first, new) != first);
+		new->next = first = head->first;
+	} while (!atomic_cmpset_ptr(&head->first, first, new));	
 
 	return (first == NULL);
 }
