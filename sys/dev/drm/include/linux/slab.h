@@ -102,7 +102,6 @@ kmem_cache_free(struct kmem_cache *kc, void *ptr)
 static inline int
 kmem_cache_shrink(struct kmem_cache *c)
 {
-        STUB();
         return 0;
 }
 
