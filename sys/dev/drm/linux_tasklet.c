@@ -89,7 +89,6 @@ static int tasklet_pending = 0;
 		set_bit(TASKLET_STATE_RUN, &t->state);			\
 									\
 		lockmgr(&tasklet_lock, LK_RELEASE);			\
-		kprintf("calling tasklet data=%lu\n", t->data);		\
 		if (t->func)						\
 			t->func(t->data);				\
 		lockmgr(&tasklet_lock, LK_EXCLUSIVE);			\
