@@ -14511,6 +14511,8 @@ static int intel_user_framebuffer_dirty(struct drm_framebuffer *fb,
 {
 	struct drm_i915_gem_object *obj = intel_fb_obj(fb);
 
+	obj->cache_dirty = true;
+
 	i915_gem_object_flush_if_display(obj);
 	intel_fb_obj_flush(obj, ORIGIN_DIRTYFB);
 
