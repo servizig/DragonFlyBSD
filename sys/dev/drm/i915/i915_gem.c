@@ -1890,8 +1890,7 @@ __vma_matches(struct vm_area_struct *vma, struct file *filp,
 static int
 vm_object_map_wc_callback(vm_page_t p, void *data)
 {
-	//pmap_page_set_memattr(p, VM_MEMATTR_WRITE_COMBINING);
-	DRM_DEBUG("phys_addr=0x%lx, fake=%d\n", p->phys_addr, p->flags & PG_FICTITIOUS);
+	pmap_page_set_memattr(p, VM_MEMATTR_WRITE_COMBINING);
 
 	return 0;
 }

@@ -818,7 +818,6 @@ add_vma:
 		err = eb_add_vma(eb, i, batch, vma);
 		if (unlikely(err))
 			goto err_vma;
-		DRM_DEBUG("handle=%d, i=%d, vma=%p\n", handle, i, eb->vma[i]);
 
 		GEM_BUG_ON(vma != eb->vma[i]);
 		GEM_BUG_ON(vma->exec_flags != &eb->flags[i]);
@@ -2238,21 +2237,15 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 	eb.i915 = to_i915(dev);
 	eb.file = file;
 	eb.args = args;
-	DRM_DEBUG("before args->flags=%lld\n", args->flags);
 	if (DBG_FORCE_RELOC || !(args->flags & I915_EXEC_NO_RELOC)) {
 		DRM_DEBUG("appending __EXEC_HAS_RELOC\n");
 		args->flags |= __EXEC_HAS_RELOC;
 	}
 
-	DRM_DEBUG("after args->flags=%lld\n", args->flags);
-	DRM_DEBUG("args->buffer_count=%u, args->batch_start_offset=%u, args->batch_len=%u\n", args->buffer_count, args->batch_start_offset, args->batch_len);
-
 	eb.exec = exec;
 	eb.vma = (struct i915_vma **)(exec + args->buffer_count + 1);
 	eb.vma[0] = NULL;
 	eb.flags = (unsigned int *)(eb.vma + args->buffer_count + 1);
-
-	DRM_DEBUG("eb.vma=%p\n", eb.vma);
 
 	eb.invalid_flags = __EXEC_OBJECT_UNKNOWN_FLAGS;
 	reloc_cache_init(&eb.reloc_cache, eb.i915);
@@ -2270,8 +2263,6 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 	}
 	if (args->flags & I915_EXEC_IS_PINNED)
 		eb.batch_flags |= I915_DISPATCH_PINNED;
-
-	DRM_DEBUG("eb.batch_flags=%u\n", eb.batch_flags);
 
 	eb.engine = eb_select_engine(eb.i915, file, args);
 	if (!eb.engine)

@@ -154,6 +154,7 @@ __volatile_write(volatile void *var, int size, void *value)
 })
 #endif
 
+#if 0
 #define	WRITE_ONCE(x,v) do {		\
 	barrier();			\
 	(*(volatile __typeof(x) *)(uintptr_t)&(x)) = (v); \
@@ -167,6 +168,18 @@ __volatile_write(volatile void *var, int size, void *value)
 	});				\
 	barrier();			\
 	__var;				\
+})
+#endif
+
+#define READ_ONCE(x) ({							\
+	typeof(x) __tmp = *(volatile typeof(x) *)&(x);			\
+	__tmp;								\
+})
+
+#define WRITE_ONCE(x, val) ({						\
+	typeof(x) __tmp = (val);					\
+	*(volatile typeof(x) *)(uintptr_t)&(x) = __tmp;				\
+	__tmp;								\
 })
 
 
