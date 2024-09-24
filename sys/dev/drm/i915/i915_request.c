@@ -530,9 +530,6 @@ void __i915_request_submit(struct i915_request *request)
 	GEM_BUG_ON(intel_engine_signaled(engine, seqno));
 
 	/* We may be recursing from the signal callback of another i915 fence */
-#if 0
-	spin_lock_nested(&request->lock, SINGLE_DEPTH_NESTING);
-#endif
 	lockmgr(&request->lock, LK_EXCLUSIVE);
 	request->global_seqno = seqno;
 	if (test_bit(DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT, &request->fence.flags))
@@ -586,9 +583,6 @@ void __i915_request_unsubmit(struct i915_request *request)
 	engine->timeline.seqno--;
 
 	/* We may be recursing from the signal callback of another i915 fence */
-#if 0
-	spin_lock_nested(&request->lock, SINGLE_DEPTH_NESTING);
-#endif
 	lockmgr(&request->lock, LK_EXCLUSIVE);
 	request->global_seqno = 0;
 	if (test_bit(DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT, &request->fence.flags))

@@ -1,8 +1,5 @@
 .PATH:	${.CURDIR}/.. ${.CURDIR}/../ttm
-
-#KCFLAGS += -g -Og -Wno-error=maybe-uninitialized
-KCFLAGS += -g -Wno-error=maybe-uninitialized
-#KCFLAGS += -DINVARIANTS
+KCFLAGS += -g -DINVARIANTS
 
 KMOD	= drm
 SRCS	= \
@@ -94,7 +91,7 @@ SRCS	= \
 	linux_sched.c \
 	linux_shmem.c \
 	linux_sort.c \
-	linux_tasklet_v2.c \
+	linux_tasklet.c \
 	linux_vmalloc.c \
 	linux_wait.c \
 	linux_workqueue.c \

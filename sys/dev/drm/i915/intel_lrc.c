@@ -1819,11 +1819,7 @@ static int gen8_init_common_ring(struct intel_engine_cs *engine)
 	if (GEM_SHOW_DEBUG() && unexpected_starting_state(engine)) {
 		struct drm_printer p = drm_debug_printer(__func__);
 
-#if 0
 		intel_engine_dump(engine, &p, NULL);
-#else
-		intel_engine_dump(engine, &p, "\n");
-#endif
 	}
 
 	enable_execlists(engine);
@@ -2306,7 +2302,7 @@ void intel_logical_ring_cleanup(struct intel_engine_cs *engine)
 	 * so this is just for documentation.
 	 */
 	if (WARN_ON(test_bit(TASKLET_STATE_SCHED,
-			     &engine->execlists.tasklet.tasklet_state)))
+			     &engine->execlists.tasklet.state)))
 		tasklet_kill(&engine->execlists.tasklet);
 
 	dev_priv = engine->i915;

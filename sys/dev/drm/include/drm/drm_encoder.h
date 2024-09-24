@@ -179,9 +179,7 @@ struct drm_encoder {
 
 #define obj_to_encoder(x) container_of(x, struct drm_encoder, base)
 
-#if 0 /* causes -Werror=nonnull-compare */
 __printf(5, 6)
-#endif
 int drm_encoder_init(struct drm_device *dev,
 		     struct drm_encoder *encoder,
 		     const struct drm_encoder_funcs *funcs,

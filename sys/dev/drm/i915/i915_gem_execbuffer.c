@@ -2317,27 +2317,6 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 		args->flags &= ~__EXEC_HAS_RELOC;
 		goto err_vma;
 	}
-#if 0
-	for (int i = 0; i < eb.buffer_count; i++) {
-		struct i915_vma *vma = eb.vma[i];
-		DRM_DEBUG("vma=%p\n", vma);
-		vm_object_t vm_obj = vma->obj.base->filp;
-		struct i915_ggtt *ggtt = eb.i915->ggtt;
-
-		vm_page_t m = vm_phys_fictitious_to_vm_page(ggtt->gmadr.start +
-			vma->node.start);
-		if (m == NULL) {
-			kprintf("i915: caught bug() (phys_fict_to_vm)\n");
-		}
-		KASSERT((m->flags & PG_FICTITIOUS) != 0, ("not fictitious %p", m));
-		KASSERT(m->wire_count == 1, ("wire_count not 1 %p", m));
-
-		if (vm_page_busy_try(m, false)) {
-			kprintf("i915_gem_execbuffer: BUSY(2)\n");
-		}
-
-	}
-#endif
 
 	if (unlikely(*eb.batch->exec_flags & EXEC_OBJECT_WRITE)) {
 		DRM_DEBUG("Attempting to use self-modifying batch buffer\n");
@@ -2443,10 +2422,6 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 	 * to explicitly hold another reference here.
 	 */
 	eb.request->batch = eb.batch;
-#if 0
-	struct drm_printer p = drm_debug_printer(__func__);
-	drm_mm_print(&eb.vma[0]->vm->mm, &p);
-#endif
 
 	trace_i915_request_queue(eb.request, eb.batch_flags);
 	err = eb_submit(&eb);

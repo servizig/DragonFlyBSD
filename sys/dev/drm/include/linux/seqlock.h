@@ -171,24 +171,20 @@ raw_read_seqcount(const seqcount_t *s)
 	return value;
 }
 
-/* TODO: check me */
 static inline void
 write_seqlock_irqsave(seqlock_t *sl, unsigned long flags)
 {
 	local_irq_save(flags);
-	crit_enter();
 	lockmgr(&sl->lock, LK_EXCLUSIVE);
 	sl->sequence++;
 }
 
-/* TODO: check me */
 static inline void
 write_sequnlock_irqrestore(seqlock_t *sl, unsigned long flags)
 {
 	sl->sequence--;
 	lockmgr(&sl->lock, LK_RELEASE);
 	local_irq_restore(flags);
-	crit_exit();
 }
 
 #endif	/* _LINUX_SEQLOCK_H_ */

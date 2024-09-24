@@ -1,9 +1,5 @@
 KMOD	= i915
 
-#KCFLAGS += -g -Og -Wno-error=maybe-uninitialized
-KCFLAGS += -g -Wno-error=maybe-uninitialized
-#KCFLAGS += -DINVARIANTS
-
 # core driver code
 SRCS =	i915_drv.c \
 	i915_irq.c \
@@ -130,14 +126,14 @@ SRCS += i915_perf.c \
 
 SRCS += i915_query.c \
 	i915_request.c \
- 	icl_dsi.c \
- 	intel_guc_ads.c \
- 	intel_hdcp.c \
- 	intel_huc_fw.c \
- 	intel_wopcm.c \
- 	intel_workarounds.c \
- 	vlv_dsi.c \
- 	vlv_dsi_pll.c \
+	icl_dsi.c \
+	intel_guc_ads.c \
+	intel_hdcp.c \
+	intel_huc_fw.c \
+	intel_wopcm.c \
+	intel_workarounds.c \
+	vlv_dsi.c \
+	vlv_dsi_pll.c \
 	i915_timeline.c
 
 SRCS += i915_module.c

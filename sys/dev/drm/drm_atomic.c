@@ -393,7 +393,7 @@ static void drm_atomic_crtc_print_state(struct drm_printer *p,
 static int drm_atomic_connector_check(struct drm_connector *connector,
 		struct drm_connector_state *state)
 {
-	struct drm_crtc_state *crtc_state;
+	struct drm_crtc_state *crtc_state = NULL;
 	struct drm_writeback_job *writeback_job = state->writeback_job;
 
 	if ((connector->connector_type != DRM_MODE_CONNECTOR_WRITEBACK) || !writeback_job)
@@ -409,7 +409,7 @@ static int drm_atomic_connector_check(struct drm_connector *connector,
 		crtc_state = drm_atomic_get_existing_crtc_state(state->state,
 								state->crtc);
 
-	if (writeback_job->fb && !crtc_state->active) {
+	if (writeback_job->fb && crtc_state != NULL && !crtc_state->active) {
 		DRM_DEBUG_ATOMIC("[CONNECTOR:%d:%s] has framebuffer, but [CRTC:%d] is off\n",
 				 connector->base.id, connector->name,
 				 state->crtc->base.id);

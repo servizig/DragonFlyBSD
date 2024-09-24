@@ -434,10 +434,8 @@ void amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,
 	aconnector->dm_dp_aux.ddc_service = aconnector->dc_link->ddc;
 
 	drm_dp_aux_register(&aconnector->dm_dp_aux.aux);
-#if 0 /* enable when upgrade to 4.20 */
 	drm_dp_cec_register_connector(&aconnector->dm_dp_aux.aux,
 				      aconnector->base.name, dm->adev->dev);
-#endif
 	aconnector->mst_mgr.cbs = &dm_mst_cbs;
 	drm_dp_mst_topology_mgr_init(
 		&aconnector->mst_mgr,

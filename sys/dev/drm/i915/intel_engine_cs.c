@@ -1357,7 +1357,7 @@ static void intel_engine_print_registers(const struct intel_engine_cs *engine,
 			   read, write,
 			   GEN8_CSB_WRITE_PTR(I915_READ(RING_CONTEXT_STATUS_PTR(engine))),
 			   yesno(test_bit(TASKLET_STATE_SCHED,
-					  &engine->execlists.tasklet.tasklet_state)),
+					  &engine->execlists.tasklet.state)),
 			   enableddisabled(!atomic_read(&engine->execlists.tasklet.count)));
 		if (read >= GEN8_CSB_ENTRIES)
 			read = 0;
@@ -1452,17 +1452,13 @@ void intel_engine_dump(struct intel_engine_cs *engine,
 	struct rb_node *rb;
 	int count;
 
-#if 0
 	if (header) {
-#endif
 		va_list ap;
 
 		va_start(ap, header);
 		drm_vprintf(m, header, &ap);
 		va_end(ap);
-#if 0
 	}
-#endif
 
 	if (i915_terminally_wedged(&engine->i915->gpu_error))
 		drm_printf(m, "*** WEDGED ***\n");

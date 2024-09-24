@@ -3277,9 +3277,7 @@ void i915_handle_error(struct drm_i915_private *dev_priv,
 	char error_msg[80];
 	char *msg = NULL;
 
-#if 0 /* nonnull argument 'fmt' compared to NULL */
 	if (fmt) {
-#endif
 		va_list args;
 
 		va_start(args, fmt);
@@ -3287,9 +3285,7 @@ void i915_handle_error(struct drm_i915_private *dev_priv,
 		va_end(args);
 
 		msg = error_msg;
-#if 0
 	}
-#endif
 
 	/*
 	 * In most cases it's guaranteed that we get here with an RPM

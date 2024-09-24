@@ -2831,6 +2831,7 @@ void i915_handle_error(struct drm_i915_private *dev_priv,
 		       u32 engine_mask,
 		       unsigned long flags,
 		       const char *fmt, ...);
+
 #define I915_ERROR_CAPTURE BIT(0)
 
 extern void intel_irq_init(struct drm_i915_private *dev_priv);
