@@ -43,5 +43,14 @@
 #define PT_SETFPREGS    (PT_FIRSTMACH + 4)
 #define PT_GETDBREGS    (PT_FIRSTMACH + 5)
 #define PT_SETDBREGS    (PT_FIRSTMACH + 6)
+#define PT_GETFSBASE	(PT_FIRSTMACH + 7)
+
+#ifdef _KERNEL
+
+#define PT_LASTMACH PT_GETFSBASE
+
+int ptrace_req_mach(int req, struct proc *p, struct lwp *lp, void *user_addr,
+		       int data, int *res);
+#endif
 
 #endif

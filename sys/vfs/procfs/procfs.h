@@ -37,6 +37,8 @@
  * $DragonFly: src/sys/vfs/procfs/procfs.h,v 1.8 2007/02/19 01:14:24 corecode Exp $
  */
 
+#include <sys/vfsops.h>
+
 /*
  * The different types of node in a procfs filesystem
  */

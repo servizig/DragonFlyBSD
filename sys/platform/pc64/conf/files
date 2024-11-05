@@ -156,6 +156,7 @@ platform/pc64/x86_64/cpufreq_machdep.c    standard
 platform/pc64/x86_64/msi.c		standard
 platform/pc64/x86_64/__udivti3.c	standard
 platform/pc64/x86_64/uwrapper.c		standard
+platform/pc64/x86_64/ptrace_machdep.c	standard
 
 platform/pc64/apic/lapic.c		standard
 platform/pc64/apic/ioapic.c		standard

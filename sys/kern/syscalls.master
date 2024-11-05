@@ -69,7 +69,7 @@
 23	STD	{ int setuid(uid_t uid); }
 24	STD	{ uid_t getuid(void); }
 25	STD	{ uid_t geteuid(void); }
-26	STD	{ int ptrace(int req, pid_t pid, caddr_t addr, \
+26	STD	{ int ptrace(int req, long pid, caddr_t addr, \
 			    int data); }
 27	STD	{ int recvmsg(int s, struct msghdr *msg, int flags); }
 28	STD	{ int sendmsg(int s, caddr_t msg, int flags); }

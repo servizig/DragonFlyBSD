@@ -115,7 +115,7 @@ struct	geteuid_args {
 };
 struct	ptrace_args {
 	int	req;	char req_[PAD_(int)];
-	pid_t	pid;	char pid_[PAD_(pid_t)];
+	long	pid;	char pid_[PAD_(long)];
 	caddr_t	addr;	char addr_[PAD_(caddr_t)];
 	int	data;	char data_[PAD_(int)];
 };

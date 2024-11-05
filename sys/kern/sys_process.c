@@ -41,6 +41,8 @@
 #include <sys/ptrace.h>
 #include <sys/reg.h>
 #include <sys/lock.h>
+#include <sys/types.h>
+#include <sys/malloc.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -209,6 +211,399 @@ pwrite (struct proc *procp, unsigned int addr, unsigned int datum)
 	return rv;
 }
 #endif
+
+static inline int
+req_is_valid(int req)
+{
+	if (PT_REQ_IS_GENERIC(req))
+		return 1;
+
+#ifdef PT_LASTMACH
+	if (PT_REQ_IS_MACH(req))
+		return 1;
+#endif
+
+	return 0;
+}
+
+/*
+ * Permissions check. Returns non-zero on error.
+ * Called with PHOLD(p) and lwkt token held.
+ * Request id must be valid.
+ */
+static int
+ptrace_check_perms(struct proc *curp, struct proc *p, int req)
+{
+	struct proc *pp;
+	int error;
+
+	if (req == PT_TRACE_ME) {
+		/* Always legal. */
+		return 0;
+	} else if (req == PT_ATTACH) {
+		/* Self */
+		if (p->p_pid == curp->p_pid) {
+			return EINVAL;
+		}
+
+		/* Already traced */
+		if (p->p_flags & P_TRACED) {
+			return EBUSY;
+		}
+
+		if (curp->p_flags & P_TRACED) {
+			for (pp = curp->p_pptr; pp != NULL; pp = pp->p_pptr) {
+				if (pp == p) {
+					return EINVAL;
+				}
+			}
+		}
+
+		/* not owned by you, has done setuid (unless you're root) */
+		if ((p->p_ucred->cr_ruid != curp->p_ucred->cr_ruid) ||
+		     (p->p_flags & P_SUGID)) {
+			error = caps_priv_check(curp->p_ucred,
+						SYSCAP_RESTRICTEDROOT);
+			if (error) {
+				return error;
+			}
+		}
+
+		/* can't trace init when securelevel > 0 */
+		if (securelevel > 0 && p->p_pid == 1) {
+			return EPERM;
+		}
+
+		/* OK */
+		return 0;
+	} else {
+		/* not being traced... */
+		if ((p->p_flags & P_TRACED) == 0) {
+			return EPERM;
+		}
+
+		/* not being traced by YOU */
+		if (p->p_pptr != curp) {
+			return EBUSY;
+		}
+
+		/* not currently stopped */
+		if (p->p_stat != SSTOP || (p->p_flags & P_WAITED) == 0) {
+			return EBUSY;
+		}
+
+		/* OK */
+		return 0;
+	}
+}
+
+/*
+ * Performs generic ptrace request.
+ * Request id was validated before.
+ * Called with PHOLD(p), LWPHOLD(lwp), and lwkt token held.
+ * NOTE! User addr points at userspace address.
+ */
+static int
+ptrace_req_generic(int req, struct proc *p, struct lwp *lp, void *user_addr,
+		   int data, int *res)
+{
+	struct proc *curp = curproc;
+	struct ptrace_io_desc piod;
+	struct iovec iov;
+	struct uio uio;
+	struct lwp *tmplp;
+	int *buf;
+	int write, tmp, nthreads;
+	int error = 0;
+
+	write = 0;
+	switch (req) {
+	case PT_TRACE_ME:
+		/* set my trace flag and "owner" so it can read/write me */
+		p->p_flags |= P_TRACED;
+		p->p_oppid = p->p_pptr->p_pid;
+		return 0;
+
+	case PT_ATTACH:
+		/* security check done above */
+		p->p_flags |= P_TRACED;
+		p->p_oppid = p->p_pptr->p_pid;
+		proc_reparent(p, curp);
+		data = SIGSTOP;
+		goto sendsig;	/* in PT_CONTINUE below */
+
+
+	case PT_KILL:
+		data = SIGKILL;
+		goto sendsig;	/* in PT_CONTINUE below */
+
+	case PT_STEP:
+	case PT_CONTINUE:
+	case PT_DETACH:
+		/* Zero means do not send any signal */
+		if (data < 0 || data >= _SIG_MAXSIG) {
+			return EINVAL;
+		}
+
+		if (req == PT_STEP) {
+			if ((error = ptrace_single_step (lp))) {
+				return error;
+			}
+		}
+
+		if (user_addr != (void *)1) {
+			if ((error = ptrace_set_pc (lp, (u_long)user_addr))) {
+				return error;
+			}
+		}
+
+		if (req == PT_DETACH) {
+			/* reset process parent */
+			if (p->p_oppid != p->p_pptr->p_pid) {
+				struct proc *pp;
+
+				pp = pfind(p->p_oppid);
+				if (pp) {
+					proc_reparent(p, pp);
+					PRELE(pp);
+				}
+			}
+
+			p->p_flags &= ~(P_TRACED | P_WAITED);
+			p->p_oppid = 0;
+
+			/* should we send SIGCHLD? */
+		}
+
+	sendsig:
+		/*
+		 * Deliver or queue signal.  If the process is stopped
+		 * force it to be SACTIVE again.
+		 */
+		crit_enter();
+		if (p->p_stat == SSTOP) {
+			p->p_xstat = data;
+			proc_unstop(p, SSTOP);
+		} else if (data) {
+			ksignal(p, data);
+		}
+		crit_exit();
+		return 0;
+
+
+	case PT_WRITE_I:
+	case PT_WRITE_D:
+		write = 1;
+		/* fallthrough */
+	case PT_READ_I:
+	case PT_READ_D:
+		/*
+		 * NOTE! uio_offset represents the offset in the target
+		 * process.  The iov is in the current process (the guy
+		 * making the ptrace call) so uio_td must be the current
+		 * process (though for a SYSSPACE transfer it doesn't
+		 * really matter).
+		 */
+		tmp = 0;
+		/* write = 0 set above */
+		iov.iov_base = write ? (caddr_t)&user_addr : (caddr_t)&tmp;
+		iov.iov_len = sizeof(int);
+		uio.uio_iov = &iov;
+		uio.uio_iovcnt = 1;
+		uio.uio_offset = (off_t)(uintptr_t)user_addr;
+		uio.uio_resid = sizeof(int);
+		uio.uio_segflg = UIO_SYSSPACE;
+		uio.uio_rw = write ? UIO_WRITE : UIO_READ;
+		uio.uio_td = curthread;
+		error = procfs_domem(curp, lp, NULL, &uio);
+		if (uio.uio_resid != 0) {
+			/*
+			 * XXX procfs_domem() doesn't currently return ENOSPC,
+			 * so I think write() can bogusly return 0.
+			 * XXX what happens for short writes?  We don't want
+			 * to write partial data.
+			 * XXX procfs_domem() returns EPERM for other invalid
+			 * addresses.  Convert this to EINVAL.  Does this
+			 * clobber returns of EPERM for other reasons?
+			 */
+			if (error == 0 || error == ENOSPC || error == EPERM)
+				error = EINVAL;	/* EOF */
+		}
+		if (!write)
+			*res = tmp;
+		return error;
+
+	case PT_IO:
+		/*
+		 * NOTE! uio_offset represents the offset in the target
+		 * process.  The iov is in the current process (the guy
+		 * making the ptrace call) so uio_td must be the current
+		 * process.
+		 */
+		error = copyin(user_addr, &piod, sizeof(piod));
+		if (error)
+			return error;
+//		piod = addr;
+		iov.iov_base = piod.piod_addr;
+		iov.iov_len = piod.piod_len;
+		uio.uio_iov = &iov;
+		uio.uio_iovcnt = 1;
+		uio.uio_offset = (off_t)(uintptr_t)piod.piod_offs;
+		uio.uio_resid = piod.piod_len;
+		uio.uio_segflg = UIO_USERSPACE;
+		uio.uio_td = curthread;
+		switch (piod.piod_op) {
+		case PIOD_READ_D:
+		case PIOD_READ_I:
+			uio.uio_rw = UIO_READ;
+			break;
+		case PIOD_WRITE_D:
+		case PIOD_WRITE_I:
+			uio.uio_rw = UIO_WRITE;
+			break;
+		default:
+			return EINVAL;
+		}
+		error = procfs_domem(curp, lp, NULL, &uio);
+		piod.piod_len -= uio.uio_resid;
+		if (error == 0)
+			copyout(&piod, user_addr, sizeof(piod));
+		return error;
+
+	case PT_GETNUMLWPS:
+		*res = p->p_nthreads;
+		break;
+	case PT_GETLWPLIST:
+		if (data <= 0)
+			return EINVAL;
+		nthreads = MIN(data, p->p_nthreads);
+		tmp = 0;
+		buf = kmalloc(nthreads * sizeof(lwpid_t), M_TEMP, M_WAITOK); 
+		FOREACH_LWP_IN_PROC(tmplp, p) {
+			if (tmp >= nthreads)
+				break;
+			buf[tmp] = tmplp->lwp_tid;
+			tmp++;
+		}
+		error = copyout(buf, user_addr, nthreads * sizeof(lwpid_t));
+		kfree(buf, M_TEMP);
+		if (!error)
+			*res = nthreads;
+		break;
+	default:
+		return EINVAL;
+	}
+
+	return error;
+}
+
+/*
+ * Process debugging system call.
+ *
+ * MPALMOSTSAFE
+ */
+int
+sys_ptrace(struct sysmsg *sysmsg, const struct ptrace_args *uap)
+{
+	int error = 0;
+
+	error = kern_ptrace(uap->req, uap->pid, uap->addr, uap->data,
+			    &sysmsg->sysmsg_result);
+	return (error);
+}
+
+int
+kern_ptrace(int req, ptrace_ptid_t ptid, void *user_addr, int data, int *res)
+{
+	struct proc *curp = curproc;
+	struct proc *p;
+	struct lwp *lp;
+	int error = 0;
+	pid_t pid = PTRACE_GET_PID(ptid);
+	lwpid_t lwpid = PTRACE_GET_LWPID(ptid);
+
+	kprintf("req=%d, pid=%d, lwpid=%d\n", req, pid, lwpid);
+	/*
+	 * Validate request id.
+	 */
+	if (!req_is_valid(req))
+		return EINVAL;
+
+	if (req == PT_TRACE_ME) {
+		p = curp;
+		PHOLD(p);
+	} else {
+		if ((p = pfind(pid)) == NULL)
+			return ESRCH;
+	}
+	if (!PRISON_CHECK(curp->p_ucred, p->p_ucred)) {
+		error = ESRCH;
+		goto err_proc;
+	}
+	if (p->p_flags & P_SYSTEM) {
+		error = EINVAL;
+		goto err_proc;
+	}
+
+	lwkt_gettoken(&p->p_token);
+	/* Can't trace a process that's currently exec'ing. */
+	if ((p->p_flags & P_INEXEC) != 0) {
+		error = EAGAIN;
+		goto err_lwkt;
+	}
+
+	/*
+	 * Permissions check
+	 */
+	error = ptrace_check_perms(curp, p, req);
+	if (error)
+		goto err_lwkt;
+
+	/* XXX lwp */
+	lp = NULL;
+	if (lwpid == 0) {
+		lp = FIRST_LWP_IN_PROC(p);
+		if (lp != NULL)
+			LWPHOLD(lp);
+	} else {
+		lp = lwpfind(p, lwpid);
+	}
+	if (lp == NULL) {
+		error = EINVAL;
+		goto err_lwkt;
+	}
+
+#ifdef FIX_SSTEP
+	/*
+	 * Single step fixup ala procfs
+	 */
+	FIX_SSTEP(lp);
+#endif
+
+	/*
+	 * Actually do the requests
+	 */
+
+	*res = 0;
+
+	if (PT_REQ_IS_GENERIC(req)) {
+		error = ptrace_req_generic(req, p, lp, user_addr, data, res);
+	}
+#ifdef PT_LASTMACH
+	else if (PT_REQ_IS_MACH(req)) {
+		error = ptrace_req_mach(req, p, lp, user_addr, data, res);
+	}
+#endif
+
+	LWPRELE(lp);
+err_lwkt:
+	lwkt_reltoken(&p->p_token);
+err_proc:
+	PRELE(p);
+	return error;
+}
+
+#if 0
 
 /*
  * Process debugging system call.
@@ -725,6 +1120,8 @@ kern_ptrace(struct proc *curp, int req, pid_t pid, void *addr,
 
 	return 0;
 }
+
+#endif
 
 int
 trace_req(struct proc *p)

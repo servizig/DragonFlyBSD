@@ -132,6 +132,10 @@ typedef	__off_t		off_t;		/* file offset */
 typedef	__pid_t		pid_t;		/* process id */
 #define	_PID_T_DECLARED
 #endif
+#ifndef _PTRACE_PTID_T_DECLARED
+typedef __int64_t	ptrace_ptid_t;	/* ptrace process and thread ids */
+#define _PTRACE_PTID_T_DECLARED
+#endif
 #if __BSD_VISIBLE
 typedef	__register_t	register_t;	/* register-sized type */
 #ifndef _RLIM_T_DECLARED

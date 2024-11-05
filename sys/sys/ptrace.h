@@ -52,6 +52,10 @@
 #define	PT_DETACH	11	/* stop tracing a process */
 #define	PT_IO		12	/* do I/O to/from stopped process. */
 
+#define PT_GETNUMLWPS	13	/* number of user threads */
+#define PT_GETLWPLIST	14	/* array of user thread ids */
+/* Don't forget to update PT_LASTGENERIC */
+
 #define	PT_FIRSTMACH	32	/* for machine-specific requests */
 
 #ifndef _MACHINE_PTRACE_H_
@@ -75,13 +79,26 @@ struct ptrace_io_desc {
 
 #ifdef _KERNEL
 
+#define PTRACE_PID_MASK		((1LL << 32) - 1)
+#define PTRACE_LWPID_MASK	(((1LL << 32) - 1) << 32)
+#define PTRACE_GET_PID(ptid)	(ptid & PTRACE_PID_MASK)
+#define PTRACE_GET_LWPID(ptid)	((ptid & PTRACE_LWPID_MASK) >> 32)
+
+#define PT_REQ_IS_GENERIC(req)	(PT_FIRSTGENERIC <= (req) && (req) <= PT_LASTGENERIC)
+#ifdef PT_LASTMACH
+#define PT_REQ_IS_MACH(req)	(PT_FIRSTMACH <= (req) && (req) <= PT_LASTMACH)
+#endif
+
+#define PT_FIRSTGENERIC PT_TRACE_ME
+#define PT_LASTGENERIC PT_GETLWPLIST
+
 struct proc;
 struct lwp;
 
 void	proc_reparent (struct proc *child, struct proc *newparent);
 int	ptrace_set_pc (struct lwp *p, unsigned long addr);
 int	ptrace_single_step (struct lwp *lp);
-int	kern_ptrace (struct proc *p, int req, pid_t pid, void *addr,
+int	kern_ptrace (int req, ptrace_ptid_t pid, void *addr,
 		int data, int *res);
 
 #else /* !_KERNEL */
@@ -91,7 +108,7 @@ int	kern_ptrace (struct proc *p, int req, pid_t pid, void *addr,
 #endif
 
 __BEGIN_DECLS
-int	ptrace (int, pid_t, caddr_t, int);
+int	ptrace (int, ptrace_ptid_t, caddr_t, int);
 __END_DECLS
 
 #endif /* _KERNEL */
