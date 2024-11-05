@@ -71,6 +71,9 @@
 #define PATH_RTLD	"/usr/libexec/ld-elf.so.2"
 #define LD_ARY_CACHE	16
 
+size_t _rtld_entry_off_linkmap = offsetof(Obj_Entry, linkmap);
+size_t _rtld_entry_off_tlsindex = offsetof(Obj_Entry, tlsindex);
+
 /* Types. */
 typedef void (*func_ptr_type)();
 typedef void * (*path_enum_proc) (const char *path, size_t len, void *arg);

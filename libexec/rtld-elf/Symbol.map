@@ -18,6 +18,11 @@ DF402.0 {
     r_debug_state;
 };
 
+DF606.0 {
+    _rtld_entry_off_linkmap;
+    _rtld_entry_off_tlsindex;
+};
+
 DFprivate_1.0 {
     _rtld_allocate_tls;
     _rtld_free_tls;
