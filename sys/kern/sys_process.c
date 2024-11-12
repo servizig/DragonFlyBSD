@@ -31,6 +31,9 @@
  * $FreeBSD: src/sys/kern/sys_process.c,v 1.51.2.6 2003/01/08 03:06:45 kan Exp $
  */
 
+#include "sys/select.h"
+#include "sys/signal.h"
+#include "sys/signalvar.h"
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysmsg.h>
@@ -53,6 +56,7 @@
 
 #include <sys/thread2.h>
 #include <sys/spinlock2.h>
+#include <sys/signal2.h>
 
 /* use the equivalent procfs code */
 #if 0
@@ -284,17 +288,118 @@ ptrace_check_perms(struct proc *curp, struct proc *p, int req)
 
 		/* not being traced by YOU */
 		if (p->p_pptr != curp) {
+			kprintf("p->p_pptr != curp\n");
 			return EBUSY;
 		}
 
-		/* not currently stopped */
-		if (p->p_stat != SSTOP || (p->p_flags & P_WAITED) == 0) {
-			return EBUSY;
+		if (req != PT_GETNEXTEVENT) {
+			/* not currently stopped */
+			if (p->p_stat != SSTOP) {
+				kprintf("p->p_stat != SSTOP\n");
+				return EBUSY;
+			}
 		}
 
 		/* OK */
 		return 0;
 	}
+}
+
+static struct lwp*
+get_signaled_lwp(struct proc *p)
+{
+	struct lwp *tmplp;
+	int signal = 0;
+
+	FOREACH_LWP_IN_PROC(tmplp, p) {
+		signal = CURSIG_NOBLOCK(tmplp);
+		if (signal)
+			return tmplp;
+	}
+
+	return NULL;
+}
+
+static int
+get_signal_lwp(struct lwp *lwp)
+{
+	int i;
+	sigset_t sigset = lwp_sigpend(lwp);
+	for (i = 1; i < _SIG_MAXSIG; i++) {
+		if (SIGISMEMBER(sigset, i))
+			return i;
+	}
+	return 0;
+}
+
+static int
+wait_next_event(struct proc *p, struct lwp *lp, void *user_addr,
+		struct ptrace_event *event)
+{
+	struct lwp *tmplp;
+	int error = 0;
+
+	if (user_addr == NULL)
+		return EINVAL;
+
+	event->status = PT_EV_NONE;
+
+	/* Check if process has exited and turned into zombie */
+	if (p->p_stat == SZOMB) {
+		event->status = PT_EV_PROC_EXITED;
+		return 0;
+	}
+
+	tmplp = get_signaled_lwp(p);
+
+	if (tmplp) {
+		event->status = PT_EV_SIGNALED;
+		event->lwpid = tmplp->lwp_tid;
+		event->signal = get_signal_lwp(tmplp);
+		kprintf("first: lwpid=%d, signal=%d\n",
+			event->lwpid, event->signal);
+		atomic_set_int(&p->p_ptrace_events, 0);
+		error = copyout(event, user_addr, sizeof(*event));
+		return error;
+	}
+
+	kprintf("p->p_ptrace_events=%d\n", p->p_ptrace_events);
+
+	if (p->p_ptrace_events == 0) {
+		tsleep_interlock(&p->p_ptrace_events, PCATCH);
+		cpu_ccfence();
+		if (p->p_ptrace_events == 0) {
+			atomic_set_int(&p->p_ptrace_events, 0);
+
+			LWPRELE(lp);
+			/* XXX: is it needed? */
+			lwkt_reltoken(&p->p_token);
+			PRELE(p);
+
+			error = tsleep(&p->p_ptrace_events,
+				       PCATCH | PINTERLOCKED, "ptnextevent", 0);
+
+			PHOLD(p);
+			/* XXX: is it needed? */
+			lwkt_gettoken(&p->p_token);
+			LWPHOLD(lp);
+
+			if (error)
+				return error;
+			tmplp = get_signaled_lwp(p);
+			if (tmplp) {
+				event->status = PT_EV_SIGNALED;
+				event->lwpid = tmplp->lwp_tid;
+				event->signal = get_signal_lwp(tmplp);
+				kprintf("second: lwpid=%d, signal=%d\n",
+					event->lwpid, event->signal);
+				error = copyout(event, user_addr, sizeof(*event));
+				return error;
+			}
+		}
+	}
+
+	return error;
 }
 
 /*
@@ -308,13 +413,20 @@ ptrace_req_generic(int req, struct proc *p, struct lwp *lp, void *user_addr,
 		   int data, int *res)
 {
 	struct proc *curp = curproc;
-	struct ptrace_io_desc piod;
 	struct iovec iov;
 	struct uio uio;
 	struct lwp *tmplp;
 	int *buf;
 	int write, tmp, nthreads;
 	int error = 0;
+
+	/*
+	 * XXX this obfuscation is to reduce stack usage.
+	 */
+	union {
+		struct ptrace_io_desc piod;
+		struct ptrace_event event;
+	} r;
 
 	write = 0;
 	switch (req) {
@@ -440,19 +552,19 @@ ptrace_req_generic(int req, struct proc *p, struct lwp *lp, void *user_addr,
 		 * making the ptrace call) so uio_td must be the current
 		 * process.
 		 */
-		error = copyin(user_addr, &piod, sizeof(piod));
+		error = copyin(user_addr, &r.piod, sizeof(r.piod));
 		if (error)
 			return error;
 //		piod = addr;
-		iov.iov_base = piod.piod_addr;
-		iov.iov_len = piod.piod_len;
+		iov.iov_base = r.piod.piod_addr;
+		iov.iov_len = r.piod.piod_len;
 		uio.uio_iov = &iov;
 		uio.uio_iovcnt = 1;
-		uio.uio_offset = (off_t)(uintptr_t)piod.piod_offs;
-		uio.uio_resid = piod.piod_len;
+		uio.uio_offset = (off_t)(uintptr_t)r.piod.piod_offs;
+		uio.uio_resid = r.piod.piod_len;
 		uio.uio_segflg = UIO_USERSPACE;
 		uio.uio_td = curthread;
-		switch (piod.piod_op) {
+		switch (r.piod.piod_op) {
 		case PIOD_READ_D:
 		case PIOD_READ_I:
 			uio.uio_rw = UIO_READ;
@@ -465,9 +577,9 @@ ptrace_req_generic(int req, struct proc *p, struct lwp *lp, void *user_addr,
 			return EINVAL;
 		}
 		error = procfs_domem(curp, lp, NULL, &uio);
-		piod.piod_len -= uio.uio_resid;
+		r.piod.piod_len -= uio.uio_resid;
 		if (error == 0)
-			copyout(&piod, user_addr, sizeof(piod));
+			copyout(&r.piod, user_addr, sizeof(r.piod));
 		return error;
 
 	case PT_GETNUMLWPS:
@@ -478,7 +590,7 @@ ptrace_req_generic(int req, struct proc *p, struct lwp *lp, void *user_addr,
 			return EINVAL;
 		nthreads = MIN(data, p->p_nthreads);
 		tmp = 0;
-		buf = kmalloc(nthreads * sizeof(lwpid_t), M_TEMP, M_WAITOK); 
+		buf = kmalloc(nthreads * sizeof(lwpid_t), M_TEMP, M_WAITOK);
 		FOREACH_LWP_IN_PROC(tmplp, p) {
 			if (tmp >= nthreads)
 				break;
@@ -489,6 +601,15 @@ ptrace_req_generic(int req, struct proc *p, struct lwp *lp, void *user_addr,
 		kfree(buf, M_TEMP);
 		if (!error)
 			*res = nthreads;
+		break;
+	case PT_GETNEXTEVENT:
+		error = wait_next_event(p, lp, user_addr, &r.event);
+		break;
+	case PT_SUSPEND:
+		
+		break;
+	case PT_RESUME:
+		
 		break;
 	default:
 		return EINVAL;

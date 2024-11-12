@@ -1313,6 +1313,12 @@ lwpsignal(struct proc *p, struct lwp *lp, int sig)
 			lwkt_gettoken(&q->p_token);
 			p->p_flags |= P_CONTINUED;
 			wakeup(q);
+
+			if (p->p_flags & P_TRACED) {
+				atomic_set_int(&p->p_ptrace_events, 1);
+				wakeup(&p->p_ptrace_events);
+			}
+
 			if (action == SIG_DFL)
 				SIGDELSET_ATOMIC(p->p_siglist, sig);
 			proc_unstop(p, SSTOP);
@@ -1661,6 +1667,12 @@ proc_stop(struct proc *p, int stat)
 		PHOLD(q);
 		lwkt_gettoken(&q->p_token);
 		p->p_flags &= ~P_WAITED;
+
+		if (p->p_flags & P_TRACED) {
+			atomic_set_int(&p->p_ptrace_events, 1);
+			wakeup(&p->p_ptrace_events);
+		}
+
 		wakeup(q);
 		if ((q->p_sigacts->ps_flag & PS_NOCLDSTOP) == 0)
 			ksignal(p->p_pptr, SIGCHLD);

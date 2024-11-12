@@ -336,7 +336,7 @@ struct	proc {
 	forkid_t	p_forkid;	/* unique forkid */
 	struct sysreaper *p_reaper;	/* reaper control */
 	int		p_deathsig;	/* signal us on parent death */
-	int		p_unused03;
+	int		p_ptrace_events;
 	void		*p_reserveds[2]; /* reserved for future */
 };
 

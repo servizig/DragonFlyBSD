@@ -37,36 +37,54 @@
 #include <sys/types.h>
 #endif
 
-#define	PT_TRACE_ME	0	/* child declares it's being traced */
-#define	PT_READ_I	1	/* read word in child's I space */
-#define	PT_READ_D	2	/* read word in child's D space */
-/* was	PT_READ_U	3	 * read word in child's user structure */
-#define	PT_WRITE_I	4	/* write word in child's I space */
-#define	PT_WRITE_D	5	/* write word in child's D space */
-/* was	PT_WRITE_U	6	 * write word in child's user structure */
-#define	PT_CONTINUE	7	/* continue the child */
-#define	PT_KILL		8	/* kill the child process */
-#define	PT_STEP		9	/* single step the child */
+#define         PT_TRACE_ME     0   /* child declares it's being traced */
+#define         PT_READ_I       1   /* read word in child's I space */
+#define         PT_READ_D       2   /* read word in child's D space */
+/* was          PT_READ_U       3    * read word in child's user structure */
+#define         PT_WRITE_I      4   /* write word in child's I space */
+#define         PT_WRITE_D      5   /* write word in child's D space */
+/* was          PT_WRITE_U      6    * write word in child's user structure */
+#define         PT_CONTINUE     7   /* continue the child */
+#define         PT_KILL         8   /* kill the child process */
+#define         PT_STEP         9   /* single step the child */
 
-#define	PT_ATTACH	10	/* trace some running process */
-#define	PT_DETACH	11	/* stop tracing a process */
-#define	PT_IO		12	/* do I/O to/from stopped process. */
+#define         PT_ATTACH       10  /* trace some running process */
+#define         PT_DETACH       11  /* stop tracing a process */
+#define         PT_IO           12  /* do I/O to/from stopped process. */
 
-#define PT_GETNUMLWPS	13	/* number of user threads */
-#define PT_GETLWPLIST	14	/* array of user thread ids */
+#define         PT_GETNUMLWPS   13  /* number of user threads */
+#define         PT_GETLWPLIST   14  /* array of user thread ids */
+#define         PT_GETNEXTEVENT 15  /* wait for next event */
+#define         PT_SUSPEND      16  /* stop single thread */
+#define         PT_RESUME       17  /* continure single thread */
+
 /* Don't forget to update PT_LASTGENERIC */
 
-#define	PT_FIRSTMACH	32	/* for machine-specific requests */
+#define         PT_FIRSTMACH    32  /* for machine-specific requests */
 
 #ifndef _MACHINE_PTRACE_H_
 #include <machine/ptrace.h>	/* machine-specific requests, if any */
 #endif
 
 struct ptrace_io_desc {
-	int	piod_op;	/* I/O operation */
-	void	*piod_offs;	/* child offset */
-	void	*piod_addr;	/* parent offset */
-	size_t	piod_len;	/* request length */
+	int      piod_op;       /* I/O operation */
+	void    *piod_offs;     /* child offset */
+	void    *piod_addr;     /* parent offset */
+	size_t   piod_len;      /* request length */
+};
+
+enum ptrace_stat {
+	PT_EV_NONE = 0,           /* Nothing happened */
+	PT_EV_PROC_EXITED = 1,    /* Traced process exited */
+	PT_EV_THREAD_CREATED = 2, /* Thread created */
+	PT_EV_THREAD_EXITED = 3,  /* Thread exited */
+	PT_EV_SIGNALED = 4,       /* Thread signaled */
+};
+
+struct ptrace_event {
+	enum ptrace_stat status;
+	lwpid_t          lwpid;
+	int              signal;
 };
 
 /*
@@ -79,18 +97,18 @@ struct ptrace_io_desc {
 
 #ifdef _KERNEL
 
-#define PTRACE_PID_MASK		((1LL << 32) - 1)
-#define PTRACE_LWPID_MASK	(((1LL << 32) - 1) << 32)
-#define PTRACE_GET_PID(ptid)	(ptid & PTRACE_PID_MASK)
-#define PTRACE_GET_LWPID(ptid)	((ptid & PTRACE_LWPID_MASK) >> 32)
+#define PTRACE_PID_MASK         ((1LL << 32) - 1)
+#define PTRACE_LWPID_MASK       (((1LL << 32) - 1) << 32)
+#define PTRACE_GET_PID(ptid)    (ptid & PTRACE_PID_MASK)
+#define PTRACE_GET_LWPID(ptid)  ((ptid & PTRACE_LWPID_MASK) >> 32)
 
-#define PT_REQ_IS_GENERIC(req)	(PT_FIRSTGENERIC <= (req) && (req) <= PT_LASTGENERIC)
+#define PT_REQ_IS_GENERIC(req)  (PT_FIRSTGENERIC <= (req) && (req) <= PT_LASTGENERIC)
 #ifdef PT_LASTMACH
-#define PT_REQ_IS_MACH(req)	(PT_FIRSTMACH <= (req) && (req) <= PT_LASTMACH)
+#define PT_REQ_IS_MACH(req)     (PT_FIRSTMACH <= (req) && (req) <= PT_LASTMACH)
 #endif
 
 #define PT_FIRSTGENERIC PT_TRACE_ME
-#define PT_LASTGENERIC PT_GETLWPLIST
+#define PT_LASTGENERIC  PT_GETNEXTEVENT
 
 struct proc;
 struct lwp;

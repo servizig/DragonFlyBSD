@@ -1367,6 +1367,11 @@ tstop(void)
 			lwkt_gettoken(&q->p_token);
 			p->p_flags &= ~P_WAITED;
 			wakeup(p->p_pptr);
+
+			if (p->p_flags & P_TRACED) {
+				wakeup(&p->p_ptrace_events);
+			}
+
 			if ((q->p_sigacts->ps_flag & PS_NOCLDSTOP) == 0)
 				ksignal(q, SIGCHLD);
 			lwkt_reltoken(&q->p_token);
