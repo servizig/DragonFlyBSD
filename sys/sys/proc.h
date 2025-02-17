@@ -204,6 +204,7 @@ struct lwp {
 #define lwp_startcopy	lwp_cpumask
 	cpumask_t	lwp_cpumask;
 	sigset_t	lwp_siglist;	/* Signals arrived but not delivered. */
+//	sigset_t	lwp_ptsiglist;	/* Signals to be reported to gdb */
 	sigset_t	lwp_oldsigmask;	/* saved mask from before sigpause */
 	sigset_t	lwp_sigmask;	/* Current signal mask. */
 	stack_t		lwp_sigstk;	/* sp & on stack state variable */
@@ -221,6 +222,7 @@ struct lwp {
 	struct spinlock lwp_spin;	/* spinlock for signal handling */
 	TAILQ_HEAD(, vm_map_backing) lwp_lpmap_backing_list;
 	sysclock_t	lwp_cpbase;	/* Measurement base */
+	u_short		lwp_xstat;
 };
 
 struct	proc {
@@ -337,6 +339,7 @@ struct	proc {
 	struct sysreaper *p_reaper;	/* reaper control */
 	int		p_deathsig;	/* signal us on parent death */
 	int		p_ptrace_events;
+	struct lock	p_siglock;
 	void		*p_reserveds[2]; /* reserved for future */
 };
 
@@ -408,6 +411,9 @@ struct	proc {
 #define	LWP_MP_ULOAD	0x0000008 /* uload accounting for current cpu */
 #define	LWP_MP_RRFORCE	0x0000010 /* forced resched due to rrcount */
 #define LWP_MP_VNLRU	0x0000020 /* check excessive vnode allocations (lwpuserret()) */
+#define LWP_MP_SUSPEND	0x0000040 /* suspended by ptrace/gdb */
+#define LWP_MP_CREATED	0x0000080
+#define LWP_MP_EXITED	0x0000100
 
 #define LWP_MP_URETMASK	(LWP_MP_WEXIT | LWP_MP_VNLRU)
 
@@ -490,9 +496,11 @@ void stopevent(struct proc *, unsigned int, unsigned int);
 #define PSTALL(p, msg, n) \
 	do { if ((p)->p_lock > (n)) pstall((p), (msg), (n)); } while (0)
 
-#define STOPLWP(p, lp)						\
-	(((p)->p_stat == SSTOP || (p)->p_stat == SCORE) &&	\
-	 ((lp)->lwp_mpflags & LWP_MP_WEXIT) == 0)
+#define STOPLWP(p, lp)                                  \
+	(((p)->p_stat == SSTOP                          \
+	  || (p)->p_stat == SCORE                       \
+	|| (((lp)->lwp_mpflags & LWP_MP_SUSPEND) != 0)) \
+	&& (((lp)->lwp_mpflags & LWP_MP_WEXIT) == 0))
 
 /*
  * Hold lwp in memory, don't destruct, normally for ptrace/procfs work
@@ -559,6 +567,7 @@ int	p_trespass (struct ucred *cr1, struct ucred *cr2);
 void	setrunnable (struct lwp *);
 void	proc_stop (struct proc *, int);
 void	proc_unstop (struct proc *, int);
+void	proc_wait_until_stopped (struct proc *);
 void	sleep_early_gdinit (struct globaldata *);
 void	sleep_gdinit (struct globaldata *);
 thread_t cpu_heavy_switch (struct thread *);

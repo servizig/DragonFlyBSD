@@ -52,11 +52,28 @@
 #define         PT_DETACH       11  /* stop tracing a process */
 #define         PT_IO           12  /* do I/O to/from stopped process. */
 
+#define	PT_TRACE_ME	0	/* child declares it's being traced */
+#define	PT_READ_I	1	/* read word in child's I space */
+#define	PT_READ_D	2	/* read word in child's D space */
+/* was	PT_READ_U	3	 * read word in child's user structure */
+#define	PT_WRITE_I	4	/* write word in child's I space */
+#define	PT_WRITE_D	5	/* write word in child's D space */
+/* was	PT_WRITE_U	6	 * write word in child's user structure */
+#define	PT_CONTINUE	7	/* continue the child */
+#define	PT_KILL		8	/* kill the child process */
+#define	PT_STEP		9	/* single step the child */
+
+#define	PT_ATTACH	10	/* trace some running process */
+#define	PT_DETACH	11	/* stop tracing a process */
+#define	PT_IO		12	/* do I/O to/from stopped process. */
 #define         PT_GETNUMLWPS   13  /* number of user threads */
 #define         PT_GETLWPLIST   14  /* array of user thread ids */
 #define         PT_GETNEXTEVENT 15  /* wait for next event */
 #define         PT_SUSPEND      16  /* stop single thread */
 #define         PT_RESUME       17  /* continure single thread */
+#define         PT_LWPINFO      18  /* get information about lwp */
+#define         PT_LWPEVENT     19
+#define         PT_WAIT         20
 
 /* Don't forget to update PT_LASTGENERIC */
 
@@ -66,6 +83,10 @@
 #include <machine/ptrace.h>	/* machine-specific requests, if any */
 #endif
 
+struct ptrace_lwpinfo {
+	lwpid_t lwpid;
+};
+
 struct ptrace_io_desc {
 	int      piod_op;       /* I/O operation */
 	void    *piod_offs;     /* child offset */
@@ -74,12 +95,15 @@ struct ptrace_io_desc {
 };
 
 enum ptrace_stat {
-	PT_EV_NONE = 0,           /* Nothing happened */
-	PT_EV_PROC_EXITED = 1,    /* Traced process exited */
-	PT_EV_THREAD_CREATED = 2, /* Thread created */
-	PT_EV_THREAD_EXITED = 3,  /* Thread exited */
-	PT_EV_SIGNALED = 4,       /* Thread signaled */
+	PT_NONE          = 0, /* Nothing happened */
+	PT_PROC_ZOMB     = 1, /* Traced process exiting */
+	PT_LWP_SIGNAL    = 2, /* Thread signal pending */
+	PT_LWP_CREATED   = 4, /* Thread created */
+	PT_LWP_EXITED    = 8, /* Thread exited */
 };
+
+#define PT_STAT_ALL (PT_PROC_ZOMB | PT_LWP_SIGNAL \
+	| PT_LWP_CREATED | PT_LWP_EXITED)
 
 struct ptrace_event {
 	enum ptrace_stat status;
@@ -108,7 +132,7 @@ struct ptrace_event {
 #endif
 
 #define PT_FIRSTGENERIC PT_TRACE_ME
-#define PT_LASTGENERIC  PT_GETNEXTEVENT
+#define PT_LASTGENERIC  PT_WAIT
 
 struct proc;
 struct lwp;

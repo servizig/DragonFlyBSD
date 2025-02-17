@@ -65,6 +65,8 @@
 #include <sys/signal2.h>
 #include <sys/spinlock2.h>
 
+#include <sys/ptrace.h>
+
 #include <sys/dsched.h>
 
 static MALLOC_DEFINE(M_ATFORK, "atfork", "atfork callback");
@@ -253,6 +255,13 @@ lwp_create1(struct lwp_params *uprm, const cpumask_t *umask)
 	lp->lwp_stat = LSRUN;
 	p->p_usched->setrunqueue(lp);
 	crit_exit();
+
+	if (lp->lwp_tid > 1 && (p->p_flags & P_TRACED)) {
+		proc_stop(p, SSTOP);
+		atomic_set_int(&lp->lwp_mpflags, LWP_MP_SUSPEND | LWP_MP_CREATED);	
+		atomic_set_int(&p->p_ptrace_events, PT_LWP_CREATED);
+	}
+
 	lwkt_reltoken(&p->p_token);
 
 	return (0);
@@ -713,6 +722,8 @@ fork1(struct lwp *lp1, int flags, struct proc **procp)
 	 * tell any interested parties about the new process
 	 */
 	KNOTE(&p1->p_klist, NOTE_FORK | p2->p_pid);
+
+	lockinit(&p2->p_siglock, "siglock", 0, LK_CANRECURSE);
 
 	/*
 	 * Return child proc pointer to parent.

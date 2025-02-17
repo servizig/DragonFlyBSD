@@ -67,6 +67,8 @@
 #include <sys/thread2.h>
 #include <sys/spinlock2.h>
 
+#include <sys/ptrace.h>
+
 #include <machine/cpu.h>
 #include <machine/smp.h>
 
@@ -1266,8 +1268,21 @@ lwpsignal(struct proc *p, struct lwp *lp, int sig)
 			spin_lock(&lp->lwp_spin);
 			SIGADDSET(lp->lwp_siglist, sig);
 			spin_unlock(&lp->lwp_spin);
+
+			if (p->p_flags & P_TRACED) {
+				kprintf("p->p_stat == SSTOP for lp lwp=%d sig=%d\n",
+					lp->lwp_tid, sig);
+				lockmgr(&p->p_siglock, LK_SHARED);
+				atomic_set_int(&p->p_ptrace_events, PT_LWP_SIGNAL);
+				//wakeup(&p->p_ptrace_events);
+				lockmgr(&p->p_siglock, LK_RELEASE);
+			}
 		} else {
 			SIGADDSET_ATOMIC(p->p_siglist, sig);
+			if (p->p_flags & P_TRACED) {
+				kprintf("p->p_stat == SSTOP for proc sig=%d\n",
+					sig);
+			}
 		}
 
 		/*
@@ -1313,11 +1328,6 @@ lwpsignal(struct proc *p, struct lwp *lp, int sig)
 			lwkt_gettoken(&q->p_token);
 			p->p_flags |= P_CONTINUED;
 			wakeup(q);
-
-			if (p->p_flags & P_TRACED) {
-				atomic_set_int(&p->p_ptrace_events, 1);
-				wakeup(&p->p_ptrace_events);
-			}
 
 			if (action == SIG_DFL)
 				SIGDELSET_ATOMIC(p->p_siglist, sig);
@@ -1373,6 +1383,10 @@ active_process:
 		sigirefs_hold(p);
 		lp = find_lwp_for_signal(p, sig);
 		if (lp) {
+			if (p->p_flags & P_TRACED) {
+				kprintf("lwps: sel %d sig %d\n", lp->lwp_tid, sig);
+			}
+
 			if (SIGISMEMBER(lp->lwp_sigmask, sig)) {
 				lwkt_reltoken(&lp->lwp_token);
 				LWPRELE(lp);
@@ -1401,6 +1415,9 @@ active_process:
 		KNOTE(&p->p_klist, NOTE_SIGNAL | sig);
 		SIGADDSET_ATOMIC(p->p_siglist, sig);
 		sigirefs_drop(p);
+		if (p->p_flags & P_TRACED) {
+			kprintf("lwps: no lp sig %d\n", sig);
+		}
 		goto out;
 	}
 
@@ -1461,6 +1478,23 @@ active_process:
 	spin_lock(&lp->lwp_spin);
 	SIGADDSET(lp->lwp_siglist, sig);
 	spin_unlock(&lp->lwp_spin);
+
+#if 0
+	if (p->p_flags & P_TRACED) {
+		kprintf("lwpsig: %d-%d\n", lp->lwp_tid, sig);
+	}
+#endif
+	
+#if 0
+	if (p->p_flags & P_TRACED) {
+		lwkt_gettoken(&p->p_token);
+		kprintf("lwpsignal: add %d\n", sig);
+		//lockmgr(&p->p_siglock, LK_SHARED);
+		atomic_set_int(&p->p_ptrace_events, PT_LWP_SIGNAL);
+		//lockmgr(&p->p_siglock, LK_RELEASE);
+		lwkt_reltoken(&p->p_token);
+	}
+#endif
 
 	lwp_signotify(lp);
 
@@ -1617,6 +1651,10 @@ proc_stop(struct proc *p, int stat)
 		}
 	}
 	p->p_stat = stat;
+	if (p->p_flags & P_TRACED) {
+		//kprintf("proc_stop\n");
+		//print_backtrace(4);
+	}
 
 	FOREACH_LWP_IN_PROC(lp, p) {
 		LWPHOLD(lp);
@@ -1657,7 +1695,7 @@ proc_stop(struct proc *p, int stat)
 		lwkt_reltoken(&lp->lwp_token);
 		LWPRELE(lp);
 	}
-
+	
 	if (p->p_nstopped == p->p_nthreads) {
 		/*
 		 * Token required to interlock kern_wait().  Reparenting can
@@ -1669,7 +1707,7 @@ proc_stop(struct proc *p, int stat)
 		p->p_flags &= ~P_WAITED;
 
 		if (p->p_flags & P_TRACED) {
-			atomic_set_int(&p->p_ptrace_events, 1);
+			//kprintf("proc_stop: wakeup\n");
 			wakeup(&p->p_ptrace_events);
 		}
 
@@ -1678,6 +1716,8 @@ proc_stop(struct proc *p, int stat)
 			ksignal(p->p_pptr, SIGCHLD);
 		lwkt_reltoken(&q->p_token);
 		PRELE(q);
+	} else {
+		//kprintf("proc_stop: skip wake\n");
 	}
 }
 
@@ -1691,10 +1731,16 @@ proc_unstop(struct proc *p, int stat)
 
 	ASSERT_LWKT_TOKEN_HELD(&p->p_token);
 
-	if (p->p_stat != stat)
+	if (p->p_stat != stat) {
+		kprintf("proc_unstop: %d != %d\n", p->p_stat, stat);
 		return;
+	}
 
 	p->p_stat = SACTIVE;
+
+	if (p->p_flags & P_TRACED) {
+		//kprintf("proc_unstop\n");
+	}
 
 	FOREACH_LWP_IN_PROC(lp, p) {
 		LWPHOLD(lp);
@@ -1752,6 +1798,18 @@ proc_unstop(struct proc *p, int stat)
 	 * token.
 	 */
 	wakeup(p);
+}
+
+void
+proc_wait_until_stopped(struct proc *p)
+{
+	while ((p->p_stat == SSTOP || p->p_stat == SCORE) &&
+	       p->p_nstopped < p->p_nthreads) {
+		tsleep(&p->p_nstopped, 0, "stopwt2", hz);
+	}
+
+	if (p->p_stat != SSTOP)
+		kprintf("p_w_u_s: p_stat %d\n", p->p_stat);
 }
 
 /*
@@ -2102,14 +2160,26 @@ issignal(struct lwp *lp, int maytrace, int *ptokp)
 				haveptok = 1;
 			}
 			p->p_xstat = sig;
+			//kprintf("lwp=%d put p_xstat=%d\n", lp->lwp_tid, sig);
+			lp->lwp_xstat = sig;
 			proc_stop(p, SSTOP);
 
 			/*
 			 * Normally we don't stop until we return to userland, but
 			 * make an exception when tracing and 'maytrace' is asserted.
 			 */
-			if (p->p_flags & P_TRACED)
+			if (p->p_flags & P_TRACED) {
+#if 0
+				kprintf("iss:1 p_stat=%d rip=0x%lx\n",
+					p->p_stat, lp->lwp_md.md_regs->tf_rip);
+#endif
+				atomic_set_int(&p->p_ptrace_events, PT_LWP_SIGNAL);
 				tstop();
+#if 0
+				kprintf("iss:2 p_stat=%d rip=0x%lx\n",
+					p->p_stat, lp->lwp_md.md_regs->tf_rip);
+#endif
+			}
 
 			/*
 			 * If parent wants us to take the signal,
@@ -2120,6 +2190,11 @@ issignal(struct lwp *lp, int maytrace, int *ptokp)
 			lwp_delsig(lp, sig, 1);	/* clear old signal */
 			spin_unlock(&lp->lwp_spin);
 			sig = p->p_xstat;
+			if (sig)
+				kprintf("-------------------------------- lwp=%d sig=%d\n",
+					lp->lwp_tid, sig);
+			//kprintf("lwp=%d get p_xstat=%d\n", lp->lwp_tid, sig);
+			sig = lp->lwp_xstat;
 			if (sig == 0) {
 				/* haveptok is TRUE */
 				lwkt_reltoken(&p->p_token);

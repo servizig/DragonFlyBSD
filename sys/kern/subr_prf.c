@@ -298,6 +298,10 @@ log_console(struct uio *uio)
 	return;
 }
 
+#if 0
+static struct lock printlk = LOCK_INITIALIZER("prlk", 0, 0);
+#endif
+
 /*
  * Output to the console.
  */
@@ -309,6 +313,7 @@ kprintf(const char *fmt, ...)
 	struct putchar_arg pca;
 	int retval;
 
+	//lockmgr(&printlk, LK_EXCLUSIVE);
 	savintr = consintr;		/* disable interrupts */
 	consintr = 0;
 	__va_start(ap, fmt);
@@ -320,6 +325,7 @@ kprintf(const char *fmt, ...)
 	if (!panicstr)
 		msgbuftrigger = 1;
 	consintr = savintr;		/* reenable interrupts */
+	//lockmgr(&printlk, LK_RELEASE);
 	return (retval);
 }
 

@@ -3001,8 +3001,10 @@ fill_regs(struct lwp *lp, struct reg *regs)
 {
 	struct trapframe *tp;
 
-	if ((tp = lp->lwp_md.md_regs) == NULL)
+	if ((tp = lp->lwp_md.md_regs) == NULL) {
+		kprintf("(tp = lp->lwp_md.md_regs) == NULL\n");
 		return EINVAL;
+	}
 	bcopy(&tp->tf_rdi, &regs->r_rdi, sizeof(*regs));
 	return (0);
 }

@@ -1182,10 +1182,14 @@ proc_move_allproc_zombie(struct proc *p)
 
 	n = ALLPROC_HASH(p->p_pid);
 	prg = &procglob[n];
-	PSTALL(p, "reap1", 0);
+	if ((p->p_flags & P_TRACED) == 0) {
+		PSTALL(p, "reap1", 0);
+	}
 	lwkt_gettoken(&prg->proc_token);
 
-	PSTALL(p, "reap1a", 0);
+	if ((p->p_flags & P_TRACED) == 0) {
+		PSTALL(p, "reap1a", 0);
+	}
 	p->p_stat = SZOMB;
 
 	lwkt_reltoken(&prg->proc_token);

@@ -86,6 +86,8 @@ ptrace_req_mach(int req, struct proc *p, struct lwp *lp, void *user_addr,
 			error = procfs_doregs(curp, lp, NULL, &uio);
 			if (error == 0 && write == 0)
 				error = copyout(&r.reg, user_addr, sizeof(r.reg));
+		} else {
+			kprintf("!procfs_validregs, tid=%d, pid=%d\n", lp->lwp_tid, lp->lwp_proc->p_pid);
 		}
 		break;
 
@@ -140,6 +142,10 @@ ptrace_req_mach(int req, struct proc *p, struct lwp *lp, void *user_addr,
 		error = copyout(&fsbase, user_addr, sizeof(fsbase));
 		break;
 	}
-	
+	if (error) {
+		kprintf("[error] req=%d tid=%d, pid=%d\n",
+			req, lp->lwp_tid, lp->lwp_proc->p_pid);
+	}
+
 	return error;
 }

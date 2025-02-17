@@ -473,6 +473,11 @@ interpret:
 			atomic_add_int(&p->p_pptr->p_upmap->invfork, -1);
 		atomic_clear_int(&p->p_flags, P_PPWAIT);
 		wakeup(p->p_pptr);
+
+#if 0
+		if (p->p_flags & P_TRACED)
+			wakeup(&p->p_ptrace_events);
+#endif
 	}
 
 	/*
@@ -944,7 +949,9 @@ exec_new_vmspace(struct image_params *imgp, struct vmspace *vmcopy)
 	 *
 	 * If P_PPWAIT is set the parent vfork()'d and has a PHOLD() on us.
 	 */
-	PSTALL(p, "exec1", ((p->p_flags & P_PPWAIT) ? 1 : 0));
+	if ((p->p_flags & P_TRACED) == 0) {
+		PSTALL(p, "exec1", ((p->p_flags & P_PPWAIT) ? 1 : 0));
+	}
 
 	/*
 	 * Blow away entire process VM, if address space not shared,

@@ -488,6 +488,10 @@ trap(struct trapframe *frame)
 
 		case T_BPTFLT:		/* bpt instruction fault */
 		case T_TRCTRAP:		/* trace trap */
+#if 0
+			kprintf("user cpu=%d, lwpid=%d, tf_rflags=0x%lx, type=%d\n",
+				gd->gd_cpuid, lp->lwp_tid, frame->tf_rflags, type);
+#endif
 			frame->tf_rflags &= ~PSL_T;
 			i = SIGTRAP;
 			ucode = (type == T_TRCTRAP ? TRAP_TRACE : TRAP_BRKPT);
@@ -509,17 +513,31 @@ trap(struct trapframe *frame)
 			goto out;
 
 		case T_PROTFLT:		/* general protection fault */
+			if (p->p_flags & P_TRACED) {
+				kprintf("PROT (SIGBUS): type=%d, lwp=%d, rip=0x%lx, code=%d\n",
+					type, lp->lwp_tid, frame->tf_rip, code);
+			}
+
 			i = SIGBUS;
 			ucode = BUS_OBJERR;
 			break;
 		case T_STKFLT:		/* stack fault */
 		case T_SEGNPFLT:	/* segment not present fault */
+			if (p->p_flags & P_TRACED) {
+				kprintf("STK|SEGN (SIGBUS): type=%d, lwp=%d",
+					type, lp->lwp_tid);
+			}
+
 			i = SIGBUS;
 			ucode = BUS_ADRERR;
 			break;
 		case T_TSSFLT:		/* invalid TSS fault */
 		case T_DOUBLEFLT:	/* double fault */
 		default:
+			if (p->p_flags & P_TRACED) {
+				kprintf("default (SIGBUS): type=%d, lwp=%d",
+					type, lp->lwp_tid);
+			}
 			i = SIGBUS;
 			ucode = BUS_OBJERR;
 			break;
@@ -748,6 +766,8 @@ trap(struct trapframe *frame)
 			 * Otherwise, debugger traps "can't happen".
 			 */
 			ucode = TRAP_BRKPT;
+			kprintf("kernel cpu=%d, lwpid=%d, tf_rflags=0x%lx, type=%d\n",
+				gd->gd_cpuid, lp->lwp_tid, frame->tf_rflags, type);
 #ifdef DDB
 			if (kdb_trap(type, 0, frame))
 				goto out2;
@@ -1342,6 +1362,7 @@ bad:
 	 */
 	if (__predict_false(orig_tf_rflags & PSL_T)) {
 		frame->tf_rflags &= ~PSL_T;
+		kprintf("trapsignal for %d\n", lp->lwp_tid);
 		trapsignal(lp, SIGTRAP, TRAP_TRACE);
 	}
 

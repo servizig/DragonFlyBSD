@@ -1369,6 +1369,7 @@ tstop(void)
 			wakeup(p->p_pptr);
 
 			if (p->p_flags & P_TRACED) {
+				//kprintf("tstop: wake p_stat=%d\n", p->p_stat);
 				wakeup(&p->p_ptrace_events);
 			}
 

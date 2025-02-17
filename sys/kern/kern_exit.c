@@ -188,7 +188,7 @@ killalllwps(int forexec)
 	struct lwp *lp = curthread->td_lwp;
 	struct proc *p = lp->lwp_proc;
 	int fakestop;
-
+	
 	/*
 	 * Interlock against P_WEXIT.  Only one of the process's thread
 	 * is allowed to do the master exit.
@@ -200,7 +200,7 @@ killalllwps(int forexec)
 	}
 	p->p_flags |= P_WEXIT;
 	lwkt_gettoken(&lp->lwp_token);
-
+	
 	/*
 	 * Set temporary stopped state in case we are racing a coredump.
 	 * Otherwise the coredump may hang forever.
@@ -213,14 +213,15 @@ killalllwps(int forexec)
 		fakestop = 1;
 		wakeup(&p->p_nstopped);
 	}
-
+	
 	/*
 	 * Interlock with LWP_MP_WEXIT and kill any remaining LWPs
 	 */
 	atomic_set_int(&lp->lwp_mpflags, LWP_MP_WEXIT);
-	if (p->p_nthreads > 1)
+	if (p->p_nthreads > 1) {
 		killlwps(lp);
-
+	}
+	
 	/*
 	 * Undo temporary stopped state
 	 */
@@ -302,7 +303,7 @@ exit1(int rv)
 	int error;
 
 	lwkt_gettoken(&p->p_token);
-
+	
 	if (p->p_pid == 1) {
 		kprintf("init died (signal %d, exit %d)\n",
 		    WTERMSIG(rv), WEXITSTATUS(rv));
@@ -311,6 +312,7 @@ exit1(int rv)
 	varsymset_clean(&p->p_varsymset);
 	lockuninit(&p->p_varsymset.vx_lock);
 
+	
 	/*
 	 * Kill all lwps associated with the current process, return an
 	 * error if we race another thread trying to do the same thing
@@ -318,6 +320,7 @@ exit1(int rv)
 	 */
 	error = killalllwps(0);
 	if (error) {
+		kprintf("exit1: error=%d\n", error);
 		lwp_exit(0, NULL);
 		/* NOT REACHED */
 	}
@@ -512,6 +515,16 @@ exit1(int rv)
 		wakeup(p->p_pptr);
 	}
 
+
+	if (p->p_flags & P_TRACED) {
+		kprintf("exit1: reap zomb\n");
+		proc_stop(p, SSTOP);
+		atomic_set_int(&p->p_ptrace_events, PT_PROC_ZOMB);
+		while ((p->p_ptrace_events & PT_PROC_ZOMB) != 0) {
+			tstop();
+		}
+	}
+
 	/*
 	 * Move the process to the zombie list.  This will block
 	 * until the process p_lock count reaches 0.  The process will
@@ -529,7 +542,7 @@ exit1(int rv)
 	pp = p->p_pptr;
 	atomic_add_long(&pp->p_waitgen, 1);
 	pp = NULL;
-
+	
 	/*
 	 * release controlled reaper for exit if we own it and return the
 	 * remaining reaper (the one for us), which we will drop after we
@@ -570,6 +583,7 @@ exit1(int rv)
 			 * since their existence means someone is screwing up.
 			 */
 			if (q->p_flags & P_TRACED) {
+				kprintf("exit1: q->p_flags & P_TRACED\n");
 				q->p_flags &= ~P_TRACED;
 				ksignal(q, SIGKILL);
 			}
@@ -585,7 +599,7 @@ exit1(int rv)
 		lwkt_reltoken(&reproc->p_token);
 		wakeup(reproc);
 	}
-
+	
 	/*
 	 * Save exit status and final rusage info.  We no longer add
 	 * child rusage info into self times, wait4() and kern_wait()
@@ -673,6 +687,18 @@ lwp_exit(int masterexit, void *waddr)
 	struct lwp *lp = td->td_lwp;
 	struct proc *p = lp->lwp_proc;
 	int dowake = 0;
+
+	if (!masterexit && (p->p_flags & P_TRACED)) {
+		proc_stop(p, SSTOP);
+
+		atomic_set_int(&lp->lwp_mpflags, LWP_MP_SUSPEND | LWP_MP_EXITED);
+		atomic_set_int(&p->p_ptrace_events, PT_LWP_EXITED);
+
+		cpu_ccfence();
+		while(STOPLWP(p, lp) && (lp->lwp_mpflags & LWP_MP_EXITED)) {
+			tstop();
+		}
+	}
 
 	/*
 	 * Release the current user process designation on the process so
@@ -1121,7 +1147,7 @@ loop:
 
 		/*
 		 * This special case handles a kthread spawned by linux_clone
-		 * (see linux_misc.c).  The linux_wait4 and linux_waitpid 
+		 * (see linux_misc.c).  The linux_wait4 and linux_waitpid
 		 * functions need to be able to distinguish between waiting
 		 * on a process and waiting on a thread.  It is a thread if
 		 * p_sigparent is not SIGCHLD, and the WLINUXCLONE option
@@ -1151,11 +1177,13 @@ loop:
 			 * WAITRES.
 			 */
 			if (PHOLDZOMB(p)) {
+				kprintf("kern_exit: PHOLDZOMB\n");
 				PRELE(p);
 				goto loop;
 			}
 			lwkt_gettoken(&p->p_token);
 			if (p->p_pptr != q) {
+				kprintf("kern_exit: p->p_pptr != q\n");
 				lwkt_reltoken(&p->p_token);
 				PRELE(p);
 				PRELEZOMB(p);
@@ -1236,6 +1264,7 @@ loop:
 			 * child on the zombie list.
 			 */
 			if (options & WNOWAIT) {
+				kprintf("kern_exit: options & WNOWAIT\n");
 				lwkt_reltoken(&p->p_token);
 				PRELEZOMB(p);
 				error = 0;
@@ -1247,6 +1276,7 @@ loop:
 			 * we need to give it back to the old parent.
 			 */
 			if (p->p_oppid && (t = pfind(p->p_oppid)) != NULL) {
+				kprintf("kern_exit: p->p_oppid=%d\n", p->p_oppid);
 				p->p_oppid = 0;
 				proc_reparent(p, t);
 				ksignal(t, SIGCHLD);
@@ -1257,6 +1287,8 @@ loop:
 				error = 0;
 				goto done;
 			}
+
+			lockuninit(&p->p_siglock);
 
 			/*
 			 * Unlink the proc from its process group so that
@@ -1335,6 +1367,10 @@ loop:
 			kfree(p, M_PROC);
 			atomic_add_int(&nprocs, -1);
 			error = 0;
+
+			if (p->p_flags & P_TRACED) {
+				kprintf("kern_exit: SZOMB done\n");
+			}
 			goto done;
 		}
 

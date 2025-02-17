@@ -1,0 +1,78 @@
+DF306.0 {
+global:
+	_rtld_error;
+	dlclose;
+	dlerror;
+	dlopen;
+	dlsym;
+	dlfunc;
+	dlvsym;
+	dladdr;
+	dlinfo;
+	dl_iterate_phdr;
+	__tls_get_addr;
+	__tls_get_addr_tcb;
+	fdlopen;
+};
+
+DF306.1 {
+} DF306.0;
+
+DF402.0 {
+global:
+	r_debug_state;
+} DF306.1;
+
+DF404.0 {
+} DF402.0;
+
+DF406.0 {
+} DF404.0;
+
+DF408.0 {
+} DF406.0;
+
+DF410.0 {
+} DF408.0;
+
+DF502.0 {
+} DF410.0;
+
+DF504.0 {
+} DF502.0;
+
+DF506.0 {
+} DF504.0;
+
+DF508.0 {
+} DF506.0;
+
+DF510.0 {
+} DF508.0;
+
+DF602.0 {
+} DF510.0;
+
+DF604.0 {
+} DF602.0;
+
+DF606.0 {
+} DF604.0;
+
+DFprivate_1.0 {
+global:
+	_rtld_allocate_tls;
+	_rtld_free_tls;
+	_rtld_call_init;
+	_rtld_thread_init;
+	_rtld_thread_prefork;
+	_rtld_thread_postfork;
+	_rtld_thread_childfork;
+	_rtld_setthreaded;
+	_rtld_addr_phdr;
+	_rtld_get_stack_prot;
+	_r_debug_postinit;
+local:
+	*;
+} DF606.0;
+
