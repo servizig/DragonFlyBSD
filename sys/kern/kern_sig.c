@@ -1383,9 +1383,11 @@ active_process:
 		sigirefs_hold(p);
 		lp = find_lwp_for_signal(p, sig);
 		if (lp) {
+#if 0
 			if (p->p_flags & P_TRACED) {
 				kprintf("lwps: sel %d sig %d\n", lp->lwp_tid, sig);
 			}
+#endif
 
 			if (SIGISMEMBER(lp->lwp_sigmask, sig)) {
 				lwkt_reltoken(&lp->lwp_token);
@@ -1803,8 +1805,26 @@ proc_unstop(struct proc *p, int stat)
 void
 proc_wait_until_stopped(struct proc *p)
 {
+	struct lwp *tmplp;
+
 	while ((p->p_stat == SSTOP || p->p_stat == SCORE) &&
 	       p->p_nstopped < p->p_nthreads) {
+		kprintf("p_w_u_s: p_nstopped=%d p_nthreads=%d, p_stat=%d\n",
+			p->p_nstopped, p->p_nthreads, p->p_stat);
+		FOREACH_LWP_IN_PROC(tmplp, p) {
+		kprintf("p_w_u_s: %d/%d lwp_stat=%d lwp_xstat=%d lwp_mpflags=0x%x tf_rflags=0x%lx rip=0x%lx signals:",
+			p->p_pid, tmplp->lwp_tid, tmplp->lwp_stat, tmplp->lwp_xstat,
+			tmplp->lwp_mpflags,
+			tmplp->lwp_md.md_regs->tf_rflags,
+			tmplp->lwp_md.md_regs->tf_rip);
+	
+		sigset_t sigset = lwp_sigpend(tmplp);
+		for (int i = 1; i < _SIG_MAXSIG; i++)
+			if (SIGISMEMBER(sigset, i))
+				kprintf("%d ", i);
+		kprintf("\n");
+		}
+		
 		tsleep(&p->p_nstopped, 0, "stopwt2", hz);
 	}
 

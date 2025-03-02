@@ -65,7 +65,7 @@
 static void
 print_signals(struct proc *p)
 {
-	//return;
+	return;
 	
 	struct lwp *tmplp;
 
@@ -75,7 +75,6 @@ print_signals(struct proc *p)
 			p->p_pid, tmplp->lwp_tid, tmplp->lwp_stat, tmplp->lwp_xstat,
 			tmplp->lwp_md.md_regs->tf_rflags,
 			tmplp->lwp_md.md_regs->tf_rip);
-		
 	
 		sigset_t sigset = lwp_sigpend(tmplp);
 		for (int i = 1; i < _SIG_MAXSIG; i++)
@@ -223,8 +222,12 @@ waitforevent(struct proc *p, struct lwp *lp, void *user_addr, int data,
 {
 	int error = 0;
 	
+	if (user_addr == NULL) return EINVAL;
+	
+#if 0
 	kprintf("waitforevent: [in] p_ptrace_events=%d p_stat=%d\n",
 		p->p_ptrace_events, p->p_stat);
+#endif
 
 loop:
 	print_signals(p);
@@ -233,6 +236,8 @@ loop:
 		atomic_set_int(&p->p_ptrace_events, PT_PROC_ZOMB);
 		kprintf("waitforevent: [out] error=%d p_ptrace_events=%d p_stat=%d\n",
 			error, p->p_ptrace_events, p->p_stat);
+		event->status = PT_PROC_ZOMB;
+		copyout(event, user_addr, sizeof(*event));
 		return 0;
 	}
 
@@ -252,17 +257,23 @@ loop:
 
 	cpu_ccfence();
 
-	if (p->p_stat == SZOMB) {
+	if (p->p_stat == SZOMB || p->p_ptrace_events & PT_PROC_ZOMB) {
 		/* TODO: is it a correct place? */
 		kprintf("waitforevent: SZOMB 2\n");
 		atomic_set_int(&p->p_ptrace_events, PT_PROC_ZOMB);
+		event->status = PT_PROC_ZOMB;
+		copyout(event, user_addr, sizeof(*event));
 		return 0;
 	}
+	event->status = PT_NONE;
+	copyout(event, user_addr, sizeof(*event));
 
 	proc_wait_until_stopped(p);
 
+#if 0
 	kprintf("waitforevent: [out] error=%d p_ptrace_events=%d p_stat=%d\n",
 		error, p->p_ptrace_events, p->p_stat);
+#endif
 
 	return error;
 }
@@ -282,8 +293,10 @@ getnextevent(struct proc *p, struct lwp *lp, void *user_addr, int data,
 
 	event->status = PT_NONE;
 
+#if 0
 	kprintf("getnextevent: [in] p_ptrace_events=%d p_stat=%d\n",
 		p->p_ptrace_events, p->p_stat);
+#endif
 
 	if (p->p_ptrace_events == 0) {
 		goto out;
@@ -360,9 +373,11 @@ getnextevent(struct proc *p, struct lwp *lp, void *user_addr, int data,
 
 out:
 
+#if 0
 	kprintf("getnextevent: [out] error=%d p_ptrace_events=%d "
 		"status=%d lwpid=%d signal=%d\n",
 		error, p->p_ptrace_events, event->status, event->lwpid, event->signal);
+#endif
 
 	if (error == 0) {
 		copyout(event, user_addr, sizeof(*event));
@@ -457,9 +472,11 @@ ptrace_req_generic(int req, struct proc *p, struct lwp *lp, void *user_addr,
 		}
 
 	sendsig:
+#if 0
 		kprintf("req=%d pid=%d stat=%d lwpid=%d, rip=0x%lx\n",
 			req, p->p_pid, p->p_stat, lp->lwp_tid, lp->lwp_md.md_regs->tf_rip);
 		print_signals(p);
+#endif
 
 		/*
 		 * Deliver or queue signal.  If the process is stopped
@@ -589,13 +606,17 @@ ptrace_req_generic(int req, struct proc *p, struct lwp *lp, void *user_addr,
 		error = waitforevent(p, lp, user_addr, data, &r.event);
 		break;
 	case PT_SUSPEND:
+#if 0
 		kprintf("suspend %d/%d lwp_stat %d mpflags 0x%x\n",
 			p->p_pid, lp->lwp_tid, lp->lwp_stat, lp->lwp_mpflags);
+#endif
 		atomic_set_int(&lp->lwp_mpflags, LWP_MP_SUSPEND);
 		break;
 	case PT_RESUME:
+#if 0
 		kprintf("resume %d/%d lwp_stat %d mpflags 0x%x\n",
 			p->p_pid, lp->lwp_tid, lp->lwp_stat, lp->lwp_mpflags);
+#endif
 		atomic_clear_int(&lp->lwp_mpflags, LWP_MP_SUSPEND);
 		break;
 	case PT_LWPINFO:

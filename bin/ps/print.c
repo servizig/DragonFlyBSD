@@ -221,7 +221,10 @@ state(const KINFO *k, const struct varent *vent)
 	switch (KI_PROC(k, stat)) {
 
 	case SSTOP:
-		*cp = 'T';
+		if (KI_LWP(k, stat) == LSSTOP)
+			*cp = 'T';
+		else
+			*cp = 't';
 		break;
 
 	case SACTIVE:

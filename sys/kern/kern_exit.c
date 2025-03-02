@@ -517,12 +517,19 @@ exit1(int rv)
 
 
 	if (p->p_flags & P_TRACED) {
-		kprintf("exit1: reap zomb\n");
+	  kprintf("exit1: reap zomb\n");
+#if 0
 		proc_stop(p, SSTOP);
+#endif
 		atomic_set_int(&p->p_ptrace_events, PT_PROC_ZOMB);
+		wakeup(&p->p_ptrace_events);
+#if 0
 		while ((p->p_ptrace_events & PT_PROC_ZOMB) != 0) {
+			kprintf("p_ptrace_events LOOP\n");
+			tsleep(&p->p_ptrace_events, 0, "ptexit1", hz * 2);
 			tstop();
 		}
+#endif
 	}
 
 	/*
