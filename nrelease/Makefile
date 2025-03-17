@@ -22,17 +22,22 @@ NREL_MAKE_JOBS?= $$(sysctl -n hw.ncpu)
 .if !defined(NOFSCHG)
 MTREE_FSCHG=	-i
 .endif
-WORLD_VERSION!=	${AWK} '/^\#define[[:blank:]]__DragonFly_version/ {print $$3}' < /usr/include/sys/param.h
 
+# Current version in format: <tag>[<n>.g<commit>]
+# e.g., "v6.4.0", "v6.5.0.816.g708615"
 GITREV!=	sh ${SRCDIR}/tools/gitrev.sh
 
 # The label/name of the disklabel64(5) slice in the ".img" file.  This is
 # used to identify the USB device with DragonFly installation image, avoiding
 # hardcoding the USB device name (e.g., "da8").
 #
-# This label is also used as the volume ID of the ".iso" file.
+# Also fix the label for use as the volume ID of the ".iso" file, which has
+# a maximum length of 32 characters and must contain only A-Z, 0-9, and _.
 #
-LABEL?=		DragonFly_${GITREV}
+LABEL?=		DRAGONFLY_${GITREV:S/./_/g:C/_g.*$//:tu}
+
+# The publisher ID of the ".iso" file.
+PUBLISHER?=	The DragonFly Project
 
 CHROOT_CMD?=	/usr/sbin/chroot ${ISOROOT} sh -c
 
@@ -51,7 +56,6 @@ DPORTS_PACKAGES?=	security/ca_root_nss \
 			devel/git-lite \
 			dns/bind-tools \
 			net/isc-dhcp44-server \
-			sysutils/cdrtools \
 			${DPORTS_EXTRA_PACKAGES}
 
 # dports options to use when building packages
@@ -146,12 +150,6 @@ realquick:	realquickrel
 #########################################################################
 
 check:
-.if !exists(/usr/local/bin/mkisofs) && !exists(/usr/pkg/bin/mkisofs)
-	@echo
-	@echo "Your machine does not have cdrtools installed.  You can install it with:"
-	@echo "    pkg install cdrtools"
-.endif
-
 .if make(nopkgs)
 	@echo Not building packages.
 .elif make(binpkgs)
@@ -167,10 +165,6 @@ check:
 	else \
 		echo "Using ${DPORTS_PATH} as the dports tree."; \
 	fi
-.endif
-
-.if !exists(/usr/local/bin/mkisofs) && !exists(/usr/pkg/bin/mkisofs)
-	@/usr/bin/false
 .endif
 
 buildworld1 buildworld2:
@@ -341,37 +335,24 @@ pkgs:
 .endif  # !empty(DPORTS_PACKAGES)
 
 mkiso:
-.if ${WORLD_VERSION} < 600106
-	if [ ! -d ${IMGMNT} ]; then mkdir -p ${IMGMNT}; fi
-	-if [ -f ${ISODIR}/vn.which ]; then umount ${IMGMNT}; 		\
-	    vnconfig -u `cat ${ISODIR}/vn.which`; fi
-	newfs_msdos -C 400k -F 12 -L EFI -m 0xf8 ${ISOROOT}/boot/efiboot.img
-	vnconfig -l | grep "not in use" | head -n 1 | 			\
-	    cut -f 1 -d: > ${ISODIR}/vn.which
-	vnconfig -e `cat ${ISODIR}/vn.which` ${ISOROOT}/boot/efiboot.img
-	mount_msdos /dev/`cat ${ISODIR}/vn.which` ${IMGMNT}
-	mkdir -p ${IMGMNT}/EFI/BOOT
-	cp ${ISOROOT}/boot/loader.efi ${IMGMNT}/EFI/BOOT/BOOTX64.EFI
-	umount ${IMGMNT}
-.else
-	( tmpdir=`mktemp -d -t nrelease` && mkdir -p "$${tmpdir}/EFI/BOOT" && \
+	( tmpdir=`mktemp -d -t nrelease` && \
+	    mkdir -p "$${tmpdir}/EFI/BOOT" && \
 	    cp ${ISOROOT}/boot/loader.efi $${tmpdir}/EFI/BOOT/BOOTX64.EFI && \
 	    makefs -t msdos -o fat_type=12 -o sectors_per_cluster=1 \
 		-o volume_label=EFI -o media_descriptor=248 -s 400k \
 		${ISOROOT}/boot/efiboot.img $${tmpdir} && \
 	    rm -rf $${tmpdir} )
-.endif
-	( cd ${ISOROOT}; mkisofs -R -J -o ${ISOFILE} \
-	    -b boot/cdboot -no-emul-boot \
-	    -eltorito-alt-boot -eltorito-platform efi \
-	    -eltorito-boot boot/efiboot.img -no-emul-boot \
-	    -V ${LABEL:C/(^.{32}).*/\1/} . )  # cut label to <= 32 characters
+	( cd ${ISOROOT}; makefs -t cd9660 \
+	    -o rockridge \
+	    -o label="${LABEL}" \
+	    -o publisher="${PUBLISHER}" \
+	    -o bootimage="i386;boot/cdboot" -o no-emul-boot \
+	    -o bootimage="efi;boot/efiboot.img" -o no-emul-boot \
+	    ${ISOFILE} . )
 	rm -f ${ISOROOT}/boot/efiboot.img
 
 mkimg:
 	if [ ! -d ${IMGMNT} ]; then mkdir -p ${IMGMNT}; fi
-	-if [ -f ${ISODIR}/vn.which ]; then umount ${IMGMNT}; 		\
-	    vnconfig -u `cat ${ISODIR}/vn.which`; fi
 	rm -f ${IMGFILE}
 .ifdef IMGSIZE
 	@echo "STEP: use an image size of ${IMGSIZE} 512-byte sectors"
@@ -390,9 +371,7 @@ mkimg:
 	    truncate -s $${sz}M ${IMGFILE}
 .endif
 	@echo "STEP: determine free vn device"
-	vnconfig -l | grep "not in use" | head -n 1 | 			\
-	    cut -f 1 -d: > ${ISODIR}/vn.which
-	vnconfig -e `cat ${ISODIR}/vn.which` ${IMGFILE}
+	vnconfig -e vn ${IMGFILE} > ${ISODIR}/vn.which
 	@echo "STEP: set up legacy MBR"
 	fdisk -b ${ISOROOT}/boot/mbr -IB `cat ${ISODIR}/vn.which`
 	fdisk -s `cat ${ISODIR}/vn.which` >${ISODIR}/fdisk.dat
@@ -425,17 +404,12 @@ mkimg:
 	newfs /dev/`cat ${ISODIR}/vn.which`s2a
 	mount /dev/`cat ${ISODIR}/vn.which`s2a ${IMGMNT}
 	cpdup ${ISOROOT} ${IMGMNT}
-	@echo "STEP: fixup ${IMGMNT}/etc/fstab"
-	echo "/dev/part-by-label/${LABEL}.a / ufs rw,noatime 0 1" > ${IMGMNT}/etc/fstab
-	echo "dummy /tmp tmpfs rw 0 0" >> ${IMGMNT}/etc/fstab
-	echo "dummy /var/tmp tmpfs rw 0 0" >> ${IMGMNT}/etc/fstab
-	echo "dummy /var/run tmpfs rw,-C 0 0" >> ${IMGMNT}/etc/fstab
-	echo "dummy /usr/obj tmpfs rw 0 0" >> ${IMGMNT}/etc/fstab
-	echo "proc /proc procfs rw 0 0" >> ${IMGMNT}/etc/fstab
+	@echo "STEP: fixup ${IMGMNT}/etc/rc.conf"
+	sed -i '' -E -e 's|^(root_rw_mount=.*)$$|#\1|' ${IMGMNT}/etc/rc.conf
 	@echo "STEP: fixup ${IMGMNT}/boot/loader.conf"
-	-fgrep -v kernel_options ${IMGMNT}/boot/loader.conf > ${IMGMNT}/boot/loader.conf.new
-	echo 'vfs.root.mountfrom="ufs:part-by-label/${LABEL}.a"' >> ${IMGMNT}/boot/loader.conf.new
-	mv ${IMGMNT}/boot/loader.conf.new ${IMGMNT}/boot/loader.conf
+	sed -i '' -E -e 's|^(kernel_options=.*)$$|#\1|' \
+		-e 's|^#?(vfs.root.mountfrom)="ROOT"|\1="ufs:part-by-label/${LABEL}.a"|' \
+		${IMGMNT}/boot/loader.conf
 	@echo "STEP: create /firstboot"
 	touch ${IMGMNT}/firstboot
 	@echo "STEP: cleanup"
@@ -454,11 +428,13 @@ clean:
 	-umount ${ISOROOT}/usr/distfiles > /dev/null 2>&1
 	-umount ${ISOROOT}/usr/dports > /dev/null 2>&1
 	-umount ${ISOROOT}/dev > /dev/null 2>&1
-	-if [ -f ${ISODIR}/vn.which ]; then umount ${IMGMNT}; 		\
-	    vnconfig -u `cat ${ISODIR}/vn.which`; fi
+	-if [ -f ${ISODIR}/vn.which ]; then				\
+	    umount ${IMGMNT} > /dev/null 2>&1;				\
+	    vnconfig -u `cat ${ISODIR}/vn.which` > /dev/null 2>&1;	\
+	    rm -f ${ISODIR}/vn.which;					\
+	fi
 	if [ -d ${ISOROOT} ]; then chflags -R noschg ${ISOROOT}; fi
 	rm -rf ${ISOROOT}
-	rm -f ${ISODIR}/.didbootstrap ${ISODIR}/vn.which
 
 realclean:	clean
 	rm -rf ${ISODIR}/packages

@@ -78,15 +78,14 @@ static void	usage(void);
 int
 main(int argc, char **argv)
 {
-	struct stat sb;
 	struct iso_args args;
-	int ch, mntflags, opts, set_mask, set_dirmask;
+	int ch, mntflags, opts;
 	char *dev, *dir, mntpath[MAXPATHLEN];
 	struct vfsconf vfc;
 	int error, verbose;
 	const char *cs_local;
 
-	mntflags = opts = set_mask = set_dirmask = verbose = 0;
+	mntflags = opts = verbose = 0;
 	memset(&args, 0, sizeof args);
 	args.ssector = -1;
 	while ((ch = getopt(argc, argv, "bC:egG:jm:M:o:rs:U:v")) != -1)
@@ -115,11 +114,11 @@ main(int argc, char **argv)
 			break;
 		case 'm':
 			args.fmask = a_mask(optarg);
-			set_mask = 1;
+			opts |= ISOFSMNT_MODEMASK;
 			break;
 		case 'M':
 			args.dmask = a_mask(optarg);
-			set_dirmask = 1;
+			opts |= ISOFSMNT_MODEMASK;
 			break;
 		case 'o':
 			getmntopts(optarg, mopts, &mntflags, &opts);
@@ -146,14 +145,6 @@ main(int argc, char **argv)
 
 	if (argc != 2)
 		usage();
-
-	if (set_mask && !set_dirmask) {
-		args.dmask = args.fmask;
-		set_dirmask = 1;
-	} else if (set_dirmask && !set_mask) {
-		args.fmask = args.dmask;
-		set_mask = 1;
-	}
 
 	dev = argv[0];
 	dir = argv[1];
@@ -195,12 +186,10 @@ main(int argc, char **argv)
 			printf("using starting sector %d\n", args.ssector);
 	}
 
-	if (!set_mask) {
-		if (stat(mntpath, &sb) == -1)
-			err(EX_OSERR, "stat %s", mntpath);
-		args.fmask = args.dmask =
-			sb.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
-	}
+	if (args.dmask == 0 && args.fmask > 0)
+		args.dmask = args.fmask;
+	else if (args.fmask == 0 && args.dmask > 0)
+		args.fmask = args.dmask;
 
 	error = getvfsbyname("cd9660", &vfc);
 	if (error && vfsisloadable("cd9660")) {
@@ -332,16 +321,13 @@ a_uid(const char *s)
 static mode_t
 a_mask(const char *s)
 {
-	int done, rv;
+	long val;
 	char *ep;
 
-	done = 0;
-	rv = -1;
-	if (*s >= '0' && *s <= '7') {
-		done = 1;
-		rv = strtol(optarg, &ep, 8);
-	}
-	if (!done || rv < 0 || *ep)
-		errx(EX_USAGE, "invalid file mode: %s", s);
-	return (rv);
+	errno = 0;
+	val = strtol(s, &ep, 8);
+	if (errno != 0 || *ep != '\0' || val <= 0 || val > (long)ALLPERMS)
+		errx(EX_USAGE, "invalid file/dir mask: %s", s);
+
+	return (mode_t)val;
 }

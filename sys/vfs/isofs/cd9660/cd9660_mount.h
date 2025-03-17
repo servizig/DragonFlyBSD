@@ -34,7 +34,12 @@
  *	@(#)cd9660_mount.h	8.1 (Berkeley) 5/24/95
  * $FreeBSD: src/sys/isofs/cd9660/cd9660_mount.h,v 1.3.2.2 2001/03/14 12:03:50 bp Exp $
  */
+
+#ifndef _ISOFS_CD9660_CD9660_MOUNT_H_
+#define _ISOFS_CD9660_CD9660_MOUNT_H_
+
 #include <sys/iconv.h>
+
 /*
  * Arguments to mount ISO 9660 filesystems.
  */
@@ -43,8 +48,8 @@ struct iso_args {
 	struct	export_args export;		/* network export info */
 	uid_t	uid;				/* uid that owns files */
 	gid_t	gid;				/* gid that owns files */
-	mode_t	fmask;				/* file mask to be applied for files */
-	mode_t	dmask;				/* file mask to be applied for directories */
+	mode_t	fmask;				/* mask to be applied for files */
+	mode_t	dmask;				/* mask to be applied for directories */
 	int	flags;				/* mounting flags, see below */
 	int	ssector;			/* starting sector, 0 for 1st session */
 	char	cs_disk[ICONV_CSNMAXLEN];	/* disk charset for Joliet cs conversion */
@@ -58,3 +63,6 @@ struct iso_args {
 #define	ISOFSMNT_KICONV		0x00000020	/* Use libiconv to convert chars */
 #define	ISOFSMNT_UID		0x00000040	/* override uid */
 #define	ISOFSMNT_GID		0x00000080	/* override gid */
+#define	ISOFSMNT_MODEMASK	0x00000100	/* mask file/dir modes */
+
+#endif /* _ISOFS_CD9660_CD9660_MOUNT_H_ */
