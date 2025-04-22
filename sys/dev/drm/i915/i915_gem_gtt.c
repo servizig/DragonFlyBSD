@@ -1235,12 +1235,10 @@ static void gen8_ppgtt_insert_4lvl(struct i915_address_space *vm,
 	struct i915_page_directory_pointer **pdps = ppgtt->pml4.pdps;
 
 	if (vma->page_sizes.sg > I915_GTT_PAGE_SIZE) {
-		DRM_DEBUG("insert huge page\n");
 		gen8_ppgtt_insert_huge_entries(vma, pdps, &iter, cache_level,
 					       flags);
 	} else {
 		struct gen8_insert_pte idx = gen8_insert_pte(vma->node.start);
-		DRM_DEBUG("insert_pte_entries\n");
 
 		while (gen8_ppgtt_insert_pte_entries(ppgtt, pdps[idx.pml4e++],
 						     &iter, &idx, cache_level,

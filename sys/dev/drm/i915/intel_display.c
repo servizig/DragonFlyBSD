@@ -14779,6 +14779,7 @@ intel_user_framebuffer_create(struct drm_device *dev,
 	obj = i915_gem_object_lookup(filp, mode_cmd.handles[0]);
 	if (!obj)
 		return ERR_PTR(-ENOENT);
+	DRM_DEBUG("obj=%p\n", obj);
 
 	fb = intel_framebuffer_create(obj, &mode_cmd);
 	if (IS_ERR(fb))

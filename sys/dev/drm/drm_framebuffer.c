@@ -342,12 +342,33 @@ int drm_mode_addfb2(struct drm_device *dev,
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -EOPNOTSUPP;
 
+	DRM_DEBUG("before: fb_id=%u, height=%u, width=%u, pixel_format=%u, flags=%u, "
+		  "handles: [0]=%u, [1]=%u, [2]=%u, [3]=%u, "
+		  "pitches: [0]=%u, [1]=%u, [2]=%u, [3]=%u,"
+		  "offsets: [0]=%u, [1]=%u, [2]=%u, [3]=%u, "
+		  "modifier: [0]=%llu, [1]=%llu, [2]=%llu, [3]=%llu\n",
+		  r->fb_id, r->height, r->width, r->pixel_format, r->flags,
+		  r->handles[0], r->handles[1], r->handles[2], r->handles[3],
+		  r->pitches[0], r->pitches[1], r->pitches[2], r->pitches[3],
+		  r->offsets[0], r->offsets[1], r->offsets[2], r->offsets[3],
+		  r->modifier[0], r->modifier[1], r->modifier[2], r->modifier[3]);
+	
 	fb = drm_internal_framebuffer_create(dev, r, file_priv);
 	if (IS_ERR(fb))
 		return PTR_ERR(fb);
 
 	DRM_DEBUG_KMS("[FB:%d]\n", fb->base.id);
 	r->fb_id = fb->base.id;
+	DRM_DEBUG("after: fb_id=%u, height=%u, width=%u, pixel_format=%u, flags=%u, "
+		  "handles: [0]=%u, [1]=%u, [2]=%u, [3]=%u, "
+		  "pitches: [0]=%u, [1]=%u, [2]=%u, [3]=%u,"
+		  "offsets: [0]=%u, [1]=%u, [2]=%u, [3]=%u, "
+		  "modifier: [0]=%llu, [1]=%llu, [2]=%llu, [3]=%llu\n",
+		  r->fb_id, r->height, r->width, r->pixel_format, r->flags,
+		  r->handles[0], r->handles[1], r->handles[2], r->handles[3],
+		  r->pitches[0], r->pitches[1], r->pitches[2], r->pitches[3],
+		  r->offsets[0], r->offsets[1], r->offsets[2], r->offsets[3],
+		  r->modifier[0], r->modifier[1], r->modifier[2], r->modifier[3]);
 
 	/* Transfer ownership to the filp for reaping on close */
 	mutex_lock(&file_priv->fbs_lock);
