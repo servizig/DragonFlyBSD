@@ -86,7 +86,7 @@ static noinline void missed_breadcrumb(struct intel_engine_cs *engine)
 		struct drm_printer p = drm_debug_printer(__func__);
 
 		intel_engine_dump(engine, &p,
-				  "%s missed breadcrumb at %pS\n",
+				  "%s missed breadcrumb at %p\n",
 				  engine->name, __builtin_return_address(0));
 	}
 

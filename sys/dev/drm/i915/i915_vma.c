@@ -732,7 +732,6 @@ int __i915_vma_do_pin(struct i915_vma *vma,
 		goto err_unpin;
 	}
 
-	DRM_DEBUG("vma=%p, flags = %llu, bound=%d\n", vma, flags, bound);
 	if ((bound & I915_VMA_BIND_MASK) == 0) {
 		ret = i915_vma_insert(vma, size, alignment, flags);
 		if (ret)

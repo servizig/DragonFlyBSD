@@ -44,6 +44,7 @@ static struct sg_table *i915_gem_map_dma_buf(struct dma_buf_attachment *attachme
 	struct scatterlist *src, *dst;
 	int ret, i;
 
+	STUB();
 	ret = i915_gem_object_pin_pages(obj);
 	if (ret)
 		goto err;
@@ -89,7 +90,7 @@ static void i915_gem_unmap_dma_buf(struct dma_buf_attachment *attachment,
 				   enum dma_data_direction dir)
 {
 	struct drm_i915_gem_object *obj = dma_buf_to_obj(attachment->dmabuf);
-
+	STUB();
 	dma_unmap_sg(attachment->dev, sg->sgl, sg->nents, dir);
 	sg_free_table(sg);
 	kfree(sg);
@@ -100,14 +101,14 @@ static void i915_gem_unmap_dma_buf(struct dma_buf_attachment *attachment,
 static void *i915_gem_dmabuf_vmap(struct dma_buf *dma_buf)
 {
 	struct drm_i915_gem_object *obj = dma_buf_to_obj(dma_buf);
-
+	STUB();
 	return i915_gem_object_pin_map(obj, I915_MAP_WB);
 }
 
 static void i915_gem_dmabuf_vunmap(struct dma_buf *dma_buf, void *vaddr)
 {
 	struct drm_i915_gem_object *obj = dma_buf_to_obj(dma_buf);
-
+	STUB();
 	i915_gem_object_unpin_map(obj);
 }
 
@@ -115,7 +116,7 @@ static void *i915_gem_dmabuf_kmap(struct dma_buf *dma_buf, unsigned long page_nu
 {
 	struct drm_i915_gem_object *obj = dma_buf_to_obj(dma_buf);
 	struct page *page;
-
+	STUB();
 	if (page_num >= obj->base.size >> PAGE_SHIFT)
 		return NULL;
 
@@ -140,7 +141,7 @@ err_unpin:
 static void i915_gem_dmabuf_kunmap(struct dma_buf *dma_buf, unsigned long page_num, void *addr)
 {
 	struct drm_i915_gem_object *obj = dma_buf_to_obj(dma_buf);
-
+	STUB();
 	kunmap(virt_to_page(addr));
 	i915_gem_object_unpin_pages(obj);
 }
@@ -151,7 +152,7 @@ static int i915_gem_dmabuf_mmap(struct dma_buf *dma_buf, struct vm_area_struct *
 #if 0
 	int ret;
 #endif
-
+	STUB();
 	if (obj->base.size < vma->vm_end - vma->vm_start)
 		return -EINVAL;
 
@@ -176,7 +177,7 @@ static int i915_gem_begin_cpu_access(struct dma_buf *dma_buf, enum dma_data_dire
 	struct drm_device *dev = obj->base.dev;
 	bool write = (direction == DMA_BIDIRECTIONAL || direction == DMA_TO_DEVICE);
 	int err;
-
+	STUB();
 	err = i915_gem_object_pin_pages(obj);
 	if (err)
 		return err;
@@ -198,7 +199,7 @@ static int i915_gem_end_cpu_access(struct dma_buf *dma_buf, enum dma_data_direct
 	struct drm_i915_gem_object *obj = dma_buf_to_obj(dma_buf);
 	struct drm_device *dev = obj->base.dev;
 	int err;
-
+	STUB();
 	err = i915_gem_object_pin_pages(obj);
 	if (err)
 		return err;
@@ -233,12 +234,14 @@ struct dma_buf *i915_gem_prime_export(struct drm_device *dev,
 {
 	struct drm_i915_gem_object *obj = to_intel_bo(gem_obj);
 	DEFINE_DMA_BUF_EXPORT_INFO(exp_info);
-
+	STUB();
 	exp_info.ops = &i915_dmabuf_ops;
 	exp_info.size = gem_obj->size;
 	exp_info.flags = flags;
 	exp_info.priv = gem_obj;
 	exp_info.resv = obj->resv;
+
+	DRM_DEBUG("obj=%p, flags=%d\n", obj, flags);
 
 	if (obj->ops->dmabuf_export) {
 		int ret = obj->ops->dmabuf_export(obj);
@@ -253,7 +256,7 @@ static int i915_gem_object_get_pages_dmabuf(struct drm_i915_gem_object *obj)
 {
 	struct sg_table *pages;
 	unsigned int sg_page_sizes;
-
+	STUB();
 	pages = dma_buf_map_attachment(obj->base.import_attach,
 				       DMA_BIDIRECTIONAL);
 	if (IS_ERR(pages))
@@ -269,6 +272,7 @@ static int i915_gem_object_get_pages_dmabuf(struct drm_i915_gem_object *obj)
 static void i915_gem_object_put_pages_dmabuf(struct drm_i915_gem_object *obj,
 					     struct sg_table *pages)
 {
+  STUB();
 	dma_buf_unmap_attachment(obj->base.import_attach, pages,
 				 DMA_BIDIRECTIONAL);
 }
@@ -284,7 +288,7 @@ struct drm_gem_object *i915_gem_prime_import(struct drm_device *dev,
 	struct dma_buf_attachment *attach;
 	struct drm_i915_gem_object *obj;
 	int ret;
-
+	STUB();
 	/* is this one of own objects? */
 	if (dma_buf->ops == &i915_dmabuf_ops) {
 		obj = dma_buf_to_obj(dma_buf);

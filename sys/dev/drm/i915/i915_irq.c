@@ -1503,8 +1503,6 @@ gen8_cs_irq_handler(struct intel_engine_cs *engine, u32 iir)
 		tasklet |= USES_GUC_SUBMISSION(engine->i915);
 	}
 
-	DRM_DEBUG("iir=%u\n", iir);
-
 	if (tasklet)
 		tasklet_hi_schedule(&engine->execlists.tasklet);
 }

@@ -51,13 +51,13 @@ struct drm_printer;
 	param(char *, guc_firmware_path, NULL) \
 	param(char *, huc_firmware_path, NULL) \
 	param(char *, dmc_firmware_path, NULL) \
-	param(int, mmio_debug, 0) \
+	param(int, mmio_debug, 3) \
 	param(int, edp_vswing, 0) \
 	param(int, reset, 2) \
 	param(unsigned int, inject_load_failure, 0) \
 	/* leave bools at the end to not create holes */ \
 	param(bool, alpha_support, IS_ENABLED(CONFIG_DRM_I915_ALPHA_SUPPORT)) \
-	param(bool, enable_hangcheck, true) \
+	param(bool, enable_hangcheck, false) \
 	param(bool, fastboot, false) \
 	param(bool, prefault_disable, false) \
 	param(bool, load_detect_test, false) \

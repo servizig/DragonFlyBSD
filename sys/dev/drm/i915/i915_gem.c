@@ -546,7 +546,6 @@ i915_gem_object_wait_reservation(struct reservation_object *resv,
 			return ret;
 
 		for (i = 0; i < count; i++) {
-			DRM_DEBUG("wait fence[%d] context=%llx, seqno=%d\n", i, shared[i]->context, shared[i]->seqno);
 			timeout = i915_gem_object_wait_fence(shared[i],
 							     flags, timeout,
 							     rps_client);
@@ -575,7 +574,6 @@ i915_gem_object_wait_reservation(struct reservation_object *resv,
 	}
 
 	if (excl && timeout >= 0) {
-		DRM_DEBUG("wait fence context=%llx, seqno=%d\n", excl->context, excl->seqno);
 		timeout = i915_gem_object_wait_fence(excl, flags, timeout,
 						     rps_client);
 	}

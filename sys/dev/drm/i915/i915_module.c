@@ -24,7 +24,7 @@ static int __init i915_init(void)
 	intel_graphics_stolen_res = (struct linux_resource)
 		DEFINE_RES_MEM(intel_graphics_stolen_base,
 		    intel_graphics_stolen_size);
-	DRM_INFO("Got Intel graphics stolen memory base 0x%lx, size 0lx%lx\n",
+	DRM_INFO("Got Intel graphics stolen memory base 0x%lx, size 0x%lx\n",
 	    intel_graphics_stolen_res.start,
 	    resource_size(&intel_graphics_stolen_res));
 	return 0;

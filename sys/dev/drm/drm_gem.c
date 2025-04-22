@@ -1043,6 +1043,9 @@ EXPORT_SYMBOL(drm_gem_mmap);
 void drm_gem_print_info(struct drm_printer *p, unsigned int indent,
 			const struct drm_gem_object *obj)
 {
+#ifdef __DragonFly__
+	drm_printf_indent(p, indent, "gem_obj=%p\n", obj);
+#endif
 	drm_printf_indent(p, indent, "name=%d\n", obj->name);
 	drm_printf_indent(p, indent, "refcount=%u\n",
 			  kref_read(&obj->refcount));
@@ -1085,7 +1088,7 @@ drm_gem_mmap_single(struct drm_device *dev, vm_ooffset_t *offset, vm_size_t size
 
 	DRM_LOCK(dev);
 	gem_obj = drm_gem_object_from_offset(dev, *offset);
-	DRM_DEBUG("gem_obj=%p\n", gem_obj);
+	DRM_DEBUG("gem_obj=%p, offset=0x%lx\n", gem_obj, *offset);
 	if (gem_obj == NULL) {
 		DRM_UNLOCK(dev);
 		return (ENODEV);

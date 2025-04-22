@@ -298,9 +298,12 @@ int drm_syncobj_create(struct drm_syncobj **out_syncobj, uint32_t flags,
 		}
 	}
 
-	if (fence)
+	if (fence) {
+	  DRM_DEBUG("fence=%p\n", fence);
 		drm_syncobj_replace_fence(syncobj, 0, fence);
+	}
 
+	DRM_DEBUG("syncobj=%p\n", syncobj);
 	*out_syncobj = syncobj;
 	return 0;
 }
@@ -336,7 +339,7 @@ int drm_syncobj_get_handle(struct drm_file *file_private,
 		drm_syncobj_put(syncobj);
 		return ret;
 	}
-
+	DRM_DEBUG("handle=%d\n", ret);
 	*handle = ret;
 	return 0;
 }
@@ -664,7 +667,7 @@ static void syncobj_wait_fence_func(struct dma_fence *fence,
 {
 	struct syncobj_wait_entry *wait =
 		container_of(cb, struct syncobj_wait_entry, fence_cb);
-
+	DRM_DEBUG("wake_up\n");
 	wake_up_process(wait->task);
 }
 
@@ -677,6 +680,7 @@ static void syncobj_wait_syncobj_func(struct drm_syncobj *syncobj,
 	/* This happens inside the syncobj lock */
 	wait->fence = dma_fence_get(rcu_dereference_protected(syncobj->fence,
 							      lockdep_is_held(&syncobj->lock)));
+	DRM_DEBUG("wake_up\n");
 	wake_up_process(wait->task);
 }
 
@@ -694,6 +698,12 @@ static signed long drm_syncobj_array_wait_timeout(struct drm_syncobj **syncobjs,
 	if (!entries)
 		return -ENOMEM;
 
+	DRM_DEBUG("[in] timeout=%ld, flags=%u, entries=%p\n", timeout, flags, entries);
+#if 0
+	if (timeout == 0)
+	  timeout = 2 * hz;
+#endif
+
 	/* Walk the list of sync objects and initialize entries.  We do
 	 * this up-front so that we can properly return -EINVAL if there is
 	 * a syncobj with a missing fence and then never have the chance of
@@ -705,8 +715,10 @@ static signed long drm_syncobj_array_wait_timeout(struct drm_syncobj **syncobjs,
 		entries[i].fence = drm_syncobj_fence_get(syncobjs[i]);
 		if (!entries[i].fence) {
 			if (flags & DRM_SYNCOBJ_WAIT_FLAGS_WAIT_FOR_SUBMIT) {
+			  DRM_DEBUG("continue\n");
 				continue;
 			} else {
+			  DRM_DEBUG("-EINVAL\n");
 				timeout = -EINVAL;
 				goto cleanup_entries;
 			}
@@ -781,7 +793,9 @@ static signed long drm_syncobj_array_wait_timeout(struct drm_syncobj **syncobjs,
 			goto done_waiting;
 		}
 
+		DRM_DEBUG("[before] timeout=%ld\n", timeout);
 		timeout = schedule_timeout(timeout);
+		DRM_DEBUG("[after] timeout=%ld\n", timeout);
 	} while (1);
 
 done_waiting:

@@ -39,7 +39,8 @@ static int
 dmabuf_stat(struct file *fp, struct stat *sb, struct ucred *cred)
 {
 STUB();
-	struct dma_buf *dmabuf = fp->f_data;
+	KASSERT(fp->f_type == DTYPE_DMABUF, ("fp is not DMABUF"));
+	struct dma_buf *dmabuf = fp->private_data;
 
 	memset(sb, 0, sizeof(*sb));
 	sb->st_size = dmabuf->size;
@@ -55,13 +56,51 @@ dmabuf_close(struct file *fp)
 	return (EINVAL);
 }
 
+static int
+dmabuf_ioctl(struct file *fp, u_long com, caddr_t data,
+	    struct ucred *cred, struct sysmsg *msgv)
+{
+  kprintf("dmabuf_ioctl: com=%lu\n", com);
+	return (EBADF);
+}
+
+static int
+dmabuf_seek(struct file *fp, off_t offset, int whence, off_t *res)
+{
+	KASSERT(fp->f_type == DTYPE_DMABUF, ("fp is not DMABUF"));
+	struct dma_buf *dmabuf = fp->private_data;
+	off_t newoff;
+
+	if (offset != 0) {
+		return EINVAL;
+	}
+
+	switch (whence) {
+	case SEEK_SET:
+		newoff = 0;
+		break;
+	case SEEK_END:
+		newoff = dmabuf->size;
+		break;
+	default:
+		return EINVAL;
+	}
+	spin_lock(&fp->f_spin);
+	fp->f_offset = newoff;
+	spin_unlock(&fp->f_spin);
+	*res = newoff;
+	return 0;
+	
+}
+
 struct fileops dmabuf_fileops = {
 	.fo_read	= badfo_readwrite,
 	.fo_write	= badfo_readwrite,
-	.fo_ioctl	= badfo_ioctl,
+	.fo_ioctl	= dmabuf_ioctl,
 	.fo_kqfilter	= badfo_kqfilter,
 	.fo_stat	= dmabuf_stat,
 	.fo_close	= dmabuf_close,
+	.fo_seek	= dmabuf_seek,
 };
 
 struct dma_buf *
