@@ -1974,7 +1974,6 @@ i915_gem_mmap_ioctl(struct drm_device *dev, void *data,
 	 * fixed low address as the start point instead to avoid the NULL
 	 * return issue.
 	 */
-	//addr = PAGE_SIZE;
 	addr = round_page((vm_offset_t)p->p_vmspace->vm_taddr +
 				       maxtsiz + maxdsiz);
 	DRM_DEBUG("initial_addr=0x%lx\n", addr);
@@ -2004,6 +2003,13 @@ i915_gem_mmap_ioctl(struct drm_device *dev, void *data,
 		DRM_DEBUG("error=%d\n", error);
 	} else {
 		args->addr_ptr = (uint64_t)addr;
+		rv = vm_map_inherit(map, addr, addr + args->size, VM_INHERIT_SHARE);
+		if (rv != KERN_SUCCESS) {
+			error = -EINVAL;
+			DRM_DEBUG("inherit_error!\n");
+		} else {
+			DRM_DEBUG("vm inherit\n");
+		}
 	}
 #else
 	addr = vm_mmap(obj->base.filp, 0, args->size,
