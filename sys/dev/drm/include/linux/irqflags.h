@@ -34,12 +34,14 @@ static inline void
 local_irq_disable(void)
 {
 	crit_enter();
+	//cpu_disable_intr();
 }
 
 static inline void
 local_irq_enable(void)
 {
 	crit_exit();
+	//cpu_enable_intr();
 }
 
 static inline bool
@@ -55,7 +57,9 @@ irqs_disabled(void)
 	/* real implementation causes GEM_BUG_ON panic in the i915 driver
 	 * when handling e.g. page flip ioctl
 	 */
-	return (1);
+	//return (1);
+	//return !(read_rflags() & 0x200UL);
+	return IN_CRITICAL_SECT(curthread);
 }
 
 #define local_irq_save(flags)	\

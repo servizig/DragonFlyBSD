@@ -79,6 +79,7 @@ struct i915_capture_list {
 struct i915_request {
 	struct dma_fence fence;
 	spinlock_t lock;
+	//struct spinlock lock;
 
 	/** On Which ring this request was generated */
 	struct drm_i915_private *i915;

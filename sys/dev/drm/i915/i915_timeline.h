@@ -37,6 +37,7 @@ struct i915_timeline {
 	u32 seqno;
 
 	spinlock_t lock;
+	//struct spinlock lock;
 #define TIMELINE_CLIENT 0 /* default subclass */
 #define TIMELINE_ENGINE 1
 
