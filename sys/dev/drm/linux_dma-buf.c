@@ -35,6 +35,8 @@
 #include <linux/reservation.h>
 #include <linux/mm.h>
 
+struct fileops dmabuf_fileops;
+
 static int
 dmabuf_stat(struct file *fp, struct stat *sb, struct ucred *cred)
 {
@@ -52,15 +54,24 @@ STUB();
 static int
 dmabuf_close(struct file *fp)
 {
-	kprintf("dmabuf_close(): not implemented\n");
-	return (EINVAL);
+	struct dma_buf *dmabuf;
+	if (fp->f_ops != &dmabuf_fileops) {
+		kprintf("dmabuf_close(): file->f_ops != &dmabuf_fileops\n");
+		return EINVAL;
+	}
+	dmabuf = fp->private_data;
+	dmabuf->ops->release(dmabuf);
+	kfree(dmabuf);
+
+	//kprintf("dmabuf_close(): success\n");
+	return 0;
 }
 
 static int
 dmabuf_ioctl(struct file *fp, u_long com, caddr_t data,
 	    struct ucred *cred, struct sysmsg *msgv)
 {
-  kprintf("dmabuf_ioctl: com=%lu\n", com);
+	kprintf("dmabuf_ioctl: com=%lu\n", com);
 	return (EBADF);
 }
 
@@ -106,7 +117,6 @@ struct fileops dmabuf_fileops = {
 struct dma_buf *
 dma_buf_export(const struct dma_buf_export_info *exp_info)
 {
-STUB();
 	struct dma_buf *dmabuf;
 	struct file *fp;
 
@@ -129,7 +139,6 @@ STUB();
 int
 dma_buf_fd(struct dma_buf *dmabuf, int flags)
 {
-STUB();
 	int fd, error;
 
 	if (dmabuf == NULL)
@@ -159,7 +168,6 @@ STUB();
 struct dma_buf *
 dma_buf_get(int fd)
 {
-STUB();
 	struct file *fp;
 	struct dma_buf *dmabuf;
 
@@ -168,12 +176,12 @@ STUB();
 
 	if (fp->f_ops != &dmabuf_fileops) {
 		kprintf("dma_buf_get(): file->f_ops != &dmabuf_fileops\n");
-		fdrop(fp);
+		dropfp(curthread, fd, fp);
 		return ERR_PTR(-EBADF);
 	}
 
 	dmabuf = fp->private_data;
-	fdrop(fp);
+	dropfp(curthread, fd, fp);
 
 	return dmabuf;
 }

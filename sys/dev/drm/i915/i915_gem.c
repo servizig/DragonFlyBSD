@@ -1995,7 +1995,7 @@ i915_gem_mmap_ioctl(struct drm_device *dev, void *data,
 			 VM_MAPTYPE_NORMAL, VM_SUBSYS_DRM_GEM,
 			 VM_PROT_READ | VM_PROT_WRITE, /* prot */
 			 VM_PROT_READ | VM_PROT_WRITE, /* max */
-			 MAP_SHARED /* cow */);
+			 COWF_SHARED /* cow_flags */);
 	DRM_DEBUG("rv=%d\n", rv);
 	if (rv != KERN_SUCCESS) {
 		vm_object_deallocate(obj->base.filp);
@@ -2006,9 +2006,7 @@ i915_gem_mmap_ioctl(struct drm_device *dev, void *data,
 		rv = vm_map_inherit(map, addr, addr + args->size, VM_INHERIT_SHARE);
 		if (rv != KERN_SUCCESS) {
 			error = -EINVAL;
-			DRM_DEBUG("inherit_error!\n");
-		} else {
-			DRM_DEBUG("vm inherit\n");
+			DRM_ERROR("inherit_error!\n");
 		}
 	}
 #else

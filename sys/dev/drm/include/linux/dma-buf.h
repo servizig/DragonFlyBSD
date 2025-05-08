@@ -103,22 +103,19 @@ dma_buf_attach(struct dma_buf *dmabuf, struct device *dev)
 static inline void
 get_dma_buf(struct dma_buf *dmabuf)
 {
-  STUB();
 	fhold(dmabuf->file);
 }
 
 static inline void
 dma_buf_put(struct dma_buf *dmabuf)
 {
-  kprintf("dma_buf_put: dmabuf=%p, dmabuf->file=%p\n", dmabuf, dmabuf ? dmabuf->file : NULL);
+	//kprintf("dma_buf_put: dmabuf=%p, dmabuf->file=%p\n", dmabuf, dmabuf ? dmabuf->file : NULL);
 	if (dmabuf == NULL)
 		return;
 
 	if (dmabuf->file == NULL)
 		return;
-#if 0
 	fdrop(dmabuf->file);
-#endif
 }
 
 int dma_buf_fd(struct dma_buf *dmabuf, int flags);
