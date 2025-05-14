@@ -97,7 +97,6 @@ dma_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 		return ret;
 
 	crit_enter();
-//	cpu_disable_intr();
 	lockmgr(fence->lock, LK_EXCLUSIVE);
 
 	was_set = test_and_set_bit(DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT,
@@ -134,11 +133,9 @@ dma_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 			__set_current_state(TASK_UNINTERRUPTIBLE);
 		}
 		crit_exit();
-//		cpu_enable_intr();
 		/* wake_up_process() directly uses task_struct pointers as sleep identifiers */
 		err = lksleep(current, fence->lock, intr ? PCATCH : 0, "dmafence", ret);
 		crit_enter();
-//		cpu_disable_intr();
 		if (err == EINTR || err == ERESTART) {
 			ret = -ERESTARTSYS;
 			break;
@@ -150,7 +147,6 @@ dma_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 	__set_current_state(TASK_RUNNING);
 out:
 	crit_exit();
-//	cpu_enable_intr();
 	lockmgr(fence->lock, LK_RELEASE);
 	return ret;
 }
@@ -259,12 +255,10 @@ dma_fence_signal(struct dma_fence *fence)
 		return -EINVAL;
 
 	crit_enter();
-//	cpu_disable_intr();
 	lockmgr(fence->lock, LK_EXCLUSIVE);
 	r = dma_fence_signal_locked(fence);
 	lockmgr(fence->lock, LK_RELEASE);
 	crit_exit();
-//	cpu_enable_intr();
 
 	return r;
 }
@@ -276,13 +270,11 @@ dma_fence_enable_sw_signaling(struct dma_fence *fence)
 	    !test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags) &&
 	    fence->ops->enable_signaling) {
 		crit_enter();
-//		cpu_disable_intr();
 		lockmgr(fence->lock, LK_EXCLUSIVE);
 		if (!fence->ops->enable_signaling(fence))
 			dma_fence_signal_locked(fence);
 		lockmgr(fence->lock, LK_RELEASE);
 		crit_exit();
-//		cpu_enable_intr();
 	}
 }
 
@@ -302,7 +294,6 @@ dma_fence_add_callback(struct dma_fence *fence, struct dma_fence_cb *cb,
 	}
 
 	crit_enter();
-//	cpu_disable_intr();
 	lockmgr(fence->lock, LK_EXCLUSIVE);
 
 	was_set = test_and_set_bit(DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT, &fence->flags);
@@ -323,7 +314,6 @@ dma_fence_add_callback(struct dma_fence *fence, struct dma_fence_cb *cb,
 		INIT_LIST_HEAD(&cb->node);
 	lockmgr(fence->lock, LK_RELEASE);
 	crit_exit();
-//	cpu_enable_intr();
 
 	return ret;
 }
@@ -334,7 +324,6 @@ dma_fence_remove_callback(struct dma_fence *fence, struct dma_fence_cb *cb)
 	bool ret;
 
 	crit_enter();
-//	cpu_disable_intr();
 	lockmgr(fence->lock, LK_EXCLUSIVE);
 
 	ret = !list_empty(&cb->node);
@@ -343,7 +332,6 @@ dma_fence_remove_callback(struct dma_fence *fence, struct dma_fence_cb *cb)
 
 	lockmgr(fence->lock, LK_RELEASE);
 	crit_exit();
-//	cpu_enable_intr();
 
 	return ret;
 }

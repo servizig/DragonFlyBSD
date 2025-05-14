@@ -228,11 +228,7 @@ vga_pci_map_bios(device_t dev, size_t *size)
 		found = (bios[0] == 0x55 && bios[1] == 0xaa);
 		if (found)
 			break;
-#ifdef __DragonFly__
 		tsleep(vga_pci_map_bios, 0, "dummyvgabios", 1);
-#else
-		pause("vgabios", 1);
-#endif
 	}
 	if (found)
 		return (__DEVOLATILE(void *, bios));
@@ -267,11 +263,7 @@ vga_pci_map_bios(device_t dev, size_t *size)
 		found = (bios[0] == 0x55 && bios[1] == 0xaa);
 		if (found)
 			break;
-#ifdef __DragonFly__
 		tsleep(vga_pci_map_bios, 0, "dummyvgabios", 1);
-#else
-		pause("vgabios", 1);
-#endif
 	}
 	if (found)
 		return (__DEVOLATILE(void *, bios));

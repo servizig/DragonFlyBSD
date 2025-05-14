@@ -67,7 +67,7 @@ llist_add(struct llist_node *new, struct llist_head *head)
 
 	do {
 		new->next = first = head->first;
-	} while (!atomic_cmpset_ptr(&head->first, first, new));	
+	} while (!atomic_cmpset_ptr(&head->first, first, new));
 
 	return (first == NULL);
 }

@@ -1931,7 +1931,7 @@ i915_gem_mmap_ioctl(struct drm_device *dev, void *data,
 #endif
 
 	if (args->flags & ~(I915_MMAP_WC)) {
-		DRM_DEBUG("args->flags & ~(I915_MMAP_WC)\n");
+		DRM_DEBUG("args->flags & ~(I915_MMAP_WC) = %lld\n", args->flags);
 		return -EINVAL;
 	}
 

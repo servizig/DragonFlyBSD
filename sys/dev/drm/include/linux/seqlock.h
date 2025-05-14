@@ -51,7 +51,6 @@
 
 typedef struct {
 	unsigned sequence;
-	//struct lock lock;
 	struct spinlock lock;
 } seqlock_t;
 
@@ -59,7 +58,6 @@ static inline void
 seqlock_init(seqlock_t *sl)
 {
 	sl->sequence = 0;
-	//lockinit(&sl->lock, "lsql", 0, 0);
 	spin_init(&sl->lock, "lsql");
 }
 
@@ -71,7 +69,6 @@ seqlock_init(seqlock_t *sl)
 static inline void
 write_seqlock(seqlock_t *sl)
 {
-	//lockmgr(&sl->lock, LK_EXCLUSIVE);
 	spin_lock(&sl->lock);
 	sl->sequence++;
 	cpu_sfence();
@@ -81,7 +78,6 @@ static inline void
 write_sequnlock(seqlock_t *sl)
 {
 	sl->sequence--;
-	//lockmgr(&sl->lock, LK_RELEASE);
 	spin_unlock(&sl->lock);
 	cpu_sfence();
 }
@@ -179,7 +175,6 @@ static inline void
 write_seqlock_irqsave(seqlock_t *sl, unsigned long flags)
 {
 	local_irq_save(flags);
-	//lockmgr(&sl->lock, LK_EXCLUSIVE);
 	spin_lock(&sl->lock);
 	sl->sequence++;
 }
@@ -188,7 +183,6 @@ static inline void
 write_sequnlock_irqrestore(seqlock_t *sl, unsigned long flags)
 {
 	sl->sequence--;
-	//lockmgr(&sl->lock, LK_RELEASE);
 	spin_unlock(&sl->lock);
 	local_irq_restore(flags);
 }

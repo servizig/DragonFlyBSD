@@ -1,5 +1,4 @@
 .PATH:	${.CURDIR}/.. ${.CURDIR}/../ttm
-KCFLAGS += -g -DINVARIANTS
 
 KMOD	= drm
 SRCS	= \
