@@ -96,9 +96,13 @@ atomic64_set(atomic64_t *v, long i)
 }
 
 static inline int
-atomic_read(const atomic_t *v)
+atomic_read(atomic_t *v)
 {
+#if 0
 	return READ_ONCE(v->counter);
+#else
+	return atomic_load_acq_int(&v->counter);
+#endif
 }
 
 static inline int64_t

@@ -998,8 +998,19 @@ static int amdgpu_cs_ib_fill(struct amdgpu_device *adev,
 		ib = &parser->job->ibs[j];
 		chunk_ib = (struct drm_amdgpu_cs_chunk_ib *)chunk->kdata;
 
+kprintf("ib_fill: chunk[%d] chunk_id=%d\n", i, chunk->chunk_id);
+
+if (chunk->chunk_id == AMDGPU_CHUNK_ID_FENCE) {
+}
+if (chunk->chunk_id == AMDGPU_CHUNK_ID_BO_HANDLES) {
+}
+
 		if (chunk->chunk_id != AMDGPU_CHUNK_ID_IB)
 			continue;
+
+kprintf("ib_fill: chunk_ib[%d] flags=0x%x va_start=0x%llx ib_bytes=%d ip_type=%d ip_instance=%d ring=%d\n",
+	i, chunk_ib->flags, chunk_ib->va_start, chunk_ib->ib_bytes, chunk_ib->ip_type, chunk_ib->ip_instance, chunk_ib->ring); 
+
 
 		if (chunk_ib->ip_type == AMDGPU_HW_IP_GFX && amdgpu_sriov_vf(adev)) {
 			if (chunk_ib->flags & AMDGPU_IB_FLAG_PREEMPT) {
@@ -1218,6 +1229,8 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 	if (r)
 		goto error_unlock;
 
+//kprintf("cs_submit#1: %p\n", job);
+
 	/* No memory allocation is allowed while holding the mn lock */
 	amdgpu_mn_lock(p->mn);
 	amdgpu_bo_list_for_each_userptr_entry(e, p->bo_list) {
@@ -1231,6 +1244,8 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 
 	job->owner = p->filp;
 	p->fence = dma_fence_get(&job->base.s_fence->finished);
+
+//kprintf("cs_submit#2: fence %lld/%d\n", p->fence->context, p->fence->seqno);
 
 	amdgpu_ctx_add_fence(p->ctx, entity, p->fence, &seq);
 	amdgpu_cs_post_dependencies(p);
@@ -1323,7 +1338,10 @@ int amdgpu_cs_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 	if (r)
 		goto out;
 
+//kprintf("amdgpu_cs in: ctx_id=%d bo_list_handle=%d num_chunks=%d\n",
+//	cs->in.ctx_id, cs->in.bo_list_handle, cs->in.num_chunks);
 	r = amdgpu_cs_submit(&parser, cs);
+//kprintf("amdgpu_cs out: handle=%lld\n", cs->out.handle);
 
 out:
 	amdgpu_cs_parser_fini(&parser, r, reserved_buffers);
@@ -1349,6 +1367,9 @@ int amdgpu_cs_wait_ioctl(struct drm_device *dev, void *data,
 	struct dma_fence *fence;
 	long r;
 
+kprintf("amdgpu_cs_wait in: handle=%lld timeout=%lld ip_type=%d ip_instance=%d ring=%d ctx_id=%d\n",
+	wait->in.handle, wait->in.timeout, wait->in.ip_type, wait->in.ip_instance, wait->in.ring, wait->in.ctx_id);
+
 	ctx = amdgpu_ctx_get(filp->driver_priv, wait->in.ctx_id);
 	if (ctx == NULL)
 		return -EINVAL;
@@ -1361,6 +1382,7 @@ int amdgpu_cs_wait_ioctl(struct drm_device *dev, void *data,
 	}
 
 	fence = amdgpu_ctx_get_fence(ctx, entity, wait->in.handle);
+kprintf("amdgpu_cs_wait: fence=%p\n", fence);
 	if (IS_ERR(fence))
 		r = PTR_ERR(fence);
 	else if (fence) {
@@ -1371,6 +1393,7 @@ int amdgpu_cs_wait_ioctl(struct drm_device *dev, void *data,
 	} else
 		r = 1;
 
+kprintf("amdgpu_cs_wait out: status=%d\n", (r == 0));
 	amdgpu_ctx_put(ctx);
 	if (r < 0)
 		return r;

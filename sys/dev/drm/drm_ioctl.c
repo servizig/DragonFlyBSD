@@ -830,9 +830,9 @@ int drm_ioctl(struct dev_ioctl_args *ap)
 		ioctl = &drm_ioctls[nr];
 	}
 
-	DRM_DEBUG_IOCTL("pid=%d, dev=0x%lx, auth=%d, %s\n",
-		  DRM_CURRENTPID,
-		  (long)dev->dev,
+	DRM_DEBUG_IOCTL("auth=%d, %s\n",
+		  //DRM_CURRENTPID,
+		  //(long)dev->dev,
 		  file_priv->authenticated, ioctl->name);
 
 	/* Do not trust userspace, use our own definition */

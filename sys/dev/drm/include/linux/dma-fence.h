@@ -34,7 +34,11 @@
 #include <linux/printk.h>
 #include <linux/rcupdate.h>
 
+#if 1
 #define DMA_FENCE_TRACE(fence, fmt, args...) do {} while(0)
+#else
+#define DMA_FENCE_TRACE(fence, fmt, args...) do { struct dma_fence *__ff = (fence); DRM_DEBUG("%lld/%d: " fmt, __ff->context, __ff->seqno, ##args); } while(0)
+#endif
 
 struct dma_fence_cb;
 

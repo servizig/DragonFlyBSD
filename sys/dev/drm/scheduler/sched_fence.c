@@ -165,6 +165,8 @@ struct drm_sched_fence *drm_sched_fence_create(struct drm_sched_entity *entity,
 	lockinit(&fence->lock, "dscl", 0, LK_CANRECURSE);
 
 	seq = atomic_inc_return(&entity->fence_seq);
+
+//kprintf("drm_sched_fence_create: %ld-%ld/%d\n", entity->fence_context, entity->fence_context, seq);
 	dma_fence_init(&fence->scheduled, &drm_sched_fence_ops_scheduled,
 		       &fence->lock, entity->fence_context, seq);
 	dma_fence_init(&fence->finished, &drm_sched_fence_ops_finished,

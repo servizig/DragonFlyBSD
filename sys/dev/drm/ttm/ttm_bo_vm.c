@@ -83,12 +83,14 @@ static int ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 	/*
 	 * Ordinary wait.
 	 */
+#if 0
 	ret = dma_fence_wait(bo->moving, true);
 	if (unlikely(ret != 0)) {
 		ret = (ret != -ERESTARTSYS) ? VM_FAULT_SIGBUS :
 			VM_FAULT_NOPAGE;
 		goto out_unlock;
 	}
+#endif
 
 out_clear:
 	dma_fence_put(bo->moving);
@@ -558,9 +560,11 @@ retry:
 
 		if (vmf->flags & FAULT_FLAG_ALLOW_RETRY || 1) {
 			if (!(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
+				ttm_bo_get(bo);
 				up_read(&vma->vm_mm->mmap_sem);
 				(void) ttm_bo_wait_unreserved(bo);
 				down_read(&vma->vm_mm->mmap_sem);
+				ttm_bo_put(bo);
 			}
 
 #ifndef __DragonFly__
@@ -794,7 +798,7 @@ ttm_bo_mmap_single(struct file *fp, struct drm_device *dev,
 	 * setup our own VM object and ignore what the linux code did other
 	 * then supplying us the 'bo'.
 	 */
-	ret = ttm_bo_mmap(fp, &vma, bdev);
+	ret = ttm_bo_mmap(NULL, &vma, bdev);
 
 	if (ret == 0) {
 		bo = vma.vm_private_data;

@@ -89,7 +89,9 @@ do {									\
 static inline int
 del_timer(struct timer_list *timer)
 {
-	return callout_stop(&(timer)->timer_callout);
+	int ret = callout_stop(&(timer)->timer_callout);
+	//callout_terminate(&(timer)->timer_callout);
+	return ret;
 }
 
 static inline int

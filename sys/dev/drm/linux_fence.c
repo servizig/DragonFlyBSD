@@ -29,6 +29,8 @@ void
 dma_fence_init(struct dma_fence *fence, const struct dma_fence_ops *ops,
     spinlock_t *lock, u64 context, unsigned seqno)
 {
+
+//kprintf("I%lld/%d\n", context, seqno); 
 	fence->ops = ops;
 	fence->lock = lock;
 	fence->context = context;
@@ -53,8 +55,11 @@ dma_fence_release(struct kref *ref)
 long
 dma_fence_wait_timeout(struct dma_fence *fence, bool intr, long timeout)
 {
-	if (timeout < 0)
-		return -EINVAL;
+	if (timeout < 0) {
+		kprintf("dma_fence_wait_timeout fixup\n");
+		timeout = MAX_SCHEDULE_TIMEOUT;
+		//return -EINVAL;
+	}
 
 	if (fence->ops->wait)
 		return fence->ops->wait(fence, intr, timeout);
@@ -82,19 +87,22 @@ dma_fence_default_wait_cb(struct dma_fence *fence, struct dma_fence_cb *cb)
 		container_of(cb, struct default_wait_cb, base);
 
 	wake_up_process(wait->task);
+	wakeup(fence);
 }
 
 long
 dma_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 {
 	long ret = timeout ? timeout : 1;
-	unsigned long end;
+	//unsigned long end;
 	int err;
 	struct default_wait_cb cb;
 	bool was_set;
 
-	if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags))
+	if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
+//kprintf("default_wait: %lld/%d already signaled\n", fence->context, fence->seqno);
 		return ret;
+	}
 
 	crit_enter();
 	lockmgr(fence->lock, LK_EXCLUSIVE);
@@ -102,8 +110,10 @@ dma_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 	was_set = test_and_set_bit(DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT,
 	    &fence->flags);
 
-	if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags))
+	if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
+		kprintf("dma_fence: signaled#2 %lld/%d\n", fence->context, fence->seqno);
 		goto out;
+	}
 
 	if (!was_set && fence->ops->enable_signaling) {
 		if (!fence->ops->enable_signaling(fence)) {
@@ -112,39 +122,44 @@ dma_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 		}
 	}
 
+#if 0
 	if (timeout == 0) {
 		ret = 0;
 		goto out;
+	}
+#endif
+	if (timeout == MAX_SCHEDULE_TIMEOUT) {
+//		kprintf("dma_fence_default_wait: timeout fixup\n");
+		timeout = 0;
 	}
 
 	cb.base.func = dma_fence_default_wait_cb;
 	cb.task = current;
 	list_add(&cb.base.node, &fence->cb_list);
 
-	end = jiffies + timeout;
-	for (ret = timeout; ret > 0; ret = MAX(0, end - jiffies)) {
-		if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
-			break;
-		}
-		if (intr) {
-			__set_current_state(TASK_INTERRUPTIBLE);
-		}
-		else {
-			__set_current_state(TASK_UNINTERRUPTIBLE);
-		}
+	while (!test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
+		kprintf("S%lld/%d:", fence->context, fence->seqno);
 		crit_exit();
 		/* wake_up_process() directly uses task_struct pointers as sleep identifiers */
-		err = lksleep(current, fence->lock, intr ? PCATCH : 0, "dmafence", ret);
+		err = lksleep(fence, fence->lock, intr ? PCATCH : 0, "dmafence", timeout);
 		crit_enter();
+		kprintf("s:%d:%lld/%d:\n", err, fence->context, fence->seqno);
 		if (err == EINTR || err == ERESTART) {
 			ret = -ERESTARTSYS;
+			break;
+		} else if (err == EWOULDBLOCK) {
+			ret = 0;
+			break;
+		} else if (err < 0) {
+			kprintf("fence_wait: unexpected err=%d\n", err);
+			ret = err;
 			break;
 		}
 	}
 
 	if (!list_empty(&cb.base.node))
 		list_del(&cb.base.node);
-	__set_current_state(TASK_RUNNING);
+//	__set_current_state(TASK_RUNNING);
 out:
 	crit_exit();
 	lockmgr(fence->lock, LK_RELEASE);
@@ -227,16 +242,22 @@ dma_fence_signal_locked(struct dma_fence *fence)
 	struct dma_fence_cb *cur, *tmp;
 	struct list_head cb_list;
 
-	if (fence == NULL)
+	if (fence == NULL) {
+	  kprintf("signal_locked: fence == NULL\n");
+	  print_backtrace(-1);
 		return -EINVAL;
+	}
 
-	if (test_and_set_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags))
+	if (test_and_set_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
+	  kprintf("dma_fence_signal_locked#1: %lld/%d\n", fence->context, fence->seqno);
 		return -EINVAL;
+	}
 
 	list_replace(&fence->cb_list, &cb_list);
 
 	fence->timestamp = ktime_get();
 	set_bit(DMA_FENCE_FLAG_TIMESTAMP_BIT, &fence->flags);
+//	kprintf("dma_fence_signal_locked#2: %lld/%d\n", fence->context, fence->seqno);
 
 	list_for_each_entry_safe(cur, tmp, &cb_list, node) {
 		INIT_LIST_HEAD(&cur->node);

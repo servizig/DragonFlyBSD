@@ -549,12 +549,16 @@ static int drm_sched_main(void *param)
 					  (entity = drm_sched_select_entity(sched))) ||
 					 kthread_should_stop());
 
-		if (!entity)
+		if (!entity) {
+kprintf("!entity\n");
 			continue;
+		}
 
 		sched_job = drm_sched_entity_pop_job(entity);
-		if (!sched_job)
+		if (!sched_job) {
+kprintf("!sched_job\n");
 			continue;
+		}
 
 		s_fence = sched_job->s_fence;
 
@@ -563,8 +567,11 @@ static int drm_sched_main(void *param)
 
 		fence = sched->ops->run_job(sched_job);
 		drm_sched_fence_scheduled(s_fence);
+//		kprintf("%s:fence=%p\n", sched->name, fence);
+
 
 		if (fence) {
+//		  kprintf("%s#2:fence=%p %lld/%d\n", sched->name, fence, fence->context, fence->seqno);
 			s_fence->parent = dma_fence_get(fence);
 			r = dma_fence_add_callback(fence, &s_fence->cb,
 						   drm_sched_process_job);

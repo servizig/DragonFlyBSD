@@ -243,11 +243,13 @@ bool amdgpu_fence_process(struct amdgpu_ring *ring)
 
 	do {
 		struct dma_fence *fence, **ptr;
-
+//tsleep(amdgpu_fence_process, 0, "blah", 2);
 		++last_seq;
 		last_seq &= drv->num_fences_mask;
+//tsleep(amdgpu_fence_process, 0, "blah", 2);
 		ptr = &drv->fences[last_seq];
 
+//tsleep(amdgpu_fence_process, 0, "blah", 2);
 		/* There is always exactly one thread signaling this fence slot */
 		fence = rcu_dereference_protected(*ptr, 1);
 		RCU_INIT_POINTER(*ptr, NULL);
@@ -255,6 +257,7 @@ bool amdgpu_fence_process(struct amdgpu_ring *ring)
 		if (!fence)
 			continue;
 
+//kprintf("IRQ:%lld/%d\n", fence->context, fence->seqno);
 		r = dma_fence_signal(fence);
 		if (!r)
 			DMA_FENCE_TRACE(fence, "signaled from irq context\n");

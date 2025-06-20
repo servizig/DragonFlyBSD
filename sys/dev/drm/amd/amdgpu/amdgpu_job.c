@@ -42,6 +42,19 @@ static void amdgpu_job_timedout(struct drm_sched_job *s_job)
 	DRM_ERROR("ring %s timeout, signaled seq=%u, emitted seq=%u\n",
 		  job->base.sched->name, atomic_read(&ring->fence_drv.last_seq),
 		  ring->fence_drv.sync_seq);
+if (job->fence) {
+	kprintf("job=%p fence: %lld/%d\n", job, job->fence->context, job->fence->seqno);
+}
+
+if (s_job->s_fence) {
+	kprintf("s_job=%p s_fence: scheduled=%lld/%d finished=%lld/%d\n", s_job, 
+		s_job->s_fence->scheduled.context, s_job->s_fence->scheduled.seqno,
+		s_job->s_fence->finished.context, s_job->s_fence->finished.seqno);
+}
+
+if (s_job->s_fence->parent) {
+  kprintf("parent fence: %lld/%d\n", s_job->s_fence->parent->context, s_job->s_fence->parent->seqno);
+}
 
 	if (amdgpu_device_should_recover_gpu(ring->adev))
 		amdgpu_device_gpu_recover(ring->adev, job);
@@ -152,6 +165,9 @@ int amdgpu_job_submit(struct amdgpu_job *job, struct drm_sched_entity *entity,
 	ring = to_amdgpu_ring(entity->rq->sched);
 	amdgpu_ring_priority_get(ring, priority);
 
+//kprintf("amdgpu_job_submit: @%s job=%p %lld/%d\n",
+//	ring->name, job, (*f)->context, (*f)->seqno);
+
 	return 0;
 }
 
@@ -163,6 +179,10 @@ int amdgpu_job_submit_direct(struct amdgpu_job *job, struct amdgpu_ring *ring,
 	job->base.sched = &ring->sched;
 	r = amdgpu_ib_schedule(ring, job->num_ibs, job->ibs, NULL, fence);
 	job->fence = dma_fence_get(*fence);
+
+
+kprintf("amdgpu_job_submit_direct=%d: @%s job=%p %lld/%d\n",
+	r, ring->name, job, job->fence->context, job->fence->seqno);
 	if (r)
 		return r;
 
@@ -228,10 +248,18 @@ static struct dma_fence *amdgpu_job_run(struct drm_sched_job *sched_job)
 		if (r)
 			DRM_ERROR("Error scheduling IBs (%d)\n", r);
 	}
+
 	/* if gpu reset, hw fence will be replaced here */
 	dma_fence_put(job->fence);
 	job->fence = dma_fence_get(fence);
 
+if (job->fence && job->base.sched->name[0] != 's') {
+//	kprintf("R2:%lld/%d;\n", job->fence->context, job->fence->seqno);
+}
+
+if (job->base.sched->name[0] == 'g') {
+	kprintf("R2: %p\n", fence);
+}
 	amdgpu_job_free_resources(job);
 	return fence;
 }

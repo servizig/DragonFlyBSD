@@ -223,9 +223,12 @@ int amdgpu_bo_create_list_entry_array(struct drm_amdgpu_bo_list_in *in,
 	struct drm_amdgpu_bo_list_entry *info;
 	int r;
 
+kprintf("bo_create_list: %d -- %d\n", in->bo_number, info_size);
 	info = kvmalloc_array(in->bo_number, info_size, GFP_KERNEL);
-	if (!info)
+	if (!info) {
+kprintf("-ENOMEM\n");
 		return -ENOMEM;
+	}
 
 	/* copy the handle array from userspace to a kernel buffer */
 	r = -EFAULT;
