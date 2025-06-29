@@ -995,6 +995,7 @@ int amdgpu_vm_alloc_pts(struct amdgpu_device *adev,
 		r = amdgpu_bo_create(adev, &bp, &pt);
 		if (r)
 			return r;
+//kprintf("page table created at bo %p tbo %p\n", pt, &pt->tbo);
 
 		r = amdgpu_vm_clear_bo(adev, vm, pt, cursor.level, ats);
 		if (r)
@@ -1166,8 +1167,10 @@ int amdgpu_vm_flush(struct amdgpu_ring *ring, struct amdgpu_job *job, bool need_
 	pasid_mapping_needed &= adev->gmc.gmc_funcs->emit_pasid_mapping &&
 		ring->funcs->emit_wreg;
 
-	if (!vm_flush_needed && !gds_switch_needed && !need_pipe_sync)
+	if (!vm_flush_needed && !gds_switch_needed && !need_pipe_sync) {
+//kprintf("vm_flush: skipped!\n");
 		return 0;
+}
 
 	if (ring->funcs->init_cond_exec)
 		patch_offset = amdgpu_ring_init_cond_exec(ring);
@@ -1187,6 +1190,7 @@ int amdgpu_vm_flush(struct amdgpu_ring *ring, struct amdgpu_job *job, bool need_
 		r = amdgpu_fence_emit(ring, &fence, 0);
 		if (r)
 			return r;
+if (ring->name[0] == 'g') kprintf("%s: vm flush emit_fence %p\n", ring->name, fence);
 	}
 
 	if (vm_flush_needed) {
@@ -1226,6 +1230,9 @@ int amdgpu_vm_flush(struct amdgpu_ring *ring, struct amdgpu_job *job, bool need_
 		amdgpu_ring_emit_switch_buffer(ring);
 		amdgpu_ring_emit_switch_buffer(ring);
 	}
+
+//kprintf("vm_flush: vm_flush_needed=%d, pasid_mapping_needed=%d, vmid=%d, pasid=%d, id->pasid=%d, job->vm_pd_addr=0x%lx\n",
+//	vm_flush_needed, pasid_mapping_needed, job->vmid, job->pasid, id->pasid, job->vm_pd_addr);
 	return 0;
 }
 
@@ -1280,6 +1287,7 @@ static void amdgpu_vm_do_set_ptes(struct amdgpu_pte_update_params *params,
 {
 	pe += amdgpu_bo_gpu_offset(bo);
 	trace_amdgpu_vm_set_ptes(pe, addr, count, incr, flags);
+//kprintf("vm_set_ptes: bo %p pe 0x%lx addr 0x%lx count %d incr %u flags 0x%lx\n", bo, pe, addr, count, incr, flags);
 
 	if (count < 3) {
 		amdgpu_vm_write_pte(params->adev, params->ib, pe,
@@ -1314,6 +1322,7 @@ static void amdgpu_vm_do_copy_ptes(struct amdgpu_pte_update_params *params,
 
 	pe += amdgpu_bo_gpu_offset(bo);
 	trace_amdgpu_vm_copy_ptes(pe, src, count);
+//kprintf("vm_copy_pte: bo %p pe 0x%lx src 0x%lx count %d\n", bo, pe, src, count);
 
 	amdgpu_vm_copy_pte(params->adev, params->ib, pe, src, count);
 }
@@ -1338,9 +1347,11 @@ static uint64_t amdgpu_vm_map_gart(const dma_addr_t *pages_addr, uint64_t addr)
 	result = pages_addr[addr >> PAGE_SHIFT];
 
 	/* in case cpu page size != gpu page size*/
-	result |= addr & (~PAGE_MASK);
+	result |= addr & (~LINUX_PAGE_MASK);
 
 	result &= 0xFFFFFFFFFFFFF000ULL;
+
+//kprintf("map_gart: addr 0x%lx idx %ld result 0x%lx\n", addr, addr >> PAGE_SHIFT, result);
 
 	return result;
 }
@@ -1986,9 +1997,12 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 	trace_amdgpu_vm_bo_update(mapping);
 
 	pfn = mapping->offset >> PAGE_SHIFT;
+//kprintf("split_mapping: mapping->start 0x%lx offset 0x%lx pfn 0x%lx\n",
+//	start, mapping->offset, pfn);
 	if (nodes) {
 		while (pfn >= nodes->size) {
 			pfn -= nodes->size;
+//kprintf("loop: nodes->size 0x%llx pfn 0x%lx\n", nodes->size, pfn);
 			++nodes;
 		}
 	}
@@ -2002,6 +2016,8 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 			addr = nodes->start << PAGE_SHIFT;
 			max_entries = (nodes->size - pfn) *
 				AMDGPU_GPU_PAGES_IN_CPU_PAGE;
+//kprintf("addr 0x%lx max_entries %ld nodes->start 0x%llx\n",
+//	addr, max_entries, nodes->start);
 		} else {
 			addr = 0;
 			max_entries = S64_MAX;
@@ -2015,6 +2031,7 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 			     count < max_entries / AMDGPU_GPU_PAGES_IN_CPU_PAGE;
 			     ++count) {
 				uint64_t idx = pfn + count;
+//kprintf("count %ld idx %ld pages_addr[idx] 0x%lx\n", count, idx, pages_addr[idx]);
 
 				if (pages_addr[idx] !=
 				    (pages_addr[idx - 1] + PAGE_SIZE))
@@ -2024,27 +2041,35 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 			if (count < min_linear_pages) {
 				addr = pfn << PAGE_SHIFT;
 				dma_addr = pages_addr;
+//kprintf("if#1: addr 0x%lx dma_addr 0x%lx\n", addr, dma_addr[0]);
 			} else {
 				addr = pages_addr[pfn];
 				max_entries = count * AMDGPU_GPU_PAGES_IN_CPU_PAGE;
+//kprintf("if#2: addr 0x%lx dma_addr 0x%lx max_entries %ld\n", addr, dma_addr[0], max_entries);
 			}
 
 		} else if (flags & AMDGPU_PTE_VALID) {
 			addr += adev->vm_manager.vram_base_offset;
 			addr += pfn << PAGE_SHIFT;
+//kprintf("else if addr 0x%lx vram_base_offset 0x%llx pfn 0x%lx\n",
+//	addr, adev->vm_manager.vram_base_offset, pfn);
 		}
 
 		last = min((uint64_t)mapping->last, start + max_entries - 1);
+//kprintf("before update: start %ld last %ld addr 0x%lx\n", start, last, addr);
 		r = amdgpu_vm_bo_update_mapping(adev, exclusive, dma_addr, vm,
 						start, last, flags, addr,
 						fence);
 		if (r)
 			return r;
 
+//kprintf("before#1: pfn 0x%lx\n", pfn);
 		pfn += (last - start + 1) / AMDGPU_GPU_PAGES_IN_CPU_PAGE;
+//kprintf("before#2: pfn 0x%lx\n", pfn);
 		if (nodes && nodes->size == pfn) {
 			pfn = 0;
 			++nodes;
+//kprintf("nodes && nodes->size == pfn\n");
 		}
 		start = last + 1;
 
@@ -3313,7 +3338,7 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 	if (!RB_EMPTY_ROOT(&vm->va.rb_root)) {
 		dev_err(adev->dev, "still active bo inside vm\n");
 	}
-#ifndef __DragonFly__
+#if 1
 	rbtree_postorder_for_each_entry_safe(mapping, tmp,
 					     &vm->va.rb_root, rb) {
 #else

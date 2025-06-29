@@ -43,7 +43,7 @@ static void amdgpu_job_timedout(struct drm_sched_job *s_job)
 		  job->base.sched->name, atomic_read(&ring->fence_drv.last_seq),
 		  ring->fence_drv.sync_seq);
 if (job->fence) {
-	kprintf("job=%p fence: %lld/%d\n", job, job->fence->context, job->fence->seqno);
+	kprintf("job=%p fence: %p %lld/%d\n", job, job->fence, job->fence->context, job->fence->seqno);
 }
 
 if (s_job->s_fence) {
@@ -237,6 +237,10 @@ static struct dma_fence *amdgpu_job_run(struct drm_sched_job *sched_job)
 
 	trace_amdgpu_sched_run_job(job);
 
+if (job->base.sched->name[0] == 'g') {
+	kprintf("R1: %p\n", job);
+}
+
 	if (job->vram_lost_counter != atomic_read(&ring->adev->vram_lost_counter))
 		dma_fence_set_error(finished, -ECANCELED);/* skip IB as well if VRAM lost */
 
@@ -247,19 +251,16 @@ static struct dma_fence *amdgpu_job_run(struct drm_sched_job *sched_job)
 				       &fence);
 		if (r)
 			DRM_ERROR("Error scheduling IBs (%d)\n", r);
+if (job->base.sched->name[0] == 'g') {
+	kprintf("R2: %p\n", job);
+}
+
 	}
 
 	/* if gpu reset, hw fence will be replaced here */
 	dma_fence_put(job->fence);
 	job->fence = dma_fence_get(fence);
 
-if (job->fence && job->base.sched->name[0] != 's') {
-//	kprintf("R2:%lld/%d;\n", job->fence->context, job->fence->seqno);
-}
-
-if (job->base.sched->name[0] == 'g') {
-	kprintf("R2: %p\n", fence);
-}
 	amdgpu_job_free_resources(job);
 	return fence;
 }

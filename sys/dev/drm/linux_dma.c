@@ -28,6 +28,10 @@
 
 #include <vm/vm_extern.h>
 
+#if 0
+#include "drm/drm_legacy.h"		/* for drm_dma_handle_t */
+#endif
+
 void *
 dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *dma_handle,
     gfp_t flag)
@@ -50,9 +54,7 @@ dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *dma_handle,
 	else
 		*dma_handle = 0;
 	return (mem);
-#endif
-
-#if 0
+#else
 	size_t align = PAGE_SIZE << get_order(size);
 	int error;
 	drm_dma_handle_t *dmah;
@@ -62,7 +64,7 @@ dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *dma_handle,
 		return NULL;
 
 	error = bus_dmamem_coherent_any(
-		bus_get_dma_tag(dev->dev->bsddev),
+		bus_get_dma_tag(dev->bsddev),
 		align, size, BUS_DMA_WAITOK | BUS_DMA_ZERO | BUS_DMA_NOCACHE,
 		&dmah->tag, &dmah->map, &dmah->vaddr);
 	if (error != 0) {

@@ -583,6 +583,7 @@ static int ttm_bo_kmap_ttm(struct ttm_buffer_object *bo,
 		map->bo_kmap_type = ttm_bo_map_kmap;
 		map->page = ttm->pages[start_page];
 		map->virtual = kmap(map->page);
+kprintf("kmap bo %p %p\n", bo, map->virtual);
 	} else {
 		/*
 		 * We need to use vmap to get the desired page protection
@@ -592,6 +593,7 @@ static int ttm_bo_kmap_ttm(struct ttm_buffer_object *bo,
 		map->bo_kmap_type = ttm_bo_map_vmap;
 		map->virtual = vmap(ttm->pages + start_page, num_pages,
 				    0, prot);
+kprintf("vmap bo %p %p\n", bo, map->virtual);
 	}
 	return (!map->virtual) ? -ENOMEM : 0;
 }

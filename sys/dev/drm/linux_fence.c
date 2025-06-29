@@ -104,7 +104,7 @@ dma_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 		return ret;
 	}
 
-	crit_enter();
+	//crit_enter();
 	lockmgr(fence->lock, LK_EXCLUSIVE);
 
 	was_set = test_and_set_bit(DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT,
@@ -122,7 +122,7 @@ dma_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 		}
 	}
 
-#if 0
+#if 1
 	if (timeout == 0) {
 		ret = 0;
 		goto out;
@@ -138,21 +138,17 @@ dma_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 	list_add(&cb.base.node, &fence->cb_list);
 
 	while (!test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
-		kprintf("S%lld/%d:", fence->context, fence->seqno);
-		crit_exit();
+//		kprintf("S%lld/%d:", fence->context, fence->seqno);
+		//crit_exit();
 		/* wake_up_process() directly uses task_struct pointers as sleep identifiers */
 		err = lksleep(fence, fence->lock, intr ? PCATCH : 0, "dmafence", timeout);
-		crit_enter();
-		kprintf("s:%d:%lld/%d:\n", err, fence->context, fence->seqno);
+		//crit_enter();
+//		kprintf("s:%d:%lld/%d:\n", err, fence->context, fence->seqno);
 		if (err == EINTR || err == ERESTART) {
 			ret = -ERESTARTSYS;
 			break;
 		} else if (err == EWOULDBLOCK) {
 			ret = 0;
-			break;
-		} else if (err < 0) {
-			kprintf("fence_wait: unexpected err=%d\n", err);
-			ret = err;
 			break;
 		}
 	}
@@ -161,7 +157,7 @@ dma_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 		list_del(&cb.base.node);
 //	__set_current_state(TASK_RUNNING);
 out:
-	crit_exit();
+	//crit_exit();
 	lockmgr(fence->lock, LK_RELEASE);
 	return ret;
 }
@@ -240,48 +236,60 @@ int
 dma_fence_signal_locked(struct dma_fence *fence)
 {
 	struct dma_fence_cb *cur, *tmp;
-	struct list_head cb_list;
+//	struct list_head cb_list;
+	int ret = 0;
+	bool was_set;
 
 	if (fence == NULL) {
-	  kprintf("signal_locked: fence == NULL\n");
-	  print_backtrace(-1);
 		return -EINVAL;
 	}
 
-	if (test_and_set_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
-	  kprintf("dma_fence_signal_locked#1: %lld/%d\n", fence->context, fence->seqno);
-		return -EINVAL;
+	was_set = test_and_set_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags);
+	if (was_set) {
+		ret = -EINVAL;
+	} else {
+		fence->timestamp = ktime_get();
+		set_bit(DMA_FENCE_FLAG_TIMESTAMP_BIT, &fence->flags);	
 	}
 
-	list_replace(&fence->cb_list, &cb_list);
+//	list_replace(&fence->cb_list, &cb_list);
 
-	fence->timestamp = ktime_get();
-	set_bit(DMA_FENCE_FLAG_TIMESTAMP_BIT, &fence->flags);
-//	kprintf("dma_fence_signal_locked#2: %lld/%d\n", fence->context, fence->seqno);
-
-	list_for_each_entry_safe(cur, tmp, &cb_list, node) {
+	list_for_each_entry_safe(cur, tmp, &fence->cb_list, node) {
 		INIT_LIST_HEAD(&cur->node);
 		cur->func(fence, cur);
 	}
 
-	return 0;
+	return ret;
 }
 
 int
 dma_fence_signal(struct dma_fence *fence)
 {
-	int r;
+//	int r;
+	struct dma_fence_cb *cur, *tmp;
 
 	if (fence == NULL)
 		return -EINVAL;
 
-	crit_enter();
-	lockmgr(fence->lock, LK_EXCLUSIVE);
-	r = dma_fence_signal_locked(fence);
-	lockmgr(fence->lock, LK_RELEASE);
-	crit_exit();
+	if (test_and_set_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
+		return -EINVAL;
+	}
 
-	return r;
+	fence->timestamp = ktime_get();
+	set_bit(DMA_FENCE_FLAG_TIMESTAMP_BIT, &fence->flags);	
+
+	if (test_bit(DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT, &fence->flags)) {
+		//crit_enter();
+		lockmgr(fence->lock, LK_EXCLUSIVE);
+		list_for_each_entry_safe(cur, tmp, &fence->cb_list, node) {
+			INIT_LIST_HEAD(&cur->node);
+			cur->func(fence, cur);
+		}
+		lockmgr(fence->lock, LK_RELEASE);
+		//crit_exit();
+	}
+
+	return 0;
 }
 
 void
@@ -290,12 +298,12 @@ dma_fence_enable_sw_signaling(struct dma_fence *fence)
 	if (!test_and_set_bit(DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT, &fence->flags) &&
 	    !test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags) &&
 	    fence->ops->enable_signaling) {
-		crit_enter();
+		//crit_enter();
 		lockmgr(fence->lock, LK_EXCLUSIVE);
 		if (!fence->ops->enable_signaling(fence))
 			dma_fence_signal_locked(fence);
 		lockmgr(fence->lock, LK_RELEASE);
-		crit_exit();
+		//crit_exit();
 	}
 }
 
@@ -360,5 +368,5 @@ dma_fence_remove_callback(struct dma_fence *fence, struct dma_fence_cb *cb)
 void
 dma_fence_free(struct dma_fence *fence)
 {
-	kfree(fence);
+	kfree_rcu(fence, rcu);
 }

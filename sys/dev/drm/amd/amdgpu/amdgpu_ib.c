@@ -134,14 +134,14 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 	int r = 0;
 	bool need_pipe_sync = false;
 
-if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs:%p\n", ring); };
+//if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs:%p\n", ring); };
 
-if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#1\n"); }
+//if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#1\n"); }
 
 	if (num_ibs == 0)
 		return -EINVAL;
 
-if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#2\n"); }
+//if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#2\n"); }
 
 	/* ring tests don't use a job */
 	if (job) {
@@ -152,7 +152,7 @@ if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#2\n"); }
 		fence_ctx = 0;
 	}
 
-if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#3 job=%p\n", job); }
+//if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#3 job=%p\n", job); }
 
 	if (!ring->ready) {
 		dev_err(adev->dev, "couldn't schedule ib on ring <%s>\n", ring->name);
@@ -173,7 +173,7 @@ if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#3 job=%p\n", job); }
 		return r;
 	}
 
-if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#4\n"); }
+//if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#4\n"); }
 
 	need_ctx_switch = ring->current_ctx != fence_ctx;
 	if (ring->funcs->emit_pipeline_sync && job &&
@@ -190,21 +190,21 @@ if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#4\n"); }
 		dma_fence_put(tmp);
 	}
 
-if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#5: need_ctx_switch=%d\n", need_ctx_switch); }
+//if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#5: need_ctx_switch=%d\n", need_ctx_switch); }
 
 	if (ring->funcs->insert_start)
 		ring->funcs->insert_start(ring);
 
 	if (job) {
 		r = amdgpu_vm_flush(ring, job, need_pipe_sync);
-if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#6\n"); }
+//if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#6\n"); }
 		if (r) {
 			amdgpu_ring_undo(ring);
 			return r;
 		}
 	}
 
-if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#7\n"); }
+//if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#7\n"); }
 
 	if (job && ring->funcs->init_cond_exec)
 		patch_offset = amdgpu_ring_init_cond_exec(ring);
@@ -219,7 +219,7 @@ if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#7\n"); }
 			amdgpu_asic_flush_hdp(adev, ring);
 	}
 
-if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#8\n"); }
+//if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#8\n"); }
 
 	skip_preamble = ring->current_ctx == fence_ctx;
 	if (job && ring->funcs->emit_cntxcntl) {
@@ -230,7 +230,7 @@ if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#8\n"); }
 		amdgpu_ring_emit_cntxcntl(ring, status);
 	}
 
-if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#9\n"); }
+//if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#9\n"); }
 
 	for (i = 0; i < num_ibs; ++i) {
 		ib = &ibs[i];
@@ -264,7 +264,7 @@ if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#9\n"); }
 				       fence_flags | AMDGPU_FENCE_FLAG_64BIT);
 	}
 
-if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#10\n"); }
+//if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#10\n"); }
 
 	r = amdgpu_fence_emit(ring, f, fence_flags);
 	if (r) {
@@ -275,7 +275,7 @@ if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#10\n"); }
 		return r;
 	}
 
-if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#11: f=%p\n", f); }
+kprintf("ibs#11: f=%p\n", *f);
 
 	if (ring->funcs->insert_end)
 		ring->funcs->insert_end(ring);
@@ -288,7 +288,7 @@ if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#11: f=%p\n", f); }
 		amdgpu_ring_emit_switch_buffer(ring);
 	amdgpu_ring_commit(ring);
 
-if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#12\n"); }
+//if (ring == &adev->gfx.gfx_ring[0]) { kprintf("ibs#12\n"); }
 	return 0;
 }
 

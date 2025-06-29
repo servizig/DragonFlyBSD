@@ -145,6 +145,7 @@ int amdgpu_fence_emit(struct amdgpu_ring *ring, struct dma_fence **f,
 
 	seq = ++ring->fence_drv.sync_seq;
 	fence->ring = ring;
+if (ring->name[0] == 'g') kprintf("%s: emit_fence %d %p\n", ring->name, seq, fence);
 	dma_fence_init(&fence->base, &amdgpu_fence_ops,
 		       &ring->fence_drv.lock,
 		       adev->fence_context + ring->idx,
@@ -187,6 +188,7 @@ int amdgpu_fence_emit_polling(struct amdgpu_ring *ring, uint32_t *s)
 		return -EINVAL;
 
 	seq = ++ring->fence_drv.sync_seq;
+kprintf("%s emit_polling: %d\n", ring->name, seq);
 	amdgpu_ring_emit_fence(ring, ring->fence_drv.gpu_addr,
 			       seq, 0);
 
@@ -225,11 +227,22 @@ bool amdgpu_fence_process(struct amdgpu_ring *ring)
 	uint32_t seq, last_seq;
 	int r;
 
+if (ring->name[0] == 'g') kprintf("%s ring %p before atomic last_seq %d seq %d sync_seq %d timer pending %d active %d &last_seq %p &seq %p\n", 
+				  ring->name, ring, atomic_read(&ring->fence_drv.last_seq), amdgpu_fence_read(ring), ring->fence_drv.sync_seq,
+				  callout_pending(&ring->fence_drv.fallback_timer.timer_callout),
+				  callout_active(&ring->fence_drv.fallback_timer.timer_callout),
+				  &ring->fence_drv.last_seq,
+				  ring->fence_drv.cpu_addr);
+
 	do {
 		last_seq = atomic_read(&ring->fence_drv.last_seq);
 		seq = amdgpu_fence_read(ring);
-
 	} while (atomic_cmpxchg(&drv->last_seq, last_seq, seq) != last_seq);
+
+if (ring->name[0] == 'g') kprintf("%s after atomic last_seq %d last_seq#2 %d seq %d sync_seq %d timer pending %d active %d\n", 
+				  ring->name, last_seq, atomic_read(&ring->fence_drv.last_seq), seq, ring->fence_drv.sync_seq,
+				  callout_pending(&ring->fence_drv.fallback_timer.timer_callout),
+				  callout_active(&ring->fence_drv.fallback_timer.timer_callout));
 
 	if (del_timer(&ring->fence_drv.fallback_timer) &&
 	    seq != ring->fence_drv.sync_seq)
@@ -241,23 +254,21 @@ bool amdgpu_fence_process(struct amdgpu_ring *ring)
 	last_seq &= drv->num_fences_mask;
 	seq &= drv->num_fences_mask;
 
+if (ring->name[0] == 'g') kprintf("%s #2 %p: drv %p nfm %d last_seq %d seq %d\n", ring->name, ring, drv, drv->num_fences_mask, last_seq, seq);
 	do {
 		struct dma_fence *fence, **ptr;
-//tsleep(amdgpu_fence_process, 0, "blah", 2);
 		++last_seq;
 		last_seq &= drv->num_fences_mask;
-//tsleep(amdgpu_fence_process, 0, "blah", 2);
 		ptr = &drv->fences[last_seq];
 
-//tsleep(amdgpu_fence_process, 0, "blah", 2);
 		/* There is always exactly one thread signaling this fence slot */
 		fence = rcu_dereference_protected(*ptr, 1);
+if (ring->name[0] == 'g') kprintf("%s #3 last_seq %d ptr %p fence %p\n", ring->name, last_seq, ptr, fence);
 		RCU_INIT_POINTER(*ptr, NULL);
 
 		if (!fence)
 			continue;
 
-//kprintf("IRQ:%lld/%d\n", fence->context, fence->seqno);
 		r = dma_fence_signal(fence);
 		if (!r)
 			DMA_FENCE_TRACE(fence, "signaled from irq context\n");

@@ -46,11 +46,14 @@ void amdgpu_gmc_get_pde_for_bo(struct amdgpu_bo *bo, int level,
 	case TTM_PL_TT:
 		ttm = container_of(bo->tbo.ttm, struct ttm_dma_tt, ttm);
 		*addr = ttm->dma_address[0];
+//kprintf("gmc_get_pde_for_bo: #TT bo %p addr 0x%lx\n", bo, *addr);
 		break;
 	case TTM_PL_VRAM:
 		*addr = amdgpu_bo_gpu_offset(bo);
+//kprintf("gmc_get_pde_for_bo: #VRAM bo %p addr 0x%lx\n", bo, *addr);
 		break;
 	default:
+//kprintf("gmc_get_pde_for_bo: default %d\n", bo->tbo.mem.mem_type);
 		*addr = 0;
 		break;
 	}

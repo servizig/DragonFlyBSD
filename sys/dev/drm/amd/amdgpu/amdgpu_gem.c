@@ -85,6 +85,7 @@ retry:
 		return r;
 	}
 	*obj = &bo->gem_base;
+kprintf("gem_object created at bo %p tbo %p\n", bo, &bo->tbo);
 
 	return 0;
 }
@@ -219,6 +220,8 @@ int amdgpu_gem_create_ioctl(struct drm_device *dev, void *data,
 	uint32_t handle;
 	int r;
 
+kprintf("GEM_CREATE [in] bo_size 0x%llx alignment 0x%llx domains 0x%llx domain_flags 0x%llx\n", args->in.bo_size, args->in.alignment, args->in.domains, args->in.domain_flags);
+
 	/* reject invalid gem flags */
 	if (flags & ~(AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED |
 		      AMDGPU_GEM_CREATE_NO_CPU_ACCESS |
@@ -279,6 +282,7 @@ int amdgpu_gem_create_ioctl(struct drm_device *dev, void *data,
 
 	memset(args, 0, sizeof(*args));
 	args->out.handle = handle;
+kprintf("gem_create [out] handle %u\n", handle);
 	return 0;
 }
 
@@ -632,6 +636,9 @@ int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
 	} else {
 		bo_va = NULL;
 	}
+
+kprintf("VA_IOCTL: handle %u op %u flags 0x%x va_address 0x%llx offset_in_bo 0x%llx map_size 0x%llx\n",
+	args->handle, args->operation, args->flags, args->va_address, args->offset_in_bo, args->map_size);
 
 	switch (args->operation) {
 	case AMDGPU_VA_OP_MAP:

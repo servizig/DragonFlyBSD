@@ -206,6 +206,9 @@ static void drm_sched_job_finish(struct work_struct *work)
 						   finish_work);
 	struct drm_gpu_scheduler *sched = s_job->sched;
 
+if (sched->name[0]) {
+//  kprintf("%s job finish: %p\n", sched->name, s_job);
+}
 	/*
 	 * Canceling the timeout without removing our job from the ring mirror
 	 * list is safe, as we will only end up in this worker if our jobs
@@ -245,6 +248,10 @@ static void drm_sched_job_begin(struct drm_sched_job *s_job)
 	list_add_tail(&s_job->node, &sched->ring_mirror_list);
 	drm_sched_start_timeout(sched);
 	lockmgr(&sched->job_list_lock, LK_RELEASE);
+
+if (sched->name[0]) {
+//  kprintf("%s job begin: %p\n", sched->name, s_job);
+}
 }
 
 static void drm_sched_job_timedout(struct work_struct *work)
@@ -492,6 +499,9 @@ static void drm_sched_process_job(struct dma_fence *f, struct dma_fence_cb *cb)
 		container_of(cb, struct drm_sched_fence, cb);
 	struct drm_gpu_scheduler *sched = s_fence->sched;
 
+if (sched->name[0] == 'g') {
+  kprintf("job process: s_fence= %p\n", s_fence);
+}
 	dma_fence_get(&s_fence->finished);
 	atomic_dec(&sched->hw_rq_count);
 	atomic_dec(&sched->num_jobs);
@@ -544,19 +554,18 @@ static int drm_sched_main(void *param)
 		struct drm_sched_job *sched_job;
 		struct dma_fence *fence;
 
+if (sched->name[0] == 'g') kprintf("%s: %p prepare to wait\n", sched->name, sched);
 		wait_event_interruptible(sched->wake_up_worker,
 					 (!drm_sched_blocked(sched) &&
 					  (entity = drm_sched_select_entity(sched))) ||
 					 kthread_should_stop());
 
 		if (!entity) {
-kprintf("!entity\n");
 			continue;
 		}
 
 		sched_job = drm_sched_entity_pop_job(entity);
 		if (!sched_job) {
-kprintf("!sched_job\n");
 			continue;
 		}
 
@@ -564,17 +573,20 @@ kprintf("!sched_job\n");
 
 		atomic_inc(&sched->hw_rq_count);
 		drm_sched_job_begin(sched_job);
+if (sched->name[0] == 'g') kprintf("%s: after begin job %p\n", sched->name, sched_job);
 
 		fence = sched->ops->run_job(sched_job);
+if (sched->name[0] == 'g') kprintf("%s: after run_job fence=%p\n", sched->name, fence);
 		drm_sched_fence_scheduled(s_fence);
-//		kprintf("%s:fence=%p\n", sched->name, fence);
+if (sched->name[0] == 'g') kprintf("%s: after scheduled fence=%p\n", sched->name, s_fence);
 
 
 		if (fence) {
-//		  kprintf("%s#2:fence=%p %lld/%d\n", sched->name, fence, fence->context, fence->seqno);
+if (sched->name[0] == 'g') kprintf("%s#2:fence=%p %lld/%d\n", sched->name, fence, fence->context, fence->seqno);
 			s_fence->parent = dma_fence_get(fence);
 			r = dma_fence_add_callback(fence, &s_fence->cb,
 						   drm_sched_process_job);
+if (sched->name[0] == 'g') kprintf("%s: dma_fence_add_callback=%d fence %p\n", sched->name, r, fence);
 			if (r == -ENOENT)
 				drm_sched_process_job(fence, &s_fence->cb);
 			else if (r)
@@ -629,6 +641,7 @@ int drm_sched_init(struct drm_gpu_scheduler *sched,
 	for (i = DRM_SCHED_PRIORITY_MIN; i < DRM_SCHED_PRIORITY_MAX; i++)
 		drm_sched_rq_init(sched, &sched->sched_rq[i]);
 
+kprintf("sched init: '%s' %p\n", sched->name, sched);
 	init_waitqueue_head(&sched->wake_up_worker);
 	init_waitqueue_head(&sched->job_scheduled);
 	INIT_LIST_HEAD(&sched->ring_mirror_list);

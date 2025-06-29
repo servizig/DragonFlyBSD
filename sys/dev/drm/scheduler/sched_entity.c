@@ -172,7 +172,7 @@ long drm_sched_entity_flush(struct drm_sched_entity *entity, long timeout)
 	 * The client will not queue more IBs during this fini, consume existing
 	 * queued IBs or discard them on SIGKILL
 	 */
-	if (current->dfly_td->td_flags & TDF_EXITING) {
+	if (curproc && (curproc->p_flags & P_WEXIT)) {
 		if (timeout)
 			ret = wait_event_timeout(
 					sched->job_scheduled,
@@ -188,7 +188,7 @@ long drm_sched_entity_flush(struct drm_sched_entity *entity, long timeout)
 	last_user = cmpxchg(&entity->last_user, current->group_leader, NULL);
 #endif
 	if (/*(!last_user || last_user == current->group_leader) && */
-	    (current->dfly_td->td_flags & TDF_EXITING) && fatal_signal_pending(current)) {
+	    (curproc && (curproc->p_flags & P_WEXIT)) && fatal_signal_pending(current)) {
 		lockmgr(&entity->rq_lock, LK_EXCLUSIVE);
 		entity->stopped = true;
 		drm_sched_rq_remove_entity(entity->rq, entity);
@@ -536,7 +536,7 @@ void drm_sched_entity_push_job(struct drm_sched_job *sched_job,
 		lockmgr(&entity->rq_lock, LK_RELEASE);
 		drm_sched_wakeup(entity->rq->sched);
 	} else {
-	kprintf("skip wakeup\n");
+//	kprintf("skip wakeup\n");
 	}
 }
 EXPORT_SYMBOL(drm_sched_entity_push_job);

@@ -998,7 +998,7 @@ static int amdgpu_cs_ib_fill(struct amdgpu_device *adev,
 		ib = &parser->job->ibs[j];
 		chunk_ib = (struct drm_amdgpu_cs_chunk_ib *)chunk->kdata;
 
-kprintf("ib_fill: chunk[%d] chunk_id=%d\n", i, chunk->chunk_id);
+//kprintf("ib_fill: chunk[%d] chunk_id=%d\n", i, chunk->chunk_id);
 
 if (chunk->chunk_id == AMDGPU_CHUNK_ID_FENCE) {
 }
@@ -1008,8 +1008,8 @@ if (chunk->chunk_id == AMDGPU_CHUNK_ID_BO_HANDLES) {
 		if (chunk->chunk_id != AMDGPU_CHUNK_ID_IB)
 			continue;
 
-kprintf("ib_fill: chunk_ib[%d] flags=0x%x va_start=0x%llx ib_bytes=%d ip_type=%d ip_instance=%d ring=%d\n",
-	i, chunk_ib->flags, chunk_ib->va_start, chunk_ib->ib_bytes, chunk_ib->ip_type, chunk_ib->ip_instance, chunk_ib->ring); 
+//kprintf("ib_fill: chunk_ib[%d] flags=0x%x va_start=0x%llx ib_bytes=%d ip_type=%d ip_instance=%d ring=%d\n",
+//	i, chunk_ib->flags, chunk_ib->va_start, chunk_ib->ib_bytes, chunk_ib->ip_type, chunk_ib->ip_instance, chunk_ib->ring); 
 
 
 		if (chunk_ib->ip_type == AMDGPU_HW_IP_GFX && amdgpu_sriov_vf(adev)) {

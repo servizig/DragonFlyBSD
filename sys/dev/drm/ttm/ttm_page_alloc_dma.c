@@ -1070,6 +1070,8 @@ void ttm_dma_unpopulate(struct ttm_dma_tt *ttm_dma, struct device *dev)
 		ttm_dma->dma_address[i] = 0;
 	}
 
+kprintf("ttm_dma_unpoplate: ttm %p\n", ttm);
+
 	/* shrink pool if necessary (only on !is_cached pools)*/
 	if (npages)
 		ttm_dma_page_pool_free(pool, npages, false);

@@ -382,11 +382,11 @@ atomic_intr_cond_exit(__atomic_intr_t *p, void (*func)(void *), void *arg)
 static __inline int
 atomic_cmpxchg_int(volatile u_int *_dst, u_int _old, u_int _new)
 {
-	u_int res = _old;
+	u_int res;
 
 	__asm __volatile(MPLOCKED "cmpxchgl %2,%1; " \
-			 : "+a" (res), "=m" (*_dst) \
-			 : "r" (_new), "m" (*_dst) \
+			 : "=a" (res), "+m" (*_dst) \
+			 : "r" (_new), "0" (_old) \
 			 : "memory");
 	return (res);
 }
