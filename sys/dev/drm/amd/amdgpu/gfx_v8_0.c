@@ -6737,8 +6737,6 @@ static int gfx_v8_0_eop_irq(struct amdgpu_device *adev,
 	pipe_id = (entry->ring_id & 0x03) >> 0;
 	queue_id = (entry->ring_id & 0x70) >> 4;
 
-kprintf("GFX %d %d %d\n", me_id, pipe_id, queue_id);
-
 	switch (me_id) {
 	case 0:
 		amdgpu_fence_process(&adev->gfx.gfx_ring[0]);

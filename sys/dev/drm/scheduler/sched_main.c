@@ -561,10 +561,12 @@ if (sched->name[0] == 'g') kprintf("%s: %p prepare to wait\n", sched->name, sche
 					 kthread_should_stop());
 
 		if (!entity) {
+kprintf("!entity\n");
 			continue;
 		}
 
 		sched_job = drm_sched_entity_pop_job(entity);
+kprintf("!sched_job\n");
 		if (!sched_job) {
 			continue;
 		}

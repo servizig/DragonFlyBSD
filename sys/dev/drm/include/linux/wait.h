@@ -120,6 +120,7 @@ void finish_wait(wait_queue_head_t *q, wait_queue_entry_t *wait);
 	start_jiffies = ticks;						\
 	state = (flags & PCATCH) ? TASK_INTERRUPTIBLE : TASK_UNINTERRUPTIBLE; \
 	prepare_to_wait(&wq, &tmp_wq, state);				\
+	int __timeout = timeout_jiffies;\
 									\
 	while (1) {							\
 		__wait_event_prefix(&wq, flags);			\
@@ -129,7 +130,9 @@ void finish_wait(wait_queue_head_t *q, wait_queue_entry_t *wait);
 									\
 		tsleep_interlock(&wq, flags);			\
 									\
-		ret = tsleep(&wq, PINTERLOCKED|flags, "lwe", timeout_jiffies);	\
+		if (condition)						\
+			break;						\
+		ret = tsleep(&wq, PINTERLOCKED|flags, "lwe", __timeout);	\
 									\
 		if (ret == EINTR || ret == ERESTART) {			\
 			interrupted = true;				\

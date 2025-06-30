@@ -217,6 +217,8 @@ struct amdgpu_ring {
 	/* protected by priority_mutex */
 	int			priority;
 
+	struct lock		df_fence_lock;
+
 #if defined(CONFIG_DEBUG_FS)
 	struct dentry *ent;
 #endif

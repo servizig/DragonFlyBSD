@@ -227,8 +227,14 @@ bool amdgpu_fence_process(struct amdgpu_ring *ring)
 	uint32_t seq, last_seq;
 	int r;
 
-if (ring->name[0] == 'g') kprintf("%s ring %p before atomic last_seq %d seq %d sync_seq %d timer pending %d active %d &last_seq %p &seq %p\n", 
-				  ring->name, ring, atomic_read(&ring->fence_drv.last_seq), amdgpu_fence_read(ring), ring->fence_drv.sync_seq,
+static u_int reqs = 0;
+
+lockmgr(&ring->df_fence_lock, LK_EXCLUSIVE);
+
+if (ring->name[0] == 'g') atomic_add_int(&reqs, 1);
+
+if (ring->name[0] == 'g') kprintf("%s req %d ring %p me %d pipe %d queue %d before atomic last_seq %d seq %d sync_seq %d timer pending %d active %d &last_seq %p &seq %p\n", 
+				  ring->name, reqs, ring, ring->me, ring->pipe, ring->queue, atomic_read(&ring->fence_drv.last_seq), amdgpu_fence_read(ring), ring->fence_drv.sync_seq,
 				  callout_pending(&ring->fence_drv.fallback_timer.timer_callout),
 				  callout_active(&ring->fence_drv.fallback_timer.timer_callout),
 				  &ring->fence_drv.last_seq,
@@ -248,8 +254,10 @@ if (ring->name[0] == 'g') kprintf("%s after atomic last_seq %d last_seq#2 %d seq
 	    seq != ring->fence_drv.sync_seq)
 		amdgpu_fence_schedule_fallback(ring);
 
-	if (unlikely(seq == last_seq))
+	if (unlikely(seq == last_seq)) {
+lockmgr(&ring->df_fence_lock, LK_RELEASE);
 		return false;
+}
 
 	last_seq &= drv->num_fences_mask;
 	seq &= drv->num_fences_mask;
@@ -278,6 +286,7 @@ if (ring->name[0] == 'g') kprintf("%s #3 last_seq %d ptr %p fence %p\n", ring->n
 		dma_fence_put(fence);
 	} while (last_seq != seq);
 
+lockmgr(&ring->df_fence_lock, LK_RELEASE);
 	return true;
 }
 

@@ -238,7 +238,7 @@ static struct dma_fence *amdgpu_job_run(struct drm_sched_job *sched_job)
 	trace_amdgpu_sched_run_job(job);
 
 if (job->base.sched->name[0] == 'g') {
-	kprintf("R1: %p\n", job);
+	kprintf("R1: %p last_seq %d\n", job, atomic_read(&ring->fence_drv.last_seq));
 }
 
 	if (job->vram_lost_counter != atomic_read(&ring->adev->vram_lost_counter))
@@ -252,7 +252,7 @@ if (job->base.sched->name[0] == 'g') {
 		if (r)
 			DRM_ERROR("Error scheduling IBs (%d)\n", r);
 if (job->base.sched->name[0] == 'g') {
-	kprintf("R2: %p\n", job);
+	kprintf("R2: %p last_seq %d\n", job, atomic_read(&ring->fence_drv.last_seq));
 }
 
 	}

@@ -317,6 +317,7 @@ int amdgpu_ring_init(struct amdgpu_device *adev, struct amdgpu_ring *ring,
 	ring->max_dw = max_dw;
 	ring->priority = DRM_SCHED_PRIORITY_NORMAL;
 	lockinit(&ring->priority_mutex, "agrpm", 0, LK_CANRECURSE);
+	lockinit(&ring->df_fence_lock, "dffl", 0, LK_CANRECURSE);
 
 	for (i = 0; i < DRM_SCHED_PRIORITY_MAX; ++i)
 		atomic_set(&ring->num_jobs[i], 0);
