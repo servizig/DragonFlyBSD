@@ -54,7 +54,7 @@
 #include "ivsrcid/ivsrcid_vislands30.h"
 
 #define GFX8_NUM_GFX_RINGS     1
-#define GFX8_MEC_HPD_SIZE 2048
+#define GFX8_MEC_HPD_SIZE 4096
 
 #define TOPAZ_GB_ADDR_CONFIG_GOLDEN 0x22010001
 #define CARRIZO_GB_ADDR_CONFIG_GOLDEN 0x22010001
@@ -1443,7 +1443,7 @@ static int gfx_v8_0_mec_init(struct amdgpu_device *adev)
 	mec_hpd_size = adev->gfx.num_compute_rings * GFX8_MEC_HPD_SIZE;
 
 	r = amdgpu_bo_create_reserved(adev, mec_hpd_size, PAGE_SIZE,
-				      AMDGPU_GEM_DOMAIN_GTT,
+				      AMDGPU_GEM_DOMAIN_VRAM,
 				      &adev->gfx.mec.hpd_eop_obj,
 				      &adev->gfx.mec.hpd_eop_gpu_addr,
 				      (void **)&hpd);

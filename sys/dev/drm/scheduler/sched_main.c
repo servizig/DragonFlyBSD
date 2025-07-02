@@ -500,7 +500,7 @@ static void drm_sched_process_job(struct dma_fence *f, struct dma_fence_cb *cb)
 	struct drm_gpu_scheduler *sched = s_fence->sched;
 
 if (sched->name[0] == 'g') {
-  kprintf("job process: s_fence= %p\n", s_fence);
+//  kprintf("job process: s_fence= %p\n", s_fence);
 }
 	dma_fence_get(&s_fence->finished);
 	atomic_dec(&sched->hw_rq_count);
@@ -554,19 +554,19 @@ static int drm_sched_main(void *param)
 		struct drm_sched_job *sched_job;
 		struct dma_fence *fence;
 
-if (sched->name[0] == 'g') kprintf("%s: %p prepare to wait\n", sched->name, sched);
+//if (sched->name[0] == 'g') kprintf("%s: %p prepare to wait\n", sched->name, sched);
 		wait_event_interruptible(sched->wake_up_worker,
 					 (!drm_sched_blocked(sched) &&
 					  (entity = drm_sched_select_entity(sched))) ||
 					 kthread_should_stop());
 
 		if (!entity) {
-kprintf("!entity\n");
+//kprintf("!entity\n");
 			continue;
 		}
 
 		sched_job = drm_sched_entity_pop_job(entity);
-kprintf("!sched_job\n");
+//kprintf("!sched_job\n");
 		if (!sched_job) {
 			continue;
 		}
@@ -575,20 +575,20 @@ kprintf("!sched_job\n");
 
 		atomic_inc(&sched->hw_rq_count);
 		drm_sched_job_begin(sched_job);
-if (sched->name[0] == 'g') kprintf("%s: after begin job %p\n", sched->name, sched_job);
+//if (sched->name[0] == 'g') kprintf("%s: after begin job %p\n", sched->name, sched_job);
 
 		fence = sched->ops->run_job(sched_job);
-if (sched->name[0] == 'g') kprintf("%s: after run_job fence=%p\n", sched->name, fence);
+//if (sched->name[0] == 'g') kprintf("%s: after run_job fence=%p\n", sched->name, fence);
 		drm_sched_fence_scheduled(s_fence);
-if (sched->name[0] == 'g') kprintf("%s: after scheduled fence=%p\n", sched->name, s_fence);
+//if (sched->name[0] == 'g') kprintf("%s: after scheduled fence=%p\n", sched->name, s_fence);
 
 
 		if (fence) {
-if (sched->name[0] == 'g') kprintf("%s#2:fence=%p %lld/%d\n", sched->name, fence, fence->context, fence->seqno);
+//if (sched->name[0] == 'g') kprintf("%s#2:fence=%p %lld/%d\n", sched->name, fence, fence->context, fence->seqno);
 			s_fence->parent = dma_fence_get(fence);
 			r = dma_fence_add_callback(fence, &s_fence->cb,
 						   drm_sched_process_job);
-if (sched->name[0] == 'g') kprintf("%s: dma_fence_add_callback=%d fence %p\n", sched->name, r, fence);
+//if (sched->name[0] == 'g') kprintf("%s: dma_fence_add_callback=%d fence %p\n", sched->name, r, fence);
 			if (r == -ENOENT)
 				drm_sched_process_job(fence, &s_fence->cb);
 			else if (r)

@@ -104,7 +104,7 @@ dma_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 		return ret;
 	}
 
-	//crit_enter();
+	crit_enter();
 	lockmgr(fence->lock, LK_EXCLUSIVE);
 
 	was_set = test_and_set_bit(DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT,
@@ -139,10 +139,10 @@ dma_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 
 	while (!test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
 //		kprintf("S%lld/%d:", fence->context, fence->seqno);
-		//crit_exit();
+		crit_exit();
 		/* wake_up_process() directly uses task_struct pointers as sleep identifiers */
 		err = lksleep(fence, fence->lock, intr ? PCATCH : 0, "dmafence", timeout);
-		//crit_enter();
+		crit_enter();
 //		kprintf("s:%d:%lld/%d:\n", err, fence->context, fence->seqno);
 		if (err == EINTR || err == ERESTART) {
 			ret = -ERESTARTSYS;
@@ -157,7 +157,7 @@ dma_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 		list_del(&cb.base.node);
 //	__set_current_state(TASK_RUNNING);
 out:
-	//crit_exit();
+	crit_exit();
 	lockmgr(fence->lock, LK_RELEASE);
 	return ret;
 }
@@ -368,5 +368,5 @@ dma_fence_remove_callback(struct dma_fence *fence, struct dma_fence_cb *cb)
 void
 dma_fence_free(struct dma_fence *fence)
 {
-	kfree_rcu(fence, rcu);
+	kfree(fence);
 }

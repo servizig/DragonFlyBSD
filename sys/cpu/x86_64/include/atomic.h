@@ -384,10 +384,12 @@ atomic_cmpxchg_int(volatile u_int *_dst, u_int _old, u_int _new)
 {
 	u_int res;
 
+//	__asm __volatile("mfence" : : : "memory");
 	__asm __volatile(MPLOCKED "cmpxchgl %2,%1; " \
 			 : "=a" (res), "+m" (*_dst) \
 			 : "r" (_new), "0" (_old) \
 			 : "memory");
+//	__asm __volatile("mfence" : : : "memory");
 	return (res);
 }
 

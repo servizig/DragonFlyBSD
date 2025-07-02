@@ -1367,8 +1367,8 @@ int amdgpu_cs_wait_ioctl(struct drm_device *dev, void *data,
 	struct dma_fence *fence;
 	long r;
 
-kprintf("amdgpu_cs_wait in: handle=%lld timeout=%lld ip_type=%d ip_instance=%d ring=%d ctx_id=%d\n",
-	wait->in.handle, wait->in.timeout, wait->in.ip_type, wait->in.ip_instance, wait->in.ring, wait->in.ctx_id);
+//kprintf("amdgpu_cs_wait in: handle=%lld timeout=%lld ip_type=%d ip_instance=%d ring=%d ctx_id=%d\n",
+//	wait->in.handle, wait->in.timeout, wait->in.ip_type, wait->in.ip_instance, wait->in.ring, wait->in.ctx_id);
 
 	ctx = amdgpu_ctx_get(filp->driver_priv, wait->in.ctx_id);
 	if (ctx == NULL)
@@ -1382,7 +1382,7 @@ kprintf("amdgpu_cs_wait in: handle=%lld timeout=%lld ip_type=%d ip_instance=%d r
 	}
 
 	fence = amdgpu_ctx_get_fence(ctx, entity, wait->in.handle);
-kprintf("amdgpu_cs_wait: fence=%p\n", fence);
+//kprintf("amdgpu_cs_wait: fence=%p\n", fence);
 	if (IS_ERR(fence))
 		r = PTR_ERR(fence);
 	else if (fence) {
@@ -1393,7 +1393,7 @@ kprintf("amdgpu_cs_wait: fence=%p\n", fence);
 	} else
 		r = 1;
 
-kprintf("amdgpu_cs_wait out: status=%d\n", (r == 0));
+//kprintf("amdgpu_cs_wait out: status=%d\n", (r == 0));
 	amdgpu_ctx_put(ctx);
 	if (r < 0)
 		return r;

@@ -306,9 +306,7 @@ struct drm_gem_object *i915_gem_prime_import(struct drm_device *dev,
 	if (IS_ERR(attach))
 		return ERR_CAST(attach);
 
-#if 0
 	get_dma_buf(dma_buf);
-#endif
 
 	obj = i915_gem_object_alloc(to_i915(dev));
 	if (obj == NULL) {

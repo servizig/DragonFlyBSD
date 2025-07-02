@@ -1190,7 +1190,7 @@ int amdgpu_vm_flush(struct amdgpu_ring *ring, struct amdgpu_job *job, bool need_
 		r = amdgpu_fence_emit(ring, &fence, 0);
 		if (r)
 			return r;
-if (ring->name[0] == 'g') kprintf("%s: vm flush emit_fence %p\n", ring->name, fence);
+//if (ring->name[0] == 'g') kprintf("%s: vm flush emit_fence %p vm_flush_needed %d pasid_mapping_needed %d\n", ring->name, fence, vm_flush_needed, pasid_mapping_needed);
 	}
 
 	if (vm_flush_needed) {
@@ -3538,7 +3538,6 @@ void amdgpu_vm_get_task_info(struct amdgpu_device *adev, unsigned int pasid,
  */
 void amdgpu_vm_set_task_info(struct amdgpu_vm *vm)
 {
-	kprintf("amdgpu_vm_set_task_info: not implemented\n");
 #if 0
 	if (!vm->task_info.pid) {
 		vm->task_info.pid = current->pid;

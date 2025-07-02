@@ -275,7 +275,7 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 		return r;
 	}
 
-kprintf("ibs#11: f=%p\n", *f);
+//kprintf("ibs#11: f=%p\n", *f);
 
 	if (ring->funcs->insert_end)
 		ring->funcs->insert_end(ring);

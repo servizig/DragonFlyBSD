@@ -83,7 +83,7 @@ static int ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 	/*
 	 * Ordinary wait.
 	 */
-#if 0
+#if 1
 	ret = dma_fence_wait(bo->moving, true);
 	if (unlikely(ret != 0)) {
 		ret = (ret != -ERESTARTSYS) ? VM_FAULT_SIGBUS :
@@ -701,7 +701,7 @@ retry:
 		    VM_MEMATTR_WRITE_BACK : ttm_io_prot(bo->mem.placement, 0));
 
 if (OFF_TO_IDX(offset) < 400) {
-  kprintf("PF: bo %p vmo %p off %ld vm_page %p phys_addr 0x%lx\n", bo, vm_obj, offset, m, VM_PAGE_TO_PHYS(m));
+//  kprintf("PF: bo %p vmo %p off %ld vm_page %p phys_addr 0x%lx\n", bo, vm_obj, offset, m, VM_PAGE_TO_PHYS(m));
 }
 
 	}
