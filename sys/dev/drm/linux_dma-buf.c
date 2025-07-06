@@ -181,7 +181,7 @@ dma_buf_get(int fd)
 	}
 
 	dmabuf = fp->private_data;
-	dropfp(curthread, fd, fp);
+//	dropfp(curthread, fd, fp);
 
 	return dmabuf;
 }

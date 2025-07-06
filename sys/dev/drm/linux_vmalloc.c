@@ -135,9 +135,6 @@ vfree(const void *addr)
 void *
 kvmalloc_array(size_t n, size_t size, gfp_t flags)
 {
-	if (n == 0)
-		return NULL;
-
 	if (n > SIZE_MAX / size)
 		return NULL;
 

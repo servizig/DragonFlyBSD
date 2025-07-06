@@ -558,9 +558,11 @@ retry:
 
 		if (vmf->flags & FAULT_FLAG_ALLOW_RETRY || 1) {
 			if (!(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
+				ttm_bo_get(bo);
 				up_read(&vma->vm_mm->mmap_sem);
 				(void) ttm_bo_wait_unreserved(bo);
 				down_read(&vma->vm_mm->mmap_sem);
+				ttm_bo_put(bo);
 			}
 
 #ifndef __DragonFly__
@@ -794,7 +796,7 @@ ttm_bo_mmap_single(struct file *fp, struct drm_device *dev,
 	 * setup our own VM object and ignore what the linux code did other
 	 * then supplying us the 'bo'.
 	 */
-	ret = ttm_bo_mmap(fp, &vma, bdev);
+	ret = ttm_bo_mmap(NULL, &vma, bdev);
 
 	if (ret == 0) {
 		bo = vma.vm_private_data;
