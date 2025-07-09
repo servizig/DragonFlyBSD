@@ -958,6 +958,9 @@ int ttm_populate_and_map_pages(struct device *dev, struct ttm_dma_tt *tt,
 		tt->dma_address[i] = dma_map_page(dev, tt->ttm.pages[i],
 						  0, num_pages * PAGE_SIZE,
 						  DMA_BIDIRECTIONAL);
+
+//kprintf("map_pages: ttm %p num_pages %ld dma_address[%d] 0x%lx\n", &tt->ttm, tt->ttm.num_pages, i, tt->dma_address[i]);
+#if 0
 		if (dma_mapping_error(dev, tt->dma_address[i])) {
 			while (i--) {
 				dma_unmap_page(dev, tt->dma_address[i],
@@ -972,7 +975,9 @@ int ttm_populate_and_map_pages(struct device *dev, struct ttm_dma_tt *tt,
 			tt->dma_address[i + 1] = tt->dma_address[i] + PAGE_SIZE;
 			++i;
 		}
+#endif
 	}
+//kprintf("map_pages: ttm %p num_pages %ld dma_address 0x%lx-0x%lx\n", &tt->ttm, tt->ttm.num_pages, tt->dma_address[0], tt->dma_address[tt->ttm.num_pages-1]);
 	return 0;
 }
 EXPORT_SYMBOL(ttm_populate_and_map_pages);

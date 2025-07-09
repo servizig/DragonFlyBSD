@@ -6117,8 +6117,8 @@ pmap_page_set_memattr(vm_page_t m, vm_memattr_t ma)
      * can be relied upon to perform any cache operations that are
      * required for data coherence.
      */
-    if ((m->flags & PG_FICTITIOUS) == 0)
-        pmap_change_attr(PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m)), 1, m->pat_mode);
+    //if ((m->flags & PG_FICTITIOUS) == 0)
+    //    pmap_change_attr(PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m)), 1, m->pat_mode);
 }
 
 /*
@@ -6142,6 +6142,7 @@ pmap_change_attr(vm_offset_t va, vm_size_t count, int mode)
 	base = trunc_page(va);
 
 	if (va >= DMAP_MIN_ADDRESS && va < DMAP_MAX_ADDRESS) {
+#if 0
 		pd_entry_t *pd;
 
 		KKASSERT(va < DMapMaxAddress);
@@ -6156,6 +6157,7 @@ pmap_change_attr(vm_offset_t va, vm_size_t count, int mode)
 			va += NBPDR;
 			++pd;
 		}
+#endif
 	} else {
 		while (count) {
 			pte = vtopte(va);

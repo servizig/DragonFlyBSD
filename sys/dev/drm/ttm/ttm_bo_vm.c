@@ -697,6 +697,7 @@ retry:
 		pmap_page_set_memattr(m,
 		    (bo->mem.placement & TTM_PL_FLAG_CACHED) ?
 		    VM_MEMATTR_WRITE_BACK : ttm_io_prot(bo->mem.placement, 0));
+//kprintf("PF: bo %p ttm %p vmo %p off %ld vm_page %p phys_addr 0x%lx\n", bo, ttm, vm_obj, offset, m, VM_PAGE_TO_PHYS(m));
 	}
 
 	if (vm_page_busy_try(m, FALSE)) {

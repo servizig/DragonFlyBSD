@@ -48,6 +48,7 @@ kmap_to_page(void *addr)
 
 static inline void *kmap(struct page *pg)
 {
+kprintf("kmap\n");
 	return (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS( (struct vm_page *)pg ));
 }
 
@@ -58,6 +59,7 @@ static inline void kunmap(struct page *pg)
 
 static inline void *kmap_atomic(struct page *pg)
 {
+kprintf("kmap_atomic\n");
 	return (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS( (struct vm_page *)pg ));
 }
 

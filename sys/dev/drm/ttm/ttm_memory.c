@@ -215,6 +215,9 @@ static void ttm_shrink(struct ttm_mem_global *glob, bool from_wq,
 {
 	int ret;
 
+//kprintf("ttm_shrink\n");
+//	return;
+
 	lockmgr(&glob->lock, LK_EXCLUSIVE);
 
 	while (ttm_zones_above_swap_target(glob, from_wq, extra)) {
@@ -332,6 +335,10 @@ int ttm_mem_global_init(struct ttm_mem_global *glob)
 	 * DMA memory.
 	 */
 	mem = (uint64_t)vm_contig_avail_pages() * PAGE_SIZE;
+
+kprintf("vm_contig_avail_pages()=%ld mem=%ld\n", vm_contig_avail_pages(), mem);
+
+mem=1073741824;
 
 	ret = ttm_mem_init_kernel_zone(glob, mem);
 	if (unlikely(ret != 0))

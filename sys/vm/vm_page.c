@@ -139,7 +139,7 @@ struct vpgqueues vm_page_queues[PQ_COUNT];
 
 static volatile int vm_pages_waiting;
 static struct alist vm_contig_alist;
-static struct almeta vm_contig_ameta[ALIST_RECORDS_65536];
+static struct almeta vm_contig_ameta[ALIST_RECORDS_1048576];
 static struct spinlock vm_contig_spin = SPINLOCK_INITIALIZER(&vm_contig_spin, "vm_contig_spin");
 
 __read_mostly static int vm_page_hash_vnode_only;
@@ -423,7 +423,7 @@ vm_page_startup(void)
 	 *
 	 * By default, 128M is left in reserve on machines with 2G+ of ram.
 	 */
-	vm_low_phys_reserved = (vm_paddr_t)65536 << PAGE_SHIFT;
+	vm_low_phys_reserved = (vm_paddr_t)524288 << PAGE_SHIFT;
 	if (vm_low_phys_reserved > total / 4)
 		vm_low_phys_reserved = total / 4;
 	if (vm_dma_reserved == 0) {
@@ -432,8 +432,8 @@ vm_page_startup(void)
 			vm_dma_reserved = total / 16;
 	}
 #endif
-	alist_init(&vm_contig_alist, 65536, vm_contig_ameta,
-		   ALIST_RECORDS_65536);
+	alist_init(&vm_contig_alist, 1048576, vm_contig_ameta,
+		   ALIST_RECORDS_1048576);
 
 	/*
 	 * Initialize the mem entry structures now, and put them in the free

@@ -194,7 +194,7 @@ static int amdgpu_init_mem_type(struct ttm_bo_device *bdev, uint32_t type,
 		man->func = &amdgpu_gtt_mgr_func;
 		man->gpu_offset = adev->gmc.gart_start;
 		man->available_caching = TTM_PL_MASK_CACHING;
-		man->default_caching = TTM_PL_FLAG_CACHED;
+		man->default_caching = TTM_PL_FLAG_WC; //TTM_PL_FLAG_UNCACHED; //TTM_PL_FLAG_CACHED;
 		man->flags = TTM_MEMTYPE_FLAG_MAPPABLE | TTM_MEMTYPE_FLAG_CMA;
 		break;
 	case TTM_PL_VRAM:
@@ -204,7 +204,7 @@ static int amdgpu_init_mem_type(struct ttm_bo_device *bdev, uint32_t type,
 		man->flags = TTM_MEMTYPE_FLAG_FIXED |
 			     TTM_MEMTYPE_FLAG_MAPPABLE;
 		man->available_caching = TTM_PL_FLAG_UNCACHED | TTM_PL_FLAG_WC;
-		man->default_caching = TTM_PL_FLAG_WC;
+		man->default_caching = TTM_PL_FLAG_UNCACHED; //TTM_PL_FLAG_WC;
 		break;
 	case AMDGPU_PL_GDS:
 	case AMDGPU_PL_GWS:

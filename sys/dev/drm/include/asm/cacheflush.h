@@ -35,18 +35,21 @@
 static inline int
 set_memory_uc(unsigned long addr, int numpages)
 {
+kprintf("set_memory_uc\n");
 	pmap_change_attr(addr, numpages, PAT_UNCACHED);
 	return 0;
 }
 
 static inline int set_memory_wc(unsigned long vaddr, int numpages)
 {
+kprintf("set_memory_wc\n");
 	pmap_change_attr(vaddr, numpages, PAT_WRITE_COMBINING);
 	return 0;
 }
 
 static inline int set_memory_wb(unsigned long vaddr, int numpages)
 {
+kprintf("set_memory_wb\n");
 	pmap_change_attr(vaddr, numpages, PAT_WRITE_BACK);
 	return 0;
 }
@@ -55,6 +58,7 @@ static inline int set_pages_uc(struct page *page, int num_pages)
 {
 	struct vm_page *p = (struct vm_page *)page;
 
+kprintf("set_pages_uc\n");
 	pmap_change_attr(PHYS_TO_DMAP(VM_PAGE_TO_PHYS(p)),
 			 num_pages, PAT_UNCACHED);
 
@@ -65,6 +69,7 @@ static inline int set_pages_wb(struct page *page, int num_pages)
 {
 	struct vm_page *p = (struct vm_page *)page;
 
+kprintf("set_pages_wb\n");
 	pmap_change_attr(PHYS_TO_DMAP(VM_PAGE_TO_PHYS(p)),
 			 num_pages, PAT_WRITE_BACK);
 
@@ -74,6 +79,8 @@ static inline int set_pages_wb(struct page *page, int num_pages)
 static inline int
 set_pages_array_uc(struct page **pages, int addrinarray)
 {
+
+kprintf("set_pages_array_uc\n");
 	for (int i = 0; i < addrinarray; i++)
 		pmap_page_set_memattr((struct vm_page *)pages[i], VM_MEMATTR_UNCACHEABLE);
 
@@ -83,6 +90,7 @@ set_pages_array_uc(struct page **pages, int addrinarray)
 static inline int
 set_pages_array_wb(struct page **pages, int addrinarray)
 {
+kprintf("set_pages_array_wb\n");
 	for (int i = 0; i < addrinarray; i++)
 		pmap_page_set_memattr((struct vm_page *)pages[i], VM_MEMATTR_WRITE_BACK);
 
@@ -92,6 +100,7 @@ set_pages_array_wb(struct page **pages, int addrinarray)
 static inline int
 set_pages_array_wc(struct page **pages, int addrinarray)
 {
+kprintf("set_pages_array_wc\n");
 	for (int i = 0; i < addrinarray; i++)
 		pmap_page_set_memattr((struct vm_page *)pages[i], VM_MEMATTR_WRITE_COMBINING);
 

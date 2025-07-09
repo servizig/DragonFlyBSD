@@ -129,6 +129,8 @@ static int ttm_tt_set_page_caching(struct page *p,
 		return 0;
 #endif
 
+kprintf("tt_set_page_caching 0x%lx c_old %d c_new %d\n", PHYS_TO_DMAP(VM_PAGE_TO_PHYS((struct vm_page*)p)), c_old, c_new);
+
 	if (c_old != tt_cached) {
 		/* p isn't in the default caching state, set it to
 		 * writeback first to free its current memtype. */
