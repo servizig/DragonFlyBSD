@@ -6112,13 +6112,15 @@ pmap_page_set_memattr(vm_page_t m, vm_memattr_t ma)
 
     m->pat_mode = ma;
 
+#if 0
     /*
      * If "m" is a normal page, update its direct mapping.  This update
      * can be relied upon to perform any cache operations that are
      * required for data coherence.
      */
-    //if ((m->flags & PG_FICTITIOUS) == 0)
-    //    pmap_change_attr(PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m)), 1, m->pat_mode);
+    if ((m->flags & PG_FICTITIOUS) == 0)
+        pmap_change_attr(PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m)), 1, m->pat_mode);
+#endif
 }
 
 /*

@@ -338,7 +338,7 @@ int ttm_mem_global_init(struct ttm_mem_global *glob)
 
 kprintf("vm_contig_avail_pages()=%ld mem=%ld\n", vm_contig_avail_pages(), mem);
 
-mem=1073741824;
+//mem=1073741824;
 
 	ret = ttm_mem_init_kernel_zone(glob, mem);
 	if (unlikely(ret != 0))
