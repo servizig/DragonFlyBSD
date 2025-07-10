@@ -44,6 +44,9 @@ struct address_space;
 
 struct page {
 	struct vm_page pa_vmpage;
+	void *kptr;
+	int refs;
+	int unused01;
 };
 
 struct mm_struct {

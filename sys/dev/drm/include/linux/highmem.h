@@ -37,6 +37,8 @@
 
 #include <asm/cacheflush.h>
 
+#include <vm/vm_extern.h>
+
 static inline struct page *
 kmap_to_page(void *addr)
 {
@@ -48,13 +50,43 @@ kmap_to_page(void *addr)
 
 static inline void *kmap(struct page *pg)
 {
-kprintf("kmap\n");
+	vm_page_t ary[1];
+	void *kptr;
+
+	ary[0] = &pg->pa_vmpage;
+	atomic_add_int(&pg->refs, 1);
+	while ((kptr = pg->kptr) == NULL) {
+		kptr = (void *)kmem_alloc_nofault(kernel_map,
+						  PAGE_SIZE,
+						  VM_SUBSYS_DRM_VMAP,
+						  PAGE_SIZE);
+		pmap_qenter((vm_offset_t)kptr, ary, 1);
+		if (atomic_cmpset_ptr(&pg->kptr, NULL, kptr))
+			break;
+		pmap_qremove(kptr, 1);
+		kmem_free(kernel_map, kptr, PAGE_SIZE);
+	}
+
+	kprintf("kmap pg %p pat_mode %d to %p\n",
+		pg, pg->pa_vmpage.pat_mode, kptr);
+
+	return kptr;
+#if 0
 	return (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS( (struct vm_page *)pg ));
+#endif
 }
 
 static inline void kunmap(struct page *pg)
 {
-	/* Nothing to do on systems with a direct memory map */
+	void *kptr;
+
+	if (atomic_fetchadd_int(&pg->refs, -1) == 1) {
+		kptr = atomic_swap_ptr((void *)&pg->kptr, NULL);
+		if (kptr) {
+			pmap_qremove(kptr, 1);
+			kmem_free(kernel_map, kptr, PAGE_SIZE);
+		}
+	}
 }
 
 static inline void *kmap_atomic(struct page *pg)
