@@ -55,6 +55,8 @@
 #include <drm/ttm/ttm_page_alloc.h>
 #include <drm/ttm/ttm_set_memory.h>
 
+#include <drm/drm_cache.h>
+
 #define NUM_PAGES_TO_ALLOC		(PAGE_SIZE/sizeof(struct page *))
 #define SMALL_ALLOCATION		16
 #define FREE_ALL_PAGES			(~0U)
@@ -509,6 +511,7 @@ static int ttm_alloc_new_pages(struct pglist *pages, gfp_t gfp_flags,
 	unsigned npages = 1 << order;
 	unsigned max_cpages = min(count << order, (unsigned)NUM_PAGES_TO_ALLOC);
 
+//kprintf("alloc_new_pages: cstate %d count %u order %u npages %u max_cpages %u\n", cstate, count, order, npages, max_cpages);
 	/* allocate array for page caching change */
 	caching_array = kmalloc(max_cpages*sizeof(struct page *), M_DRM, M_WAITOK);
 
@@ -772,6 +775,7 @@ static int ttm_get_pages(struct page **pages, unsigned npages, int flags,
 	if (flags & TTM_PAGE_FLAG_ZERO_ALLOC) {
 		TAILQ_FOREACH(p, &plist, pageq) {
 			pmap_zero_page(VM_PAGE_TO_PHYS(p));
+			drm_clflush_pages((struct page **)&p, 1);
 		}
 	}
 
