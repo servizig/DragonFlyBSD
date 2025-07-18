@@ -197,8 +197,11 @@ static bool ttm_zones_above_swap_target(struct ttm_mem_global *glob,
 
 		target = (extra > target) ? 0ULL : target;
 
-		if (zone->used_mem > target)
+		if (zone->used_mem > target) {
+			kprintf("ttm_zones_above_swap_target: glob %p from_wq=%d i=%d extra=%ld, zone=%p, used_mem=%ld target=%ld\n",
+				glob, from_wq, i, extra, zone, zone->used_mem, target);
 			return true;
+		}
 	}
 	return false;
 }
@@ -222,6 +225,8 @@ static void ttm_shrink(struct ttm_mem_global *glob, bool from_wq,
 
 	while (ttm_zones_above_swap_target(glob, from_wq, extra)) {
 		lockmgr(&glob->lock, LK_RELEASE);
+		kprintf("ttm_shrink: zones above swap target, extra %ld\n",
+			extra);
 		ret = ttm_bo_swapout(glob->bo_glob, ctx);
 		lockmgr(&glob->lock, LK_EXCLUSIVE);
 		if (unlikely(ret != 0))

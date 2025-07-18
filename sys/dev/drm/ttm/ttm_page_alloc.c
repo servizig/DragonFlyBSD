@@ -459,6 +459,7 @@ static int ttm_set_pages_caching(struct page **pages,
 		enum ttm_caching_state cstate, unsigned cpages)
 {
 	int r = 0;
+
 	/* Set page caching */
 	switch (cstate) {
 	case tt_uncached:
@@ -472,6 +473,9 @@ static int ttm_set_pages_caching(struct page **pages,
 			pr_err("Failed to set %d pages to wc!\n", cpages);
 		break;
 	default:
+		r = ttm_set_pages_array_wb(pages, cpages);
+		if (r)
+			pr_err("Failed to set %d pages to wb!\n", cpages);
 		break;
 	}
 	return r;
@@ -775,9 +779,9 @@ static int ttm_get_pages(struct page **pages, unsigned npages, int flags,
 	if (flags & TTM_PAGE_FLAG_ZERO_ALLOC) {
 		TAILQ_FOREACH(p, &plist, pageq) {
 			pmap_zero_page(VM_PAGE_TO_PHYS(p));
-			drm_clflush_pages((struct page **)&p, 1);
 		}
 	}
+	drm_clflush_pages(pages, count);
 
 	/* If pool didn't have enough pages allocate new one. */
 	if (npages > 0) {

@@ -248,7 +248,7 @@ vm_add_new_page(vm_paddr_t pa, int *badcountp)
 	 * which we consider bugs... but don't crash).  Note that m->phys_addr
 	 * is pre-initialized, so use m->queue as a check.
 	 */
-	if (m->queue) {
+	if (m->flags & PG_ADDED) {
 		if (*badcountp < 10) {
 			kprintf("vm_add_new_page: duplicate pa %016jx\n",
 				(intmax_t)pa);
@@ -261,7 +261,7 @@ vm_add_new_page(vm_paddr_t pa, int *badcountp)
 	}
 
 	m->phys_addr = pa;
-	m->flags = 0;
+	m->flags = PG_ADDED;
 	m->pat_mode = PAT_WRITE_BACK;
 	m->pc = (pa >> PAGE_SHIFT);
 
@@ -292,20 +292,19 @@ vm_add_new_page(vm_paddr_t pa, int *badcountp)
 		m->wire_count = 1;
 		atomic_add_long(&vmstats.v_wire_count, 1);
 		alist_free(&vm_contig_alist, pa >> PAGE_SHIFT, 1);
-		return;
+	} else {
+		/*
+		 * General page
+		 */
+		m->queue = m->pc + PQ_FREE;
+		KKASSERT(m->dirty == 0);
+
+		atomic_add_long(&vmstats.v_page_count, 1);
+		atomic_add_long(&vmstats.v_free_count, 1);
+		vpq = &vm_page_queues[m->queue];
+		TAILQ_INSERT_HEAD(&vpq->pl, m, pageq);
+		++vpq->lcnt;
 	}
-
-	/*
-	 * General page
-	 */
-	m->queue = m->pc + PQ_FREE;
-	KKASSERT(m->dirty == 0);
-
-	atomic_add_long(&vmstats.v_page_count, 1);
-	atomic_add_long(&vmstats.v_free_count, 1);
-	vpq = &vm_page_queues[m->queue];
-	TAILQ_INSERT_HEAD(&vpq->pl, m, pageq);
-	++vpq->lcnt;
 }
 
 /*

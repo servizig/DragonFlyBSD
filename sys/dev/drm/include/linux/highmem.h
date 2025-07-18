@@ -54,45 +54,55 @@ static inline void *kmap(struct page *pg)
 	void *kptr;
 
 	ary[0] = &pg->pa_vmpage;
-	atomic_add_int(&pg->refs, 1);
-	while ((kptr = pg->kptr) == NULL) {
+	atomic_add_int(&pg->pa_vmpage.ext_refs, 1);
+	while ((kptr = pg->pa_vmpage.ext_kptr) == NULL) {
 		kptr = (void *)kmem_alloc_nofault(kernel_map,
 						  PAGE_SIZE,
 						  VM_SUBSYS_DRM_VMAP,
 						  PAGE_SIZE);
 		pmap_qenter((vm_offset_t)kptr, ary, 1);
-		if (atomic_cmpset_ptr(&pg->kptr, NULL, kptr))
+		if (atomic_cmpset_ptr(&pg->pa_vmpage.ext_kptr, NULL, kptr))
 			break;
 		pmap_qremove(kptr, 1);
 		kmem_free(kernel_map, kptr, PAGE_SIZE);
 	}
-
-	kprintf("kmap pg %p pat_mode %d to %p\n",
-		pg, pg->pa_vmpage.pat_mode, kptr);
-
 	return kptr;
-#if 0
-	return (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS( (struct vm_page *)pg ));
-#endif
 }
 
 static inline void kunmap(struct page *pg)
 {
+#if 0
+	atomic_add_int(&pg->pa_vmpage.ext_refs, -1);
+	/* leave kptr cached */
+#else
 	void *kptr;
-
-	if (atomic_fetchadd_int(&pg->refs, -1) == 1) {
-		kptr = atomic_swap_ptr((void *)&pg->kptr, NULL);
+	if (atomic_fetchadd_int(&pg->pa_vmpage.ext_refs, -1) == 1) {
+		kptr = atomic_swap_ptr((void *)&pg->pa_vmpage.ext_kptr, NULL);
 		if (kptr) {
 			pmap_qremove(kptr, 1);
 			kmem_free(kernel_map, kptr, PAGE_SIZE);
 		}
 	}
+#endif
 }
 
+/*
+ * kmap_atomic() / kunmap_atomic() maps a page to kernel memory.  Because
+ * kunmap_atomic() stupidly takes only a memory pointer, we must allocate
+ * custom space for each call.
+ */
 static inline void *kmap_atomic(struct page *pg)
 {
-//kprintf("kmap_atomic\n");
-	return (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS( (struct vm_page *)pg ));
+	vm_page_t ary[1];
+	void *kptr;
+
+	ary[0] = &pg->pa_vmpage;
+	kptr = (void *)kmem_alloc_nofault(kernel_map,
+					  PAGE_SIZE,
+					  VM_SUBSYS_DRM_VMAP,
+					  PAGE_SIZE);
+	pmap_qenter_quick((vm_offset_t)kptr, ary, 1);
+	return kptr;
 }
 
 static inline void *
@@ -103,7 +113,18 @@ kmap_atomic_prot(struct page *pg, pgprot_t prot)
 
 static inline void kunmap_atomic(void *vaddr)
 {
-	/* Nothing to do on systems with a direct memory map */
+	pmap_qremove_quick(vaddr, 1);
+	kmem_free(kernel_map, vaddr, PAGE_SIZE);
+#if 0
+	vm_offset_t pa;
+	vm_page_t m;
+
+	pa = pmap_kextract((vm_offset_t)vaddr);
+	if (pa) {
+		m = PHYS_TO_VM_PAGE(pa);
+		kunmap((struct page *)m);
+	}
+#endif
 }
 
 #endif	/* _LINUX_HIGHMEM_H_ */

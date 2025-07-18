@@ -197,8 +197,9 @@ struct vm_page {
 	uint8_t	valid;			/* map of valid DEV_BSIZE chunks */
 	uint8_t	dirty;			/* map of dirty DEV_BSIZE chunks */
 	uint32_t flags;			/* see below */
-	int	unused01;		/* available */
+	int	ext_refs;		/* extension - kptr caching refs */
 	/* 128 bytes */
+	void	*ext_kptr;		/* extension - cached kptr */
 #ifdef VM_PAGE_DEBUG
 	const char *busy_func;
 	int	busy_line;
@@ -387,6 +388,7 @@ extern struct vpgqueues vm_page_queues[PQ_COUNT];
 #define PG_UNUSED10000	0x00010000
 #define PG_UNUSED20000	0x00020000
 #define PG_NEED_COMMIT	0x00040000	/* clean page requires commit */
+#define PG_ADDED	0x00080000	/* added via vm_add_new_pages */
 
 #define PG_KEEP_NEWPAGE_MASK	(0)
 

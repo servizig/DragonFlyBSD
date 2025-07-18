@@ -29,10 +29,12 @@
 
 #include <linux/mmdebug.h>
 #include <linux/mmzone.h>
+#include <linux/mm_types.h>
 #include <linux/stddef.h>
 
 #include <sys/malloc.h>
 #include <vm/vm_page.h>
+#include <vm/vm_extern.h>
 #include <machine/bus_dma.h>
 
 #define GFP_NOWAIT	(M_NOWAIT | M_CACHEALIGN)
@@ -58,7 +60,15 @@
 
 static inline void __free_page(struct page *page)
 {
-//	vm_page_freezwq((vm_page_t)page);
+	vm_page_t m = (vm_page_t)page;
+	void *kptr;
+
+	KKASSERT(m->ext_refs == 0);
+	if ((kptr = m->ext_kptr) != NULL) {
+		m->ext_kptr = NULL;
+		pmap_qremove((vm_offset_t)kptr, 1);
+		kmem_free(kernel_map, (vm_offset_t)kptr, PAGE_SIZE);
+	}
 	vm_page_free_contig((struct vm_page *)page, PAGE_SIZE);
 }
 
@@ -104,9 +114,22 @@ alloc_pages(gfp_t gfp_mask, unsigned int order)
 static inline void
 __free_pages(struct page *pgs, unsigned int order)
 {
-	size_t bytes = PAGE_SIZE << order;
+	size_t pgcount = 1 << order;
+	size_t i;
+	vm_page_t m;
+	void *kptr;
 
-	vm_page_free_contig((struct vm_page *)pgs, bytes);
+	for (i = 0; i < pgcount; ++i) {
+		m = (vm_page_t)&pgs[i];
+
+		KKASSERT(m->ext_refs == 0);
+		if ((kptr = m->ext_kptr) != NULL) {
+			m->ext_kptr = NULL;
+			pmap_qremove((vm_offset_t)kptr, 1);
+			kmem_free(kernel_map, (vm_offset_t)kptr, PAGE_SIZE);
+		}
+	}
+	vm_page_free_contig((struct vm_page *)pgs, PAGE_SIZE * pgcount);
 }
 
 #endif	/* _LINUX_GFP_H_ */

@@ -62,7 +62,7 @@ int ttm_bo_move_ttm(struct ttm_buffer_object *bo,
 
 		if (unlikely(ret != 0)) {
 			if (ret != -ERESTARTSYS)
-				pr_err("Failed to expire sync object before unbinding TTM\n");
+				pr_err("Failed to expire sync object before unbinding TTM ret = %d\n", ret);
 			return ret;
 		}
 

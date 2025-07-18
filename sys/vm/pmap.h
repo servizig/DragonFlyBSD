@@ -206,6 +206,7 @@ void		 pmap_npt_transform (pmap_t, int);
 void		 pmap_protect (pmap_t, vm_offset_t, vm_offset_t, vm_prot_t);
 void		 pmap_remove_specific (pmap_t, vm_page_t);
 void		 pmap_qenter (vm_offset_t, struct vm_page **, int);
+void		 pmap_qenter_quick (vm_offset_t, struct vm_page **, int);
 void		 pmap_qenter_noinval (vm_offset_t, struct vm_page **, int);
 void		 pmap_qremove (vm_offset_t, int);
 void		 pmap_qremove_quick (vm_offset_t, int);

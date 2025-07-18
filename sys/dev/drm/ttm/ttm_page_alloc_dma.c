@@ -273,11 +273,16 @@ static int ttm_set_pages_caching(struct dma_pool *pool,
 		if (r)
 			pr_err("%s: Failed to set %d pages to uc!\n",
 			       pool->dev_name, cpages);
-	}
+	} else
 	if (pool->type & IS_WC) {
 		r = ttm_set_pages_array_wc(pages, cpages);
 		if (r)
 			pr_err("%s: Failed to set %d pages to wc!\n",
+			       pool->dev_name, cpages);
+	} else {
+		r = ttm_set_pages_array_wb(pages, cpages);
+		if (r)
+			pr_err("%s: Failed to set %d pages to wb!\n",
 			       pool->dev_name, cpages);
 	}
 	return r;
