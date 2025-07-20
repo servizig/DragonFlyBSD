@@ -498,7 +498,7 @@ buildports: umountports mountports
 	cp ${.CURDIR}/dports.base/pkg.conf ${WORLDDEST}/chroot/build/
 	@echo "dsynth logs will be stored in ${WORLDDEST}/chroot/build/synth/logs"
 	@echo "pkg file path: file:///${WORLDDEST}/chroot/build/synth/live_packages/"
-	chroot ${WORLDDEST}/chroot dsynth -SS -y -C /build/synth build dragonfly/base
+	chroot ${WORLDDEST}/chroot dsynth -g -SS -y -C /build/synth build dragonfly/base
 	@(cd ${.CURDIR}; ${MAKE} umountports)
 
 # Install base system ports (does not require the chroot but does require
@@ -511,7 +511,7 @@ buildports: umountports mountports
 installports: umountports mountports
 	cd ${WORLDDEST} && tar xvzpf ${WORLDDEST}/chroot/build/synth/live_packages/All/pkg-*.pkg > /dev/null 2>&1
 	cat ${.CURDIR}/dports.base/pkg.conf | sed -e 's#/build#${WORLDDEST}/chroot/build#' > ${WORLDDEST}/chroot/build/pkg.conf
-	${WORLDDEST}/usr/local/sbin/pkg-static --rootdir ${DESTDIR}/ -R ${WORLDDEST}/chroot/build install dragonfly-base
+	${WORLDDEST}/usr/local/sbin/pkg-static --rootdir ${DESTDIR}/ -R ${WORLDDEST}/chroot/build install -y dragonfly-base
 	@(cd ${.CURDIR}; ${MAKE} umountports)
 
 .ORDER: build-all install-all
