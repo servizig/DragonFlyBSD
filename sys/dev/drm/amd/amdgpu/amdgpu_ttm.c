@@ -188,6 +188,10 @@ static int amdgpu_init_mem_type(struct ttm_bo_device *bdev, uint32_t type,
 		man->flags = TTM_MEMTYPE_FLAG_MAPPABLE;
 		man->available_caching = TTM_PL_MASK_CACHING;
 		man->default_caching = TTM_PL_FLAG_CACHED;
+
+		// YYY OVERRIDE
+		//man->available_caching = TTM_PL_MASK_CACHING;
+		//man->default_caching = TTM_PL_FLAG_UNCACHED;
 		break;
 	case TTM_PL_TT:
 		/* GTT memory  */
@@ -196,6 +200,10 @@ static int amdgpu_init_mem_type(struct ttm_bo_device *bdev, uint32_t type,
 		man->available_caching = TTM_PL_MASK_CACHING;
 		man->default_caching = TTM_PL_FLAG_CACHED; //TTM_PL_FLAG_UNCACHED; //TTM_PL_FLAG_CACHED;
 		man->flags = TTM_MEMTYPE_FLAG_MAPPABLE | TTM_MEMTYPE_FLAG_CMA;
+
+		// YYY OVERRIDE
+		//man->available_caching = TTM_PL_MASK_CACHING;
+		//man->default_caching = TTM_PL_FLAG_UNCACHED;
 		break;
 	case TTM_PL_VRAM:
 		/* "On-card" video ram */
@@ -840,6 +848,9 @@ int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 	unsigned int flags = 0;
 	unsigned pinned = 0;
 	int r;
+
+	kprintf("amdgpu_ttm_tt_get_user_pages caching_state: %d\n",
+		ttm->caching_state);
 
 	if (!mm) /* Happens during process shutdown */
 		return -ESRCH;

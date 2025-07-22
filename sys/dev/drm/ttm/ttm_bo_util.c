@@ -62,7 +62,7 @@ int ttm_bo_move_ttm(struct ttm_buffer_object *bo,
 
 		if (unlikely(ret != 0)) {
 			if (ret != -ERESTARTSYS)
-				pr_err("Failed to expire sync object before unbinding TTM\n");
+				pr_err("Failed to expire sync object before unbinding TTM ret = %d\n", ret);
 			return ret;
 		}
 
@@ -262,7 +262,7 @@ static int ttm_copy_io_page(void *dst, void *src, unsigned long page)
 
 static int ttm_copy_io_ttm_page(struct ttm_tt *ttm, void *src,
 				unsigned long page,
-				pgprot_t prot)
+				pgprot_t prot) /* pgflags */
 {
 	struct page *d = ttm->pages[page];
 	void *dst;
@@ -273,7 +273,7 @@ static int ttm_copy_io_ttm_page(struct ttm_tt *ttm, void *src,
 	src = (void *)((unsigned long)src + (page << PAGE_SHIFT));
 
 #ifdef CONFIG_X86
-	dst = kmap_atomic_prot(d, prot);
+	dst = kmap_atomic_quick(d, prot);
 #else
 	if (pgprot_val(prot) != pgprot_val(PAGE_KERNEL))
 		dst = vmap(&d, 1, 0, prot);
@@ -286,7 +286,7 @@ static int ttm_copy_io_ttm_page(struct ttm_tt *ttm, void *src,
 	memcpy_fromio(dst, src, PAGE_SIZE);
 
 #ifdef CONFIG_X86
-	kunmap_atomic(dst);
+	kunmap_atomic_quick();
 #else
 	if (pgprot_val(prot) != pgprot_val(PAGE_KERNEL))
 		vunmap(dst);
@@ -299,7 +299,7 @@ static int ttm_copy_io_ttm_page(struct ttm_tt *ttm, void *src,
 
 static int ttm_copy_ttm_io_page(struct ttm_tt *ttm, void *dst,
 				unsigned long page,
-				pgprot_t prot)
+				pgprot_t prot) /* prot is pgflasg */
 {
 	struct page *s = ttm->pages[page];
 	void *src;
@@ -309,7 +309,7 @@ static int ttm_copy_ttm_io_page(struct ttm_tt *ttm, void *dst,
 
 	dst = (void *)((unsigned long)dst + (page << PAGE_SHIFT));
 #ifdef CONFIG_X86
-	src = kmap_atomic_prot(s, prot);
+	src = kmap_atomic_quick(s, prot);
 #else
 	if (pgprot_val(prot) != pgprot_val(PAGE_KERNEL))
 		src = vmap(&s, 1, 0, prot);
@@ -322,7 +322,7 @@ static int ttm_copy_ttm_io_page(struct ttm_tt *ttm, void *dst,
 	memcpy_toio(dst, src, PAGE_SIZE);
 
 #ifdef CONFIG_X86
-	kunmap_atomic(src);
+	kunmap_atomic_quick();
 #else
 	if (pgprot_val(prot) != pgprot_val(PAGE_KERNEL))
 		vunmap(src);

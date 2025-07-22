@@ -182,7 +182,7 @@ static inline void
 dma_fence_set_error(struct dma_fence *fence, int error)
 {
 	fence->error = error;
-kprintf("fence error: context=0x%llx, seqno=%d, error=%d\n", fence->context, fence->seqno, error);
+kprintf("fence error: fence=%p context=0x%llx, seqno=%d, error=%d\n", fence, fence->context, fence->seqno, error);
 //print_backtrace(-1);
 }
 

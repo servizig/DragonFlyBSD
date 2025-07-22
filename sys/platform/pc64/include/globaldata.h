@@ -84,8 +84,8 @@ struct mdglobaldata {
 	long		gd_lunused1;
 	long		gd_lunused2;
 	long		gd_lunusde3;
-	caddr_t		gd_aunused0;
-	caddr_t		gd_aunused1;
+	register_t	*gd_temp_pte;
+	vm_offset_t	gd_temp_va;
 	caddr_t		gd_aunused2;
 	struct pv_entry	*gd_newpv;
 	u_int		gd_acpi_id;

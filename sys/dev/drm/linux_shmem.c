@@ -38,6 +38,8 @@
 #include <linux/err.h>
 #include <linux/shmem_fs.h>
 
+#include <drm/drm_cache.h>
+
 /*
  * This code is typically called with a normal VM object to access
  * data from a userspace shared memory mapping.  However, handle the
@@ -78,6 +80,7 @@ shmem_read_mapping_page(vm_object_t object, vm_pindex_t pindex)
 				m->dirty = 0;
 			}
 		}
+		drm_clflush_pages((struct page **)&m, 1);
 	}
 	vm_page_wire(m);		/* put_page() undoes this */
 	vm_page_wakeup(m);

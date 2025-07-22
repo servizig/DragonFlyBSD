@@ -48,6 +48,32 @@
 
 #define TTM_BO_VM_NUM_PREFAULT 16
 
+static inline int
+cstate_to_memattr(int cstate)
+{
+        switch(cstate) {
+        case tt_cached:
+                return VM_MEMATTR_WRITE_BACK;
+        case tt_wc:
+                return VM_MEMATTR_WRITE_COMBINING;
+        case tt_uncached:
+                return VM_MEMATTR_UNCACHEABLE;
+        }
+        return VM_MEMATTR_WRITE_BACK;
+}
+
+static inline int
+place_to_memattr(int placement)
+{
+	if (placement & TTM_PL_FLAG_CACHED) 
+		return VM_MEMATTR_WRITE_BACK;
+	if (placement & TTM_PL_FLAG_WC) 
+		return VM_MEMATTR_WRITE_COMBINING;
+	if (placement & TTM_PL_FLAG_UNCACHED) 
+		return VM_MEMATTR_UNCACHEABLE;
+	return VM_MEMATTR_WRITE_BACK;
+}
+
 static int ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 				struct vm_fault *vmf)
 {
@@ -668,7 +694,6 @@ retry:
 #ifdef __DragonFly__
 		m = vm_phys_fictitious_to_vm_page(bo->mem.bus.base +
 						  bo->mem.bus.offset + offset);
-		pmap_page_set_memattr(m, ttm_io_prot(bo->mem.placement, 0));
 #endif
 		cvma.vm_page_prot = ttm_io_prot(bo->mem.placement,
 						cvma.vm_page_prot);
@@ -694,10 +719,6 @@ retry:
 			retval = VM_PAGER_ERROR;
 			goto out_io_unlock1;
 		}
-		pmap_page_set_memattr(m,
-		    (bo->mem.placement & TTM_PL_FLAG_CACHED) ?
-		    VM_MEMATTR_WRITE_BACK : ttm_io_prot(bo->mem.placement, 0));
-//kprintf("PF: bo %p ttm %p vmo %p off %ld vm_page %p phys_addr 0x%lx\n", bo, ttm, vm_obj, offset, m, VM_PAGE_TO_PHYS(m));
 	}
 
 	if (vm_page_busy_try(m, FALSE)) {
@@ -708,6 +729,14 @@ retry:
 		up_read(&vma->vm_mm->mmap_sem);
 		goto retry;
 	}
+
+#if 1
+	/* YYY set memattr according to BO, TTM might be NULL */
+	pmap_page_set_memattr(m, place_to_memattr(bo->mem.placement));
+#else
+	pmap_page_set_memattr(m, VM_MEMATTR_UNCACHEABLE);
+#endif
+//kprintf("PF: bo %p ttm %p vmo %p off %ld vm_page %p phys_addr 0x%lx\n", bo, ttm, vm_obj, offset, m, VM_PAGE_TO_PHYS(m));
 
 	/*
 	 * Return our fake page BUSYd.  Do not index it into the VM object.
@@ -805,6 +834,7 @@ ttm_bo_mmap_single(struct file *fp, struct drm_device *dev,
 					     &ttm_pager_ops,
 					     size, nprot, 0,
 					     curthread->td_ucred);
+		vm_obj->memattr = VM_MEMATTR_WRITE_BACK;
 		if (vm_obj) {
 			*obj_res = vm_obj;
 			*offset = 0;		/* object-relative offset */

@@ -60,6 +60,9 @@ dmabuf_close(struct file *fp)
 		return EINVAL;
 	}
 	dmabuf = fp->private_data;
+	fp->f_ops = &badfileops;
+	fp->f_data = NULL;
+	fp->private_data = NULL;
 	dmabuf->ops->release(dmabuf);
 	kfree(dmabuf);
 
@@ -147,20 +150,19 @@ dma_buf_fd(struct dma_buf *dmabuf, int flags)
 	if (dmabuf->file == NULL)
 		return -EINVAL;
 
-	if (flags & O_CLOEXEC) {
-	/* XXX: CLOEXEC not handled yet */
-#if 0
-		__set_close_on_exec(fd, fdt);
-	else
-		__clear_close_on_exec(fd, fdt);
-#endif
-	}
-
 	error = fdalloc(curproc, 0, &fd);
-	if (error != 0)
+	if (error)
 		return -error;
 
+	if (flags & O_CLOEXEC)
+		curproc->p_fd->fd_files[fd].fileflags |= UF_EXCLOSE;
+
+	/*
+	 * fsetfd() installs the fp and adds a ref.  We must
+	 * drop the ref we obtained from fdalloc() to finish up.
+	 */
 	fsetfd(curproc->p_fd, dmabuf->file, fd);
+	fdrop(dmabuf->file);
 
 	return fd;
 }
@@ -181,7 +183,8 @@ dma_buf_get(int fd)
 	}
 
 	dmabuf = fp->private_data;
-//	dropfp(curthread, fd, fp);
+	fhold(fp);	/* for dma_buf_put() */
+	dropfp(curthread, fd, fp);
 
 	return dmabuf;
 }

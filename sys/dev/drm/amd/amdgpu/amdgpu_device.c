@@ -3372,6 +3372,7 @@ bool amdgpu_device_should_recover_gpu(struct amdgpu_device *adev)
 		DRM_INFO("GPU recovery disabled.\n");
 		return false;
 	}
+	kprintf("GPU recovery attempt\n");
 
 	return true;
 }

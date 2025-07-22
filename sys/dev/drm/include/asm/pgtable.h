@@ -33,7 +33,18 @@
 
 static inline pgprot_t pgprot_noncached(pgprot_t prot)
 {
-	return (prot | VM_MEMATTR_UNCACHEABLE);
+	return (prot | _PAGE_PCD | _PAGE_PWT);
+}
+
+static inline int pgflags_to_memattr(pgprot_t prot)
+{
+	switch (prot & _PAGE_CACHE_MASK) {
+	case _PAGE_PAT | _PAGE_PCD:
+		return VM_MEMATTR_WRITE_COMBINING;
+	case _PAGE_PCD | _PAGE_PWT:
+		return VM_MEMATTR_UNCACHEABLE;
+	}
+	return VM_MEMATTR_WRITE_BACK;
 }
 
 #endif	/* _ASM_PGTABLE_H_ */

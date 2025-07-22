@@ -538,6 +538,9 @@ bus_dmamem_alloc(bus_dma_tag_t dmat, void **vaddr, int flags,
 	if (*vaddr == NULL)
 		return (ENOMEM);
 
+	/*
+	 * NOTE: We don't use kmalloc if the attr is not the default
+	 */
 	if (attr != VM_MEMATTR_DEFAULT) {
 		pmap_change_attr((vm_offset_t)(*vaddr),
 				 dmat->maxsize / PAGE_SIZE, attr);
@@ -554,14 +557,21 @@ bus_dmamem_free(bus_dma_tag_t dmat, void *vaddr, bus_dmamap_t map)
 {
 	/*
 	 * dmamem does not need to be bounced, so the map should be
-	 * NULL
+	 * NULL.
+	 *
+	 * kmalloc()s always have a default memattr so we only have
+	 * to restore the attribute when using contigfree().
 	 */
 	if (map != NULL && map != (void *)-1)
 		panic("bus_dmamem_free: Invalid map freed");
-	if (map == NULL)
+	if (map == NULL) {
 		kfree(vaddr, M_DEVBUF);
-	else
+	} else {
+		pmap_change_attr((vm_offset_t)vaddr,
+				 dmat->maxsize / PAGE_SIZE,
+				 VM_MEMATTR_DEFAULT);
 		contigfree(vaddr, dmat->maxsize, M_DEVBUF);
+	}
 }
 
 static __inline vm_paddr_t

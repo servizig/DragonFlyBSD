@@ -184,6 +184,7 @@ void		 pmap_enter (pmap_t, vm_offset_t, struct vm_page *,
 void		 pmap_maybethreaded(pmap_t);
 int		 pmap_mapped_sync(vm_page_t m);
 vm_page_t	 pmap_fault_page_quick(pmap_t, vm_offset_t, vm_prot_t, int *);
+vm_paddr_t	 pmap_page_to_dmap(vm_page_t m);
 vm_paddr_t	 pmap_extract (pmap_t pmap, vm_offset_t va, void **handlep);
 void		 pmap_extract_done (void *handle);
 void		 pmap_growkernel (vm_offset_t, vm_offset_t);
@@ -206,6 +207,9 @@ void		 pmap_npt_transform (pmap_t, int);
 void		 pmap_protect (pmap_t, vm_offset_t, vm_offset_t, vm_prot_t);
 void		 pmap_remove_specific (pmap_t, vm_page_t);
 void		 pmap_qenter (vm_offset_t, struct vm_page **, int);
+void		 pmap_qenter_memattr (vm_offset_t, struct vm_page **, int, int);
+void		 pmap_qenter_quick (vm_offset_t, struct vm_page **, int);
+void		 pmap_qenter_quick_memattr (vm_offset_t, struct vm_page **, int, int);
 void		 pmap_qenter_noinval (vm_offset_t, struct vm_page **, int);
 void		 pmap_qremove (vm_offset_t, int);
 void		 pmap_qremove_quick (vm_offset_t, int);

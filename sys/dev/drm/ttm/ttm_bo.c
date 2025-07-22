@@ -1800,11 +1800,12 @@ int ttm_bo_swapout(struct ttm_bo_global *glob, struct ttm_operation_ctx *ctx)
 	ttm_bo_del_from_lru(bo);
 	lockmgr(&glob->lru_lock, LK_RELEASE);
 
-	/**
+	/*
 	 * Move to system cached
+	 *
+	 * Apply https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/?id=db9c1734ad69c0ba5e5e420ba31ebc1048976be6
 	 */
-
-	if (bo->mem.mem_type != TTM_PL_SYSTEM ||
+	if (bo->mem.mem_type != TTM_PL_SYSTEM ||	/* ZZZ */
 	    bo->ttm->caching_state != tt_cached) {
 		struct ttm_operation_ctx ctx = { false, false };
 		struct ttm_mem_reg evict_mem;
@@ -1812,6 +1813,7 @@ int ttm_bo_swapout(struct ttm_bo_global *glob, struct ttm_operation_ctx *ctx)
 		evict_mem = bo->mem;
 		evict_mem.mm_node = NULL;
 		evict_mem.placement = TTM_PL_FLAG_SYSTEM | TTM_PL_FLAG_CACHED;
+		//evict_mem.placement = TTM_PL_MASK_CACHING; / *ZZZ */
 		evict_mem.mem_type = TTM_PL_SYSTEM;
 
 		ret = ttm_bo_handle_move_mem(bo, &evict_mem, true, &ctx);

@@ -447,18 +447,33 @@ void amdgpu_ctx_add_fence(struct amdgpu_ctx *ctx,
 			  struct dma_fence *fence, uint64_t* handle)
 {
 	struct amdgpu_ctx_entity *centity = to_amdgpu_ctx_entity(entity);
-	uint64_t seq = centity->sequence;
+	uint64_t seq;
 	struct dma_fence *other = NULL;
 	unsigned idx = 0;
 
+retry:
+	lockmgr(&ctx->ring_lock, LK_EXCLUSIVE);
+	seq = centity->sequence;
 	idx = seq & (amdgpu_sched_jobs - 1);
 	other = centity->fences[idx];
-	if (other)
-		BUG_ON(!dma_fence_is_signaled(other));
+	if (other) {
+		if (!dma_fence_is_signaled(other)) {
+			lockmgr(&ctx->ring_lock, LK_RELEASE);
+
+			kprintf("amdgpu_ctx_add_fence: incomplete fence "
+				"pid=%d tid=%d seq=%ld idx=%d centity=%p other=%p\n",
+				(curproc ? curproc->p_pid : -1),
+				(curthread->td_lwp ? curthread->td_lwp->lwp_tid : -1),
+				seq, idx, centity, other);
+			for (;;)
+			    tsleep(&seq, 0, "fenceslp", 0); /* just stop */
+			goto retry;
+		}
+		//BUG_ON(!dma_fence_is_signaled(other));
+	}
 
 	dma_fence_get(fence);
 
-	lockmgr(&ctx->ring_lock, LK_EXCLUSIVE);
 	centity->fences[idx] = fence;
 	centity->sequence++;
 	lockmgr(&ctx->ring_lock, LK_RELEASE);

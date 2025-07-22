@@ -239,7 +239,8 @@ __read_frequently static boolean_t pmap_initialized = FALSE;
 //static int pgeflag;		/* PG_G or-in */
 static uint64_t PatMsr;		/* value of MSR_PAT */
 
-static int ndmpdp;
+static int ndmpdp;		/* count 1GB pgtable pages needed for DMAP */
+static int ndmpgs;		/* count 2MB pgtable pages needed for DMAP */
 static vm_paddr_t dmaplimit;
 vm_offset_t kernel_vm_end = VM_MIN_KERNEL_ADDRESS;
 
@@ -255,6 +256,7 @@ uint64_t KPML4phys;		/* phys addr of kernel level 4 */
 
 static uint64_t DMPDphys;	/* phys addr of direct mapped level 2 */
 static uint64_t DMPDPphys;	/* phys addr of direct mapped level 3 */
+static uint64_t DMPGphys;	/* phys addr of direct mapped level 4 */
 
 /*
  * Data for the pv entry allocation mechanism
@@ -334,6 +336,9 @@ SYSCTL_INT(_machdep, OID_AUTO, pmap_pv_debug, CTLFLAG_RW,
 static long vm_pmap_pv_entries;
 SYSCTL_LONG(_vm, OID_AUTO, pmap_pv_entries, CTLFLAG_RD,
     &vm_pmap_pv_entries, 0, "");
+
+SYSCTL_INT(_machdep, OID_AUTO, ndmpgs, CTLFLAG_RD,
+    &ndmpgs, 0, "");
 
 /* Standard user access funtions */
 extern int std_copyinstr (const void *udaddr, void *kaddr, size_t len,
@@ -884,10 +889,10 @@ create_pagetables(vm_paddr_t *firstaddr)
 	if (ndmpdp < 512)	/* Minimum 512GB of DMAP */
 		ndmpdp = 512;
 #endif
-
 	KKASSERT(ndmpdp <= NDMPML4E * NPML4EPG);
 	DMapMaxAddress = DMAP_MIN_ADDRESS +
 			 ((ndmpdp * NPDEPG) << PDRSHIFT);
+	ndmpgs = ndmpdp * NPDEPG;
 
 	/*
 	 * Starting at KERNBASE - map all 2G worth of page table pages.
@@ -951,12 +956,8 @@ create_pagetables(vm_paddr_t *firstaddr)
 	 * attributes on a fixed grain (see pmap_change_attr()).
 	 */
 	DMPDPphys = allocpages(firstaddr, NDMPML4E);
-#if 1
-	DMPDphys = allocpages(firstaddr, ndmpdp);
-#else
-	if ((amd_feature & AMDID_PAGE1GB) == 0)
-		DMPDphys = allocpages(firstaddr, ndmpdp);
-#endif
+	DMPDphys = allocpages(firstaddr, ndmpdp);	/* 1GB w/2MB ptes */
+	DMPGphys = allocpages(firstaddr, ndmpgs);	/* 2MB w/4K ptes */
 	dmaplimit = (vm_paddr_t)ndmpdp << PDPSHIFT;
 
 	/*
@@ -1037,64 +1038,54 @@ create_pagetables(vm_paddr_t *firstaddr)
 	}
 
 	/*
-	 * Now set up the direct map space using either 2MB or 1GB pages
-	 * Preset PG_M and PG_A because demotion expects it.
+	 * Now set up the direct map.  Preset PG_M and PG_A because demotion
+	 * expects it.
 	 *
-	 * When filling in entries in the PD pages make sure any excess
-	 * entries are set to zero as we allocated enough PD pages
+	 * We generate a full-resolution DMAP because cache mode aliasing has
+	 * become too big a problem, particularly aliasing caused by
+	 * speculative reads, and we want to be able to use the DMAP.
 	 *
-	 * Stuff for our DMAP.  Use 2MB pages even when 1GB pages
-	 * are available in order to allow APU code to adjust page
-	 * attributes on a fixed grain (see pmap_change_attr()).
+	 * So we create the full 1GB->2MB->4K table instead of stopping at
+	 * 1GB or 2MB.
 	 */
-#if 0
-	if ((amd_feature & AMDID_PAGE1GB) == 0)
-#endif
-	{
-		/*
-		 * Use 2MB pages
-		 */
-		for (i = 0; i < NPDEPG * ndmpdp; i++) {
-			((pd_entry_t *)DMPDphys)[i] = i << PDRSHIFT;
-			((pd_entry_t *)DMPDphys)[i] |=
-			    pmap_bits_default[PG_RW_IDX] |
-			    pmap_bits_default[PG_V_IDX] |
-			    pmap_bits_default[PG_PS_IDX] |
-			    pmap_bits_default[PG_G_IDX] |
-			    pmap_bits_default[PG_M_IDX] |
-			    pmap_bits_default[PG_A_IDX];
-		}
 
-		/*
-		 * And the direct map space's PDP
-		 */
-		for (i = 0; i < ndmpdp; i++) {
-			((pdp_entry_t *)DMPDPphys)[i] = DMPDphys +
-							(i << PAGE_SHIFT);
-			((pdp_entry_t *)DMPDPphys)[i] |=
-			    pmap_bits_default[PG_RW_IDX] |
-			    pmap_bits_default[PG_V_IDX] |
-			    pmap_bits_default[PG_A_IDX];
-		}
+	/*
+	 * Populate 4K PTEs (PT pages), pointing to physical memory.
+	 */
+	for (i = 0; i < NPTEPG * ndmpgs; i++) {
+		((pt_entry_t *)DMPGphys)[i] = i << PAGE_SHIFT;
+		((pt_entry_t *)DMPGphys)[i] |=
+		    pmap_bits_default[PG_RW_IDX] |
+		    pmap_bits_default[PG_V_IDX] |
+		    pmap_bits_default[PG_G_IDX] |
+		    pmap_bits_default[PG_M_IDX] |
+		    pmap_bits_default[PG_A_IDX];
 	}
-#if 0
-	else {
-		/*
-		 * 1GB pages
-		 */
-		for (i = 0; i < ndmpdp; i++) {
-			((pdp_entry_t *)DMPDPphys)[i] =
-						(vm_paddr_t)i << PDPSHIFT;
-			((pdp_entry_t *)DMPDPphys)[i] |=
-			    pmap_bits_default[PG_RW_IDX] |
-			    pmap_bits_default[PG_V_IDX] |
-			    pmap_bits_default[PG_PS_IDX] |
-			    pmap_bits_default[PG_G_IDX] |
-			    pmap_bits_default[PG_M_IDX] |
-			    pmap_bits_default[PG_A_IDX];
-		}
+
+	/*
+	 * Populate 2MB PTEs (PD pages), point to DMPG pages
+	 */
+	for (i = 0; i < NPDEPG * ndmpdp; i++) {
+		((pd_entry_t *)DMPDphys)[i] = DMPGphys + (i << PAGE_SHIFT);
+		((pd_entry_t *)DMPDphys)[i] |=
+		    pmap_bits_default[PG_RW_IDX] |
+		    pmap_bits_default[PG_V_IDX] |
+		    /*pmap_bits_default[PG_PS_IDX] |*/
+		    pmap_bits_default[PG_G_IDX] |
+		    pmap_bits_default[PG_M_IDX] |
+		    pmap_bits_default[PG_A_IDX];
 	}
-#endif
+
+	/*
+	 * Populate 1GB PTEs (PDP pages), point to DMPD pages
+	 */
+	for (i = 0; i < ndmpdp; i++) {
+		((pdp_entry_t *)DMPDPphys)[i] = DMPDphys + (i << PAGE_SHIFT);
+		((pdp_entry_t *)DMPDPphys)[i] |=
+		    pmap_bits_default[PG_RW_IDX] |
+		    pmap_bits_default[PG_V_IDX] |
+		    pmap_bits_default[PG_A_IDX];
+	}
 
 	/* And recursively map PML4 to itself in order to get PTmap */
 	((pdp_entry_t *)KPML4phys)[PML4PML4I] = KPML4phys;
@@ -1707,6 +1698,21 @@ pmap_page_init(struct vm_page *m)
  ***************************************************/
 
 /*
+ * Returns the DMAP address of the page.  If the page's physical address
+ * is not in the DMAP, returns 0
+ */
+vm_paddr_t
+pmap_page_to_dmap(vm_page_t m)
+{
+	vm_paddr_t pa;
+
+        pa = VM_PAGE_TO_PHYS(m);
+        if (pa < DMapMaxAddress - DMAP_MIN_ADDRESS)
+                return PHYS_TO_DMAP(pa);
+        return 0;
+}
+
+/*
  * Extract the physical page address associated with the map/VA pair.
  * The page must be wired for this to work reliably.
  */
@@ -2058,36 +2064,108 @@ pmap_map(vm_offset_t *virtp, vm_paddr_t start, vm_paddr_t end, int prot)
 	return va_start;
 }
 
+vm_offset_t
+pmap_tempmap_enter(vm_paddr_t pa, int memattr)
+{
+	struct mdglobaldata *md = mdcpu;
+	pt_entry_t pte;
+
+	if (md->gd_temp_pte == NULL) {
+		vm_offset_t va;
+
+		va = kmem_alloc_nofault(kernel_map, PAGE_SIZE,
+					VM_SUBSYS_SYSMAP, PAGE_SIZE);
+		crit_enter();
+		if (md->gd_temp_pte == NULL) {
+			md->gd_temp_pte = vtopte(va);
+			md->gd_temp_va = va;
+		} else {
+			kmem_free(kernel_map, va, PAGE_SIZE);
+		}
+		crit_exit();
+	}
+	crit_enter();
+
+	pte = pa | 
+	      kernel_pmap->pmap_bits[PG_RW_IDX] |
+	      kernel_pmap->pmap_bits[PG_V_IDX] |
+	      kernel_pmap->pmap_cache_bits_pte[memattr];
+	*md->gd_temp_pte = pte;
+	cpu_invlpg((void *)md->gd_temp_va);
+	return (md->gd_temp_va);
+}
+
+void
+pmap_tempmap_exit(void)
+{
+	struct mdglobaldata *md = mdcpu;
+
+	*md->gd_temp_pte = 0;
+	cpu_invlpg((void *)md->gd_temp_va);
+	crit_exit();
+}
+
 #define PMAP_CLFLUSH_THRESHOLD  (2 * 1024 * 1024)
 
 /*
- * Remove the specified set of pages from the data and instruction caches.
+ * Invalidate a single page, memory barrier is not provided
+ */
+void
+pmap_invalidate_cache_page(vm_page_t m)
+{
+	vm_offset_t daddr, eva, pa;
+
+	pa = VM_PAGE_TO_PHYS(m);
+	if (pa < DMapMaxAddress - DMAP_MIN_ADDRESS) {
+		daddr = PHYS_TO_DMAP(pa);
+		eva = daddr + PAGE_SIZE;
+		while (daddr < eva) {
+			clflush(daddr);
+			daddr += cpu_clflush_line_size;
+		}
+	} else {
+		daddr = pmap_tempmap_enter(pa, VM_MEMATTR_UNCACHEABLE);
+		eva = daddr + PAGE_SIZE;
+		while (daddr < eva) {
+			clflush(daddr);
+			daddr += cpu_clflush_line_size;
+		}
+		pmap_tempmap_exit();
+	}
+}
+
+
+/*
+ * Flush and remove the specified set of pages from the data and instruction
+ * caches, and provide memory barriers.
  *
- * In contrast to pmap_invalidate_cache_range(), this function does not
- * rely on the CPU's self-snoop feature, because it is intended for use
- * when moving pages into a different cache domain.
+ * If the range is too large we just issue wbinvd on all cores, else we
+ * iterate the range and issue clflush().
  */
 void
 pmap_invalidate_cache_pages(vm_page_t *pages, int count)
 {
-	vm_offset_t daddr, eva;
-	int i;
-
 	if (count >= PMAP_CLFLUSH_THRESHOLD / PAGE_SIZE ||
 	    (cpu_feature & CPUID_CLFSH) == 0)
-		wbinvd();
-	else {
+	{
+		cpu_wbinvd_on_all_cpus();
+		//wbinvd();
+	} else {
+		int i;
+
 		cpu_mfence();
 		for (i = 0; i < count; i++) {
-			daddr = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(pages[i]));
-			eva = daddr + PAGE_SIZE;
-			for (; daddr < eva; daddr += cpu_clflush_line_size)
-				clflush(daddr);
+			pmap_invalidate_cache_page(pages[i]);
 		}
 		cpu_mfence();
 	}
 }
 
+/*
+ * Invalidate cache VA range.  If the range is too large we just
+ * issue wbinvd on all cores, else we iterate the range and issue
+ * clflush().
+ */
 void
 pmap_invalidate_cache_range(vm_offset_t sva, vm_offset_t eva)
 {
@@ -2096,12 +2174,34 @@ pmap_invalidate_cache_range(vm_offset_t sva, vm_offset_t eva)
 	KASSERT((eva & PAGE_MASK) == 0,
 	    ("pmap_invalidate_cache_range: eva not page-aligned"));
 
+
+#if 1
+	if (eva - sva >= PMAP_CLFLUSH_THRESHOLD ||
+	    (cpu_feature & CPUID_CLFSH) == 0)
+	{
+		//cpu_wbinvd_on_all_cpus();
+		wbinvd();
+	} else {
+		//kprintf("sva %016lx eva %016lx lsize %d\n",
+		//		sva, eva, cpu_clflush_line_size);
+		//print_backtrace(5);
+		cpu_mfence();
+		while (sva < eva) {
+			clflush(sva);
+			sva += cpu_clflush_line_size;
+			//kprintf("x");
+		}
+		cpu_mfence();
+		//kprintf("ok\n");
+	}
+#else
 	if (cpu_feature & CPUID_SS) {
 		; /* If "Self Snoop" is supported, do nothing. */
 	} else {
 		/* Globally invalidate caches */
 		cpu_wbinvd_on_all_cpus();
 	}
+#endif
 }
 
 /*
@@ -2126,7 +2226,8 @@ pmap_invalidate_range(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
  * The page *must* be wired.
  */
 static __inline void
-_pmap_qenter(vm_offset_t beg_va, vm_page_t *m, int count, int doinval)
+_pmap_qenter(vm_offset_t beg_va, vm_page_t *m, int count, int doinval,
+	     int memattr)
 {
 	vm_offset_t end_va;
 	vm_offset_t va;
@@ -2136,30 +2237,64 @@ _pmap_qenter(vm_offset_t beg_va, vm_page_t *m, int count, int doinval)
 	for (va = beg_va; va < end_va; va += PAGE_SIZE) {
 		pt_entry_t pte;
 		pt_entry_t *ptep;
+		int pat_mode = (memattr >= 0) ? memattr : (*m)->pat_mode;
 
 		ptep = vtopte(va);
 		pte = VM_PAGE_TO_PHYS(*m) |
 			kernel_pmap->pmap_bits[PG_RW_IDX] |
 			kernel_pmap->pmap_bits[PG_V_IDX] |
-			kernel_pmap->pmap_cache_bits_pte[(*m)->pat_mode];
+			kernel_pmap->pmap_cache_bits_pte[pat_mode];
 //		pgeflag;
 		atomic_swap_long(ptep, pte);
+		if (doinval == 2)
+			cpu_invlpg((void *)va);
 		m++;
 	}
-	if (doinval)
+	if (doinval == 1)
 		pmap_invalidate_range(kernel_pmap, beg_va, end_va);
 }
 
+/*
+ * Enter pte for current cpu use only
+ */
+void
+pmap_qenter_quick(vm_offset_t beg_va, vm_page_t *m, int count)
+{
+	_pmap_qenter(beg_va, m, count, 2, -1);
+}
+
+/*
+ * Enter pte for any cpu use
+ */
 void
 pmap_qenter(vm_offset_t beg_va, vm_page_t *m, int count)
 {
-	_pmap_qenter(beg_va, m, count, 1);
+	_pmap_qenter(beg_va, m, count, 1, -1);
+}
+
+/*
+ * Enter pte for any cpu use, override pat_mode with memattr for entry
+ */
+void
+pmap_qenter_memattr(vm_offset_t beg_va, vm_page_t *m, int count, int memattr)
+{
+	_pmap_qenter(beg_va, m, count, 1, memattr);
+}
+
+/*
+ * Enter pte for current cpu only, override pat_mode with memattr for entry
+ */
+void
+pmap_qenter_quick_memattr(vm_offset_t beg_va, vm_page_t *m,
+			  int count, int memattr)
+{
+	_pmap_qenter(beg_va, m, count, 2, memattr);
 }
 
 void
 pmap_qenter_noinval(vm_offset_t beg_va, vm_page_t *m, int count)
 {
-	_pmap_qenter(beg_va, m, count, 0);
+	_pmap_qenter(beg_va, m, count, 0, -1);
 }
 
 /*
@@ -6086,7 +6221,8 @@ pmap_mapdev_attr(vm_paddr_t pa, vm_size_t size, int mode)
 		pa += PAGE_SIZE;
 	}
 	pmap_invalidate_range(kernel_pmap, va, va + size);
-	pmap_invalidate_cache_range(va, va + size);
+	cpu_wbinvd_on_all_cpus();
+	//pmap_invalidate_cache_range(va, va + size);
 
 	return ((void *)(va + offset));
 }
@@ -6104,83 +6240,134 @@ pmap_unmapdev(vm_offset_t va, vm_size_t size)
 }
 
 /*
- * Sets the memory attribute for the specified page.
+ * Sets the memory attribute for the specified page.  If the attribute
+ * is not normal caching, we also flush the related cache lines.
  */
 void
 pmap_page_set_memattr(vm_page_t m, vm_memattr_t ma)
 {
+	vm_offset_t pa;
 
-    m->pat_mode = ma;
+	m->pat_mode = ma;
 
-#if 0
-    /*
-     * If "m" is a normal page, update its direct mapping.  This update
-     * can be relied upon to perform any cache operations that are
-     * required for data coherence.
-     */
-    if ((m->flags & PG_FICTITIOUS) == 0)
-        pmap_change_attr(PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m)), 1, m->pat_mode);
-#endif
+	/*
+	 * If "m" is a normal page, update its pte in the DMAP.  This update
+	 * can be relied upon to perform any cache operations that are
+	 * required for data coherence.
+	 *
+	 * fictitious pages can still be associated with system memory
+	 * via the low-memory dma reserve.
+	 */
+	pa = VM_PAGE_TO_PHYS(m);
+	if (pa < DMapMaxAddress - DMAP_MIN_ADDRESS)
+		pmap_change_attr(PHYS_TO_DMAP(pa), 1, m->pat_mode);
+
+	/*
+	 * Invalidate the cpu cache, even when changing back to a cacheable
+	 * state, because apparently it is possible for DMA to modify the
+	 * memory after a speculative read (even on uncached memory) loaded
+	 * the cache, resultin in a stale cache.
+	 */
+	pmap_invalidate_cache_pages(&m, 1);
 }
 
 /*
  * Change the PAT attribute on an existing kernel memory map.  Caller
  * must ensure that the virtual memory in question is not accessed
  * during the adjustment.
- *
- * If the va is within the DMAP we cannot use vtopte() because the DMAP
- * utilizes 2MB or 1GB pages.  2MB is forced atm so calculate the pd_entry
- * pointer based on that.
  */
 void
 pmap_change_attr(vm_offset_t va, vm_size_t count, int mode)
 {
 	pt_entry_t *pte;
 	vm_offset_t base;
-	int changed = 0;
+	vm_offset_t pa;
+	vm_offset_t dmva_beg;
+	vm_offset_t dmva_end;
 
 	if (va == 0)
 		panic("pmap_change_attr: va is NULL");
 	base = trunc_page(va);
 
-	if (va >= DMAP_MIN_ADDRESS && va < DMAP_MAX_ADDRESS) {
-#if 0
-		pd_entry_t *pd;
+	dmva_beg = 0;
+	dmva_end = 0;
 
-		KKASSERT(va < DMapMaxAddress);
-		pd = (pd_entry_t *)PHYS_TO_DMAP(DMPDphys);
-		pd += (va - DMAP_MIN_ADDRESS) >> PDRSHIFT;
+	if (va >= DMAP_MIN_ADDRESS && va < DMAP_MAX_ADDRESS) {
+		KKASSERT(va + count * PAGE_SIZE < DMapMaxAddress);
+		pte = (pt_entry_t *)PHYS_TO_DMAP(DMPGphys);
+		pte += (va - DMAP_MIN_ADDRESS) >> PAGE_SHIFT;
 
 		while ((long)count > 0) {
-			*pd =
-			   (*pd & ~(pd_entry_t)(kernel_pmap->pmap_cache_mask_pde)) |
-			   kernel_pmap->pmap_cache_bits_pde[mode];
-			count -= NBPDR / PAGE_SIZE;
-			va += NBPDR;
-			++pd;
+			*pte =
+			   (*pte & ~(pd_entry_t)(kernel_pmap->pmap_cache_mask_pte)) |
+			   kernel_pmap->pmap_cache_bits_pte[mode];
+			--count;
+			va += PAGE_SIZE;
+			++pte;
 		}
-#endif
 	} else {
 		while (count) {
+			/*
+			 * Adjust the kernel map PTE
+			 */
 			pte = vtopte(va);
 			*pte =
 			   (*pte & ~(pt_entry_t)(kernel_pmap->pmap_cache_mask_pte)) |
 			   kernel_pmap->pmap_cache_bits_pte[mode];
+
+			/*
+			 * If the physical address is in physical memory,
+			 * also adjust the DMAP PTE.
+			 */
+			pa = *pte & PG_FRAME;
+			if (pa < DMapMaxAddress - DMAP_MIN_ADDRESS) {
+				pte = (pt_entry_t *)PHYS_TO_DMAP(DMPGphys);
+				pte += pa >> PAGE_SHIFT;
+				*pte = (*pte & ~(pd_entry_t)(
+					kernel_pmap->pmap_cache_mask_pte)) |
+				       kernel_pmap->pmap_cache_bits_pte[mode];
+
+				/* 
+				 * Collect invalidation info for the DMAP
+				 */
+				if (dmva_beg == dmva_end) {
+					dmva_beg = PHYS_TO_DMAP(pa);
+					dmva_end = dmva_beg + PAGE_SIZE;
+				} else if (dmva_end == PHYS_TO_DMAP(pa)) {
+					dmva_end += PAGE_SIZE;
+				} else {
+					pmap_inval_smp(kernel_pmap, dmva_beg,
+						       (dmva_end - dmva_beg) >>
+							 PAGE_SHIFT,
+						       NULL, 0);
+					dmva_beg = PHYS_TO_DMAP(pa);
+					dmva_end = dmva_beg + PAGE_SIZE;
+				}
+			}
 			--count;
 			va += PAGE_SIZE;
 		}
 	}
 
-	changed = 1;	/* XXX: not optimal */
+	/*
+	 * SMP synchronize the page tables.  And if changing to non-cached
+	 * mode we also flush the CPU caches for the range.
+	 */
+	if (dmva_beg != dmva_end) {
+		pmap_inval_smp(kernel_pmap, dmva_beg,
+			       (dmva_end - dmva_beg) >> PAGE_SHIFT,
+			       NULL, 0);
+	}
+
+	pmap_invalidate_range(kernel_pmap, base, va);
 
 	/*
-	 * Flush CPU caches if required to make sure any data isn't cached that
-	 * shouldn't be, etc.
+	 * Invalidate the cpu cache, even when changing back to a cacheable
+	 * state, because apparently it is possible for DMA to modify the
+	 * memory after a speculative read (even on uncached memory) loaded
+	 * the cache, resultin in a stale cache.
 	 */
-	if (changed) {
-		pmap_invalidate_range(kernel_pmap, base, va);
-		pmap_invalidate_cache_range(base, va);
-	}
+	pmap_invalidate_cache_range(base, va);
 }
 
 /*
