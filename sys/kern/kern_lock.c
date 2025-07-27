@@ -170,13 +170,19 @@ lockmgr_shared(struct lock *lkp, u_int flags)
 			pflags = (extflags & LK_PCATCH) ? PCATCH : 0;
 			timo = (extflags & LK_TIMELOCK) ? lkp->lk_timo : 0;
 
-			tsleep_interlock(lkp, pflags);
+			if ((extflags & LK_SPIN) == 0)
+				tsleep_interlock(lkp, pflags);
 			count = atomic_fetchadd_long(&lkp->lk_count, 0);
 
 			if ((count & LKC_SHARED) &&
 			    (count & (LKC_EXREQ | LKC_UPREQ))) {
-				error = tsleep(lkp, pflags | PINTERLOCKED,
-					       lkp->lk_wmesg, timo);
+				if (extflags & LK_SPIN) {
+				    cpu_pause();
+				    error = 0;
+				} else {
+				    error = tsleep(lkp, pflags | PINTERLOCKED,
+						   lkp->lk_wmesg, timo);
+				}
 				if (error)
 					return error;
 				count = lkp->lk_count;
@@ -247,8 +253,13 @@ lockmgr_shared(struct lock *lkp, u_int flags)
 		 * Interlocked after the first loop.
 		 */
 		if (didloop) {
-			error = tsleep(lkp, pflags | PINTERLOCKED,
-				       lkp->lk_wmesg, timo);
+			if ((extflags & LK_SPIN) == 0) {
+			    error = tsleep(lkp, pflags | PINTERLOCKED,
+					   lkp->lk_wmesg, timo);
+			} else {
+			    cpu_pause();
+			    error = 0;
+			}
 			if (extflags & LK_SLEEPFAIL) {
 				undo_shreq(lkp);
 				error = ENOLCK;
@@ -268,7 +279,8 @@ lockmgr_shared(struct lock *lkp, u_int flags)
 		count = lkp->lk_count;
 		if (count & LKC_SHARED)
 			break;
-		tsleep_interlock(lkp, pflags);
+		if ((extflags & LK_SPIN) == 0)
+			tsleep_interlock(lkp, pflags);
 		count = atomic_fetchadd_64(&lkp->lk_count, 0);
 	}
 	if (error == 0)
@@ -366,7 +378,10 @@ lockmgr_exclusive(struct lock *lkp, u_int flags)
 			ncount = count | LKC_EXREQ2;
 		else
 			ncount = count | LKC_EXREQ;
-		tsleep_interlock(lkp, pflags);
+
+		if ((extflags & LK_SPIN) == 0)
+			tsleep_interlock(lkp, pflags);
+
 		if (atomic_fcmpset_64(&lkp->lk_count, &count, ncount)) {
 			/*
 			 * If we successfully transitioned to EXREQ we
@@ -378,8 +393,13 @@ lockmgr_exclusive(struct lock *lkp, u_int flags)
 				break;
 			}
 
-			error = tsleep(lkp, pflags | PINTERLOCKED,
-				       lkp->lk_wmesg, timo);
+			if ((extflags & LK_SPIN) == 0) {
+			    error = tsleep(lkp, pflags | PINTERLOCKED,
+					   lkp->lk_wmesg, timo);
+			} else {
+			    cpu_pause();
+			    error = 0;
+			}
 			count = lkp->lk_count;	/* relod */
 			cpu_ccfence();
 		}
@@ -437,7 +457,13 @@ lockmgr_exclusive(struct lock *lkp, u_int flags)
 		pflags = (extflags & LK_PCATCH) ? PCATCH : 0;
 		timo = (extflags & LK_TIMELOCK) ? lkp->lk_timo : 0;
 
-		error = tsleep(lkp, pflags | PINTERLOCKED, lkp->lk_wmesg, timo);
+		if ((extflags & LK_SPIN) == 0) {
+			error = tsleep(lkp, pflags | PINTERLOCKED,
+				       lkp->lk_wmesg, timo);
+		} else {
+			cpu_pause();
+			error = 0;
+		}
 #ifdef INVARIANTS
 		if (lock_test_mode > 0) {
 			--lock_test_mode;
@@ -482,7 +508,8 @@ lockmgr_exclusive(struct lock *lkp, u_int flags)
 			COUNT(td, 1);
 			break;
 		}
-		tsleep_interlock(lkp, pflags);
+		if ((extflags & LK_SPIN) == 0)
+			tsleep_interlock(lkp, pflags);
 		count = atomic_fetchadd_64(&lkp->lk_count, 0);
 	}
 	return error;
@@ -649,7 +676,8 @@ lockmgr_upgrade(struct lock *lkp, u_int flags)
 			 * upgrade and break to the next loop.
 			 */
 			pflags = (extflags & LK_PCATCH) ? PCATCH : 0;
-			tsleep_interlock(lkp, pflags);
+			if ((extflags & LK_SPIN) == 0)
+				tsleep_interlock(lkp, pflags);
 			ncount = (count - LKC_SCOUNT) | LKC_UPREQ;
 			if (atomic_fcmpset_64(&lkp->lk_count, &count, ncount)) {
 				count = ncount;
@@ -696,7 +724,13 @@ lockmgr_upgrade(struct lock *lkp, u_int flags)
 		pflags = (extflags & LK_PCATCH) ? PCATCH : 0;
 		timo = (extflags & LK_TIMELOCK) ? lkp->lk_timo : 0;
 
-		error = tsleep(lkp, pflags | PINTERLOCKED, lkp->lk_wmesg, timo);
+		if ((extflags & LK_SPIN) == 0) {
+			error = tsleep(lkp, pflags | PINTERLOCKED,
+				       lkp->lk_wmesg, timo);
+		} else {
+			cpu_pause();
+			error = 0;
+		}
 		if (extflags & LK_SLEEPFAIL) {
 			if (undo_upreq(lkp) == 0) {
 				lkp->lk_lockholder = LK_KERNTHREAD;
@@ -725,7 +759,8 @@ lockmgr_upgrade(struct lock *lkp, u_int flags)
 			lkp->lk_lockholder = td;
 			break;
 		}
-		tsleep_interlock(lkp, pflags);
+		if ((extflags & LK_SPIN) == 0)
+			tsleep_interlock(lkp, pflags);
 		count = atomic_fetchadd_64(&lkp->lk_count, 0);
 		/* retry */
 	}

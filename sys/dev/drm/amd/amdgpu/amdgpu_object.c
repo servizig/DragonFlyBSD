@@ -431,12 +431,51 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 	size_t acc_size;
 	int r;
 
+#if 1
 	page_align = roundup(bp->byte_align, PAGE_SIZE) >> PAGE_SHIFT;
 	if (bp->domain & (AMDGPU_GEM_DOMAIN_GDS | AMDGPU_GEM_DOMAIN_GWS |
 			  AMDGPU_GEM_DOMAIN_OA))
 		size <<= PAGE_SHIFT;
 	else
 		size = ALIGN(size, PAGE_SIZE);
+#endif
+
+#if 0	/* ZZZ linux patch, not consistent for GSD and GWS/OA vs DEFAULT */
+	/* Note that GDS/GWS/OA allocates 1 page per byte/resource. */
+	if (bp->domain & (AMDGPU_GEM_DOMAIN_GWS | AMDGPU_GEM_DOMAIN_OA)) {
+		/* GWS and OA don't need any alignment. */
+		page_align = bp->byte_align;
+		size <<= PAGE_SHIFT;
+		kprintf("GWS/OA: page_align %ld size %ld\n", page_align, size);
+	} else if (bp->domain & AMDGPU_GEM_DOMAIN_GDS) {
+		/* Both size and alignment must be a multiple of 4. */
+		page_align = ALIGN(bp->byte_align, 4);
+		size = ALIGN(size, 4) << PAGE_SHIFT;
+		kprintf("   GDS: page_align %ld size %ld\n", page_align, size);
+	} else {
+		/* Memory should be aligned at least to a page size. */
+		page_align = ALIGN(bp->byte_align, PAGE_SIZE) >> PAGE_SHIFT;
+		size = ALIGN(size, PAGE_SIZE);
+		kprintf("DEFALT: page_align %ld size %ld\n", page_align, size);
+	}
+#endif
+
+#if 1
+	/* ZZZ force alignment to fit the allocation size */
+	if (size > 2048 * 1024) {
+		unsigned long opa = page_align;
+		if (page_align == 0)
+			page_align = 1;
+		while (page_align * PAGE_SIZE < size) {
+			page_align <<= 1;
+			kprintf("ZZZ increase page_align from %ld to %ld\n",
+				opa, page_align);
+		}
+	}
+#endif
+
+	kprintf("amdgpu_bo_create: size=%ld pga=%ld (ba=%d)\n", /* ZZZ */
+		size, page_align, bp->byte_align);
 
 	if (!amdgpu_bo_validate_size(adev, size, bp->domain))
 		return -ENOMEM;

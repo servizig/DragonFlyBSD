@@ -196,14 +196,34 @@ void ttm_eu_fence_buffer_objects(struct ww_acquire_ctx *ticket,
 	driver = bdev->driver;
 	glob = bo->bdev->glob;
 
+	list_for_each_entry(entry, list, head) {
+		bo = entry->bo;
+		if (!list_empty(&bo->lru))
+			kprintf("a<%p>", bo);
+	}
+
 	lockmgr(&glob->lru_lock, LK_EXCLUSIVE);
 
 	list_for_each_entry(entry, list, head) {
 		bo = entry->bo;
+		if (!list_empty(&bo->lru)) {
+			struct ttm_validate_buffer *entry2;
+
+			kprintf("b<%p:%d>: ", bo, !!(bo->mem.placement & TTM_PL_FLAG_NO_EVICT));
+			list_for_each_entry(entry2, list, head) {
+				kprintf("%p[%d:%d] ", 
+					entry2->bo,
+					!list_empty(&entry2->bo->lru),
+					!!(entry2->bo->mem.placement & TTM_PL_FLAG_NO_EVICT)
+				);
+			}
+			kprintf("\n");
+		}
 		if (entry->shared)
 			reservation_object_add_shared_fence(bo->resv, fence);
 		else
 			reservation_object_add_excl_fence(bo->resv, fence);
+
 		ttm_bo_add_to_lru(bo);
 		reservation_object_unlock(bo->resv);
 	}

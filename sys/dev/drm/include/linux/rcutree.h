@@ -27,12 +27,7 @@
 #ifndef	_LINUX_RCUTREE_H_
 #define	_LINUX_RCUTREE_H_
 
-static inline void rcu_barrier(void) {}
-
-static inline void
-synchronize_rcu_expedited(void)
-{
-	cpu_mfence();
-}
+void rcu_barrier(void);
+void synchronize_rcu_expedited(void);
 
 #endif	/* _LINUX_RCUTREE_H_ */

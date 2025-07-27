@@ -34,6 +34,37 @@
 #include "amdgpu_gmc.h"
 #include "amdgpu_gem.h"
 
+#if 0
+static void amdgpu_cs_check_duplicates(struct amdgpu_cs_parser *p,
+					const char *str)
+{
+	struct amdgpu_bo_list_entry *e1;
+	struct amdgpu_bo_list_entry *e2;
+	int i;
+	int j;
+
+	if (list_empty(&p->validated))
+		return;
+
+	i = 0;
+	list_for_each_entry(e1, &p->validated, tv.head) {
+		struct amdgpu_bo *b1 = ttm_to_amdgpu_bo(e1->tv.bo);
+		j = 0;
+		list_for_each_entry(e2, &p->validated, tv.head) {
+			struct amdgpu_bo *b2 = ttm_to_amdgpu_bo(e2->tv.bo);
+
+			if (e1 == e2)
+				break;
+			if (b1 == b2) {
+				kprintf("conflicting entries %s amdgpu_bo=%p %d/%d\n", str, b1, j, i);
+			}
+			++j;
+		}
+		++i;
+	}
+}
+#endif
+
 static int amdgpu_cs_user_fence_chunk(struct amdgpu_cs_parser *p,
 				      struct drm_amdgpu_cs_chunk_fence *data,
 				      uint32_t *offset)
@@ -601,6 +632,7 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 	}
 
 	amdgpu_bo_list_get_list(p->bo_list, &p->validated);
+	//amdgpu_cs_check_duplicates(p, "J");
 	if (p->bo_list->first_userptr != p->bo_list->num_entries)
 		p->mn = amdgpu_mn_get(p->adev, AMDGPU_MN_TYPE_GFX);
 
@@ -790,9 +822,10 @@ static void amdgpu_cs_parser_fini(struct amdgpu_cs_parser *parser, int error,
 {
 	unsigned i;
 
-	if (error && backoff)
+	if (error && backoff) {
 		ttm_eu_backoff_reservation(&parser->ticket,
 					   &parser->validated);
+	}
 
 	for (i = 0; i < parser->num_post_dep_syncobjs; i++)
 		drm_syncobj_put(parser->post_dep_syncobjs[i]);

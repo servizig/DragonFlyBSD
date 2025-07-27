@@ -48,6 +48,32 @@
 
 #define TTM_BO_VM_NUM_PREFAULT 16
 
+static inline int
+cstate_to_memattr(int cstate)
+{
+        switch(cstate) {
+        case tt_cached:
+                return VM_MEMATTR_WRITE_BACK;
+        case tt_wc:
+                return VM_MEMATTR_WRITE_COMBINING;
+        case tt_uncached:
+                return VM_MEMATTR_UNCACHEABLE;
+        }
+        return VM_MEMATTR_WRITE_BACK;
+}
+
+static inline int
+place_to_memattr(int placement)
+{
+	if (placement & TTM_PL_FLAG_CACHED) 
+		return VM_MEMATTR_WRITE_BACK;
+	if (placement & TTM_PL_FLAG_WC) 
+		return VM_MEMATTR_WRITE_COMBINING;
+	if (placement & TTM_PL_FLAG_UNCACHED) 
+		return VM_MEMATTR_UNCACHEABLE;
+	return VM_MEMATTR_WRITE_BACK;
+}
+
 static int ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 				struct vm_fault *vmf)
 {
@@ -549,18 +575,25 @@ retry:
 	 * for reserve, and if it fails, retry the fault after waiting
 	 * for the buffer to become unreserved.
 	 */
+#if 1
+	/* use blocking, uninterruptable */
+	ret = ttm_bo_reserve(bo, false, false, NULL);	/* YYY */
+#else
 	ret = ttm_bo_reserve(bo, true, true, NULL);
+#endif
 	if (unlikely(ret != 0)) {
 		if (ret != -EBUSY) {
 			retval = VM_PAGER_ERROR;
 			goto out_unlock2;
 		}
 
-		if (vmf->flags & FAULT_FLAG_ALLOW_RETRY || 1) {
+		if ((vmf->flags & FAULT_FLAG_ALLOW_RETRY) || 1) {
 			if (!(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
+				ttm_bo_get(bo);
 				up_read(&vma->vm_mm->mmap_sem);
-				(void) ttm_bo_wait_unreserved(bo);
+				(void) ttm_bo_wait_unreserved(bo); /* YYY assumed uninterruptible */
 				down_read(&vma->vm_mm->mmap_sem);
+				ttm_bo_put(bo);
 			}
 
 #ifndef __DragonFly__
@@ -619,7 +652,11 @@ retry:
 		}
 	}
 
+#if 1
+	ret = ttm_mem_io_lock(man, false); /* YYY make uninterruptable */
+#else
 	ret = ttm_mem_io_lock(man, true);
+#endif
 	if (unlikely(ret != 0)) {
 		retval = VM_PAGER_ERROR;
 		goto out_unlock1;
@@ -666,7 +703,6 @@ retry:
 #ifdef __DragonFly__
 		m = vm_phys_fictitious_to_vm_page(bo->mem.bus.base +
 						  bo->mem.bus.offset + offset);
-		pmap_page_set_memattr(m, ttm_io_prot(bo->mem.placement, 0));
 #endif
 		cvma.vm_page_prot = ttm_io_prot(bo->mem.placement,
 						cvma.vm_page_prot);
@@ -692,9 +728,6 @@ retry:
 			retval = VM_PAGER_ERROR;
 			goto out_io_unlock1;
 		}
-		pmap_page_set_memattr(m,
-		    (bo->mem.placement & TTM_PL_FLAG_CACHED) ?
-		    VM_MEMATTR_WRITE_BACK : ttm_io_prot(bo->mem.placement, 0));
 	}
 
 	if (vm_page_busy_try(m, FALSE)) {
@@ -705,6 +738,14 @@ retry:
 		up_read(&vma->vm_mm->mmap_sem);
 		goto retry;
 	}
+
+#if 1
+	/* YYY set memattr according to BO, TTM might be NULL */
+	pmap_page_set_memattr(m, place_to_memattr(bo->mem.placement));
+#else
+	pmap_page_set_memattr(m, VM_MEMATTR_UNCACHEABLE);
+#endif
+//kprintf("PF: bo %p ttm %p vmo %p off %ld vm_page %p phys_addr 0x%lx\n", bo, ttm, vm_obj, offset, m, VM_PAGE_TO_PHYS(m));
 
 	/*
 	 * Return our fake page BUSYd.  Do not index it into the VM object.
@@ -794,7 +835,7 @@ ttm_bo_mmap_single(struct file *fp, struct drm_device *dev,
 	 * setup our own VM object and ignore what the linux code did other
 	 * then supplying us the 'bo'.
 	 */
-	ret = ttm_bo_mmap(fp, &vma, bdev);
+	ret = ttm_bo_mmap(NULL, &vma, bdev);
 
 	if (ret == 0) {
 		bo = vma.vm_private_data;
@@ -802,6 +843,7 @@ ttm_bo_mmap_single(struct file *fp, struct drm_device *dev,
 					     &ttm_pager_ops,
 					     size, nprot, 0,
 					     curthread->td_ucred);
+		vm_obj->memattr = VM_MEMATTR_WRITE_BACK;
 		if (vm_obj) {
 			*obj_res = vm_obj;
 			*offset = 0;		/* object-relative offset */

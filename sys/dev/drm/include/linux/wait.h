@@ -127,25 +127,18 @@ void finish_wait(wait_queue_head_t *q, wait_queue_entry_t *wait);
 		if (condition)						\
 			break;						\
 									\
-		tsleep_interlock(current, flags);			\
+		tsleep_interlock(&wq, flags);				\
 									\
-		if ((timeout_jiffies) != 0) {				\
-			ret = tsleep(current, PINTERLOCKED|flags, "lwe", timeout_jiffies);	\
-		} else {						\
-			ret = tsleep(current, PINTERLOCKED|flags, "lwe", hz);\
-			if (ret == EWOULDBLOCK) {			\
-				/*kprintf("F");*/			\
-				/*print_backtrace(-1);*/		\
-				ret = 0;				\
-			}						\
-		}							\
+		if (condition)						\
+			break;						\
+		ret = tsleep(&wq, PINTERLOCKED|flags, "lwe", timeout_jiffies);\
 									\
 		if (ret == EINTR || ret == ERESTART) {			\
 			interrupted = true;				\
 			break;						\
 		}							\
 		if (ret == EWOULDBLOCK) {				\
-			timeout_expired = true;				\
+			timeout_expired = true;			\
 			break;						\
 		}							\
 	}								\
@@ -165,7 +158,7 @@ void finish_wait(wait_queue_head_t *q, wait_queue_entry_t *wait);
 		retval = 1;						\
 									\
 	finish_wait(&wq, &tmp_wq);					\
-	retval;								\
+	retval;							\
 })
 
 #define wait_event(wq, condition)					\

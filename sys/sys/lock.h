@@ -167,8 +167,13 @@ struct lock {
  *
  * The first three flags may be set in lock_init to set their mode permanently,
  * or passed in as arguments to the lock manager.
+ *
+ * NOTE: LK_SPIN does not disable interrupts so if the lock is competing with
+ *	 an interrupt the caller should not use the lockmgr LK_SPIN mode.
+ *
+ * NOTE: LK_SPIN ignores timouts
  */
-#define LK_EXTFLG_MASK	0x070000F0	/* mask of external flags */
+#define LK_EXTFLG_MASK	0x0F0000F0	/* mask of external flags */
 #define LK_NOWAIT	0x00000010	/* do not sleep to await lock */
 #define LK_SLEEPFAIL	0x00000020	/* sleep, then return failure */
 #define LK_CANRECURSE	0x00000040	/* allow recursive exclusive lock */
@@ -176,6 +181,7 @@ struct lock {
 #define	LK_CANCELABLE	0x01000000	/* blocked caller can be canceled */
 #define LK_TIMELOCK	0x02000000
 #define LK_PCATCH	0x04000000	/* timelocked with signal catching */
+#define LK_SPIN		0x08000000	/* spin instead of sleep */
 
 /*
  * Control flags

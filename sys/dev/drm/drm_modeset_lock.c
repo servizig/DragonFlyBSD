@@ -271,7 +271,9 @@ static inline int modeset_lock(struct drm_modeset_lock *lock,
 		 * we will need to be able to drm_modeset_lock() things
 		 * without having to keep track of what is already locked
 		 * or not.
+		 * XXX but ww_mutex isn't recursive.  bad hack here for now
 		 */
+		ww_mutex_lock_recursive(&lock->mutex);
 		ret = 0;
 	} else if (ret == -EDEADLK) {
 		ctx->contended = lock;

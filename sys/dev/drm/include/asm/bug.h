@@ -75,6 +75,7 @@
 	if ((condition) && !__warned_once) {				\
 		WARN(condition, format);				\
 		__warned_once = true;					\
+		print_backtrace(-1);					\
 	}								\
 	unlikely(__ret);						\
 })

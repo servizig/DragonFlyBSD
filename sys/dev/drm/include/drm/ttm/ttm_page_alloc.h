@@ -32,6 +32,12 @@
 struct device;
 
 /**
+ * Set caching mode for an array of pages
+ */
+int ttm_set_pages_caching(struct page **pages,
+                enum ttm_caching_state cstate, unsigned cpages);
+
+/**
  * Initialize pool allocator.
  */
 int ttm_page_alloc_init(struct ttm_mem_global *glob, unsigned max_pages);

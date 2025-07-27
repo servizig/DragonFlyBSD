@@ -23,6 +23,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+ * See: https://www.kernel.org/doc/Documentation/RCU/whatisRCU.txt
+ */
 
 #ifndef _LINUX_RCUPDATE_H_
 #define _LINUX_RCUPDATE_H_
@@ -43,34 +46,63 @@
 
 #include <linux/rcutree.h>
 
+#include <sys/exislock.h>
+#include <sys/exislock2.h>
+
+#define RCU_WARN_ONCE(c, ...)   do {			\
+	WARN_ONCE((c), ##__VA_ARGS__);			\
+} while(0)
+
+#define __rcu_var_name(n, f, l)				\
+        __CONCAT(__CONCAT(__CONCAT(rcu_, n), _), __COUNTER__)
+
+#if 0
 static inline void
 rcu_read_lock(void)
 {
-	preempt_disable();
+    exis_hold();
 }
 
 static inline void
 rcu_read_unlock(void)
 {
-	preempt_enable();
+    exis_drop();
 }
+#endif
 
-#define rcu_dereference_protected(p, condition)	\
-	((typeof(*p) *)(p))
-
-#define rcu_dereference(p)					\
+#define __rcu_dereference_protected(p, c, n)			\
 ({								\
-	typeof(*(p)) *__rcu_dereference_tmp = READ_ONCE(p);	\
-	__rcu_dereference_tmp;					\
+    RCU_WARN_ONCE(!(c), "%s:%d: condition for %s failed\n",	\
+	__func__, __LINE__, __XSTRING(n));			\
+    rcu_dereference(p);						\
 })
+
+#define rcu_dereference_protected(p, c)			\
+    __rcu_dereference_protected((p), (c),		\
+    __rcu_var_name(protected, __func__, __LINE__))
+
+#define __rcu_dereference_check(p, c, n)				\
+({									\
+    __typeof(*p) *n = rcu_dereference(p);				\
+    RCU_WARN_ONCE(!(c), "%s:%d: condition for %s failed\n",		\
+        __func__, __LINE__, __XSTRING(n));				\
+    n;									\
+})
+
+#define rcu_dereference_check(p, c)					\
+    __rcu_dereference_check((p), (c) || rcu_read_lock_held(),		\
+        __rcu_var_name(check, __func__, __LINE__))
+
+#define rcu_dereference(p)                      \
+        ((__typeof(*p) *)READ_ONCE(p))
 
 #define rcu_dereference_raw(p)			\
 	((__typeof(*p) *)READ_ONCE(p))
 
-#define rcu_assign_pointer(p, v)	\
-do {					\
-	cpu_mfence();			\
-	WRITE_ONCE((p), (v));		\
+#define rcu_assign_pointer(p, v)				\
+do {								\
+	atomic_store_rel_ptr((volatile uintptr_t *)&(p),        \
+			     (uintptr_t)(v));			\
 } while (0)
 
 #define RCU_INIT_POINTER(p, v)		\
@@ -79,6 +111,8 @@ do {					\
 } while (0)
 
 extern void __kfree_rcu(void *ptr);
+extern void rcu_read_lock(void);
+extern void rcu_read_unlock(void);
 
 #define kfree_rcu(ptr, rcu_head)	\
 do {					\

@@ -382,11 +382,11 @@ atomic_intr_cond_exit(__atomic_intr_t *p, void (*func)(void *), void *arg)
 static __inline int
 atomic_cmpxchg_int(volatile u_int *_dst, u_int _old, u_int _new)
 {
-	u_int res = _old;
+	u_int res;
 
 	__asm __volatile(MPLOCKED "cmpxchgl %2,%1; " \
-			 : "+a" (res), "=m" (*_dst) \
-			 : "r" (_new), "m" (*_dst) \
+			 : "=a" (res), "+m" (*_dst) \
+			 : "r" (_new), "0" (_old) \
 			 : "memory");
 	return (res);
 }
@@ -683,7 +683,7 @@ atomic_testandclear_long(volatile u_long *p, u_long v)
 	return (res);
 }
 
-#define ATOMIC_STORE_LOAD(TYPE, LOP, SOP)		\
+#define ATOMIC_STORE_LOAD(TYPE, LOP, SOP, MOP)		\
 static __inline u_##TYPE				\
 atomic_load_acq_##TYPE(volatile u_##TYPE *p)		\
 {							\
@@ -699,6 +699,28 @@ atomic_load_acq_##TYPE(volatile u_##TYPE *p)		\
 }							\
 							\
 /*							\
+ * LOCK cannot be used with MOV, but XCHG cannot be	\
+ * if implementing a write to memory-mapped I/O.  Use	\
+ * a regular memmory move with a compiler barrier	\
+ * and MFENCE before and after				\ 
+ */							\
+static __inline	u_##TYPE				\
+atomic_read_##TYPE(volatile u_##TYPE *p)		\
+{							\
+	u_##TYPE res; /* accumulator can be anything */	\
+							\
+	__asm __volatile("mfence" : : : "memory");	\
+	__asm __volatile(MOP				\
+	: "=a" (res),			/* 0 */		\
+	  "=m" (*p)			/* 1 */		\
+	: "m" (*p)			/* 2 */		\
+	: "memory");					\
+	__asm __volatile("mfence" : : : "memory");	\
+							\
+	return (res);					\
+}							\
+							\
+/*							\
  * The XCHG instruction asserts LOCK automagically.	\
  */							\
 static __inline void					\
@@ -707,14 +729,34 @@ atomic_store_rel_##TYPE(volatile u_##TYPE *p, u_##TYPE v)\
 	__asm __volatile(SOP				\
 	: "=m" (*p),			/* 0 */		\
 	  "+r" (v)			/* 1 */		\
-	: "m" (*p));			/* 2 */		\
+	: "m" (*p)			/* 2 */		\
+	: "memory");					\
+}							\
+							\
+/*							\
+ * LOCK cannot be used with MOV, but XCHG cannot be	\
+ * if implementing a write to memory-mapped I/O.  Use	\
+ * a regular memmory move with a compiler barrier	\
+ * and MFENCE before and after				\ 
+ */							\
+							\
+static __inline void					\
+atomic_write_##TYPE(volatile u_##TYPE *p, u_##TYPE v)	\
+{							\
+	__asm __volatile("mfence" : : : "memory");	\
+	__asm __volatile(MOP				\
+	: "=m" (*p),			/* 0 */		\
+	  "+r" (v)			/* 1 */		\
+	: "m" (*p)			/* 2 */		\
+	: "memory");					\
+	__asm __volatile("mfence" : : : "memory");	\
 }							\
 struct __hack
 
-ATOMIC_STORE_LOAD(char, "cmpxchgb %b0,%1", "xchgb %b1,%0");
-ATOMIC_STORE_LOAD(short,"cmpxchgw %w0,%1", "xchgw %w1,%0");
-ATOMIC_STORE_LOAD(int,  "cmpxchgl %0,%1",  "xchgl %1,%0");
-ATOMIC_STORE_LOAD(long, "cmpxchgq %0,%1",  "xchgq %1,%0");
+ATOMIC_STORE_LOAD(char, "cmpxchgb %b0,%1", "xchgb %b1,%0", "movb %b1,%0");
+ATOMIC_STORE_LOAD(short,"cmpxchgw %w0,%1", "xchgw %w1,%0", "movw %w1,%0");
+ATOMIC_STORE_LOAD(int,  "cmpxchgl %0,%1",  "xchgl %1,%0", "movl %1,%0");
+ATOMIC_STORE_LOAD(long, "cmpxchgq %0,%1",  "xchgq %1,%0", "movq %1,%0");
 
 #undef ATOMIC_ASM
 #undef ATOMIC_STORE_LOAD
@@ -768,6 +810,8 @@ ATOMIC_STORE_LOAD(long, "cmpxchgq %0,%1",  "xchgq %1,%0");
 #define	atomic_load_acq_cpumask		atomic_load_acq_long
 
 /* Operations on 8-bit bytes. */
+#define	atomic_read_8		atomic_read_char
+#define atomic_write_8		atomic_write_char
 #define	atomic_set_8		atomic_set_char
 #define	atomic_set_acq_8	atomic_set_acq_char
 #define	atomic_set_rel_8	atomic_set_rel_char
@@ -785,6 +829,8 @@ ATOMIC_STORE_LOAD(long, "cmpxchgq %0,%1",  "xchgq %1,%0");
 #define	atomic_fcmpset_8	atomic_fcmpset_char
 
 /* Operations on 16-bit words. */
+#define	atomic_read_16		atomic_read_short
+#define atomic_write_16		atomic_write_short
 #define	atomic_set_16		atomic_set_short
 #define	atomic_set_acq_16	atomic_set_acq_short
 #define	atomic_set_rel_16	atomic_set_rel_short
@@ -802,6 +848,8 @@ ATOMIC_STORE_LOAD(long, "cmpxchgq %0,%1",  "xchgq %1,%0");
 #define	atomic_fcmpset_16	atomic_fcmpset_short
 
 /* Operations on 32-bit double words. */
+#define	atomic_read_32		atomic_read_int
+#define atomic_write_32		atomic_write_int
 #define	atomic_set_32		atomic_set_int
 #define	atomic_set_acq_32	atomic_set_acq_int
 #define	atomic_set_rel_32	atomic_set_rel_int
@@ -824,6 +872,8 @@ ATOMIC_STORE_LOAD(long, "cmpxchgq %0,%1",  "xchgq %1,%0");
 #define	atomic_fetchadd_32	atomic_fetchadd_int
 
 /* Operations on 64-bit quad words. */
+#define	atomic_read_64		atomic_read_long
+#define atomic_write_64		atomic_write_long
 #define	atomic_load_acq_64	atomic_load_acq_long
 #define	atomic_store_rel_64	atomic_store_rel_long
 #define	atomic_swap_64		atomic_swap_long
@@ -863,6 +913,8 @@ ATOMIC_STORE_LOAD(long, "cmpxchgq %0,%1",  "xchgq %1,%0");
 	atomic_load_acq_long((volatile u_long *)(p))
 #define atomic_store_rel_ptr(p, v) \
 	atomic_store_rel_long((volatile u_long *)(p), (v))
+#define atomic_write_ptr(p, v) \
+	atomic_write_long((volatile u_long *)(p), (v))
 #define atomic_cmpset_ptr(dst, old, new) 				\
 	atomic_cmpset_long((volatile u_long *)(dst), (u_long)(old),	\
 				(u_long)(new))

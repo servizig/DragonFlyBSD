@@ -1616,8 +1616,15 @@ static int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
 				    &dm_atomic_state_funcs);
 
 	r = amdgpu_display_modeset_create_props(adev);
-	if (r)
+	if (r) {
+		/*
+		 * YYY memory leak fix from
+		 * e035803797473c90052244dcf8eaec455f0c884f (but nothing else)
+		 */
+		dc_release_state(state->context);
+		kfree(state);
 		return r;
+	}
 
 	return 0;
 }

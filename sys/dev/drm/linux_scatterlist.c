@@ -161,6 +161,7 @@ sg_pcopy_from_buffer(struct scatterlist *sgl, unsigned int nents,
 	struct page *page;
 	char *vaddr;
 
+	kprintf("sg_pcopy_from_buffer\n");
 	off = 0;
 	for_each_sg_page(sgl, &iter, nents, 0) {
 		sg = iter.sg;
@@ -177,10 +178,10 @@ sg_pcopy_from_buffer(struct scatterlist *sgl, unsigned int nents,
 		}
 		len = min(curlen, buflen - off);
 		page = sg_page_iter_page(&iter);
-		vaddr = (char *)kmap(page) + sg->offset;
+		vaddr = (char *)kmap_atomic_quick(page, pgprot_writecombine(0)) + sg->offset;
 		memcpy(vaddr, (const char *)buf + off, len);
 		off += len;
-		kunmap(page);
+		kunmap_atomic_quick();
 	}
 
 	return (off);
@@ -213,10 +214,10 @@ sg_pcopy_to_buffer(struct scatterlist *sgl, unsigned int nents,
 		}
 		len = min(curlen, buflen - off);
 		page = sg_page_iter_page(&iter);
-		vaddr = (char *)kmap(page) + sg->offset;
+		vaddr = (char *)kmap_atomic_quick(page, pgprot_writecombine(0)) + sg->offset;
 		memcpy((char *)buf + off, vaddr, len);
 		off += len;
-		kunmap(page);
+		kunmap_atomic_quick();
 	}
 
 	return (off);

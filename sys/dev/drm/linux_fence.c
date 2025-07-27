@@ -72,7 +72,7 @@ dma_fence_context_alloc(unsigned num)
 
 struct default_wait_cb {
 	struct dma_fence_cb base;
-	struct task_struct *task;
+	void *wake_id;
 };
 
 static void
@@ -81,14 +81,15 @@ dma_fence_default_wait_cb(struct dma_fence *fence, struct dma_fence_cb *cb)
 	struct default_wait_cb *wait =
 		container_of(cb, struct default_wait_cb, base);
 
-	wake_up_process(wait->task);
+	//wake_up_process(wait->task);
+	wakeup(wait->wake_id);
 }
 
 long
 dma_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 {
 	long ret = timeout ? timeout : 1;
-	unsigned long end;
+	int wake_id = 0;
 	int err;
 	struct default_wait_cb cb;
 	bool was_set;
@@ -118,33 +119,27 @@ dma_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 	}
 
 	cb.base.func = dma_fence_default_wait_cb;
-	cb.task = current;
+	cb.wake_id = &wake_id;
 	list_add(&cb.base.node, &fence->cb_list);
 
-	end = jiffies + timeout;
-	for (ret = timeout; ret > 0; ret = MAX(0, end - jiffies)) {
-		if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
-			break;
-		}
-		if (intr) {
-			__set_current_state(TASK_INTERRUPTIBLE);
-		}
-		else {
-			__set_current_state(TASK_UNINTERRUPTIBLE);
-		}
-		crit_exit();
-		/* wake_up_process() directly uses task_struct pointers as sleep identifiers */
-		err = lksleep(current, fence->lock, intr ? PCATCH : 0, "dmafence", ret);
-		crit_enter();
+	tsleep_interlock(&wake_id, (intr ? PCATCH : 0));
+	while (!test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
+		/* can sleep with a crit section held */
+		err = lksleep(&wake_id, fence->lock,
+			      (intr ? PCATCH : 0) | PINTERLOCKED,
+			      "dmafence", timeout);
 		if (err == EINTR || err == ERESTART) {
 			ret = -ERESTARTSYS;
 			break;
+		} else if (err == EWOULDBLOCK) {
+			ret = 0;
+			break;
 		}
+		tsleep_interlock(&wake_id, (intr ? PCATCH : 0));
 	}
 
 	if (!list_empty(&cb.base.node))
 		list_del(&cb.base.node);
-	__set_current_state(TASK_RUNNING);
 out:
 	crit_exit();
 	lockmgr(fence->lock, LK_RELEASE);
@@ -153,7 +148,7 @@ out:
 
 static bool
 dma_fence_test_signaled_any(struct dma_fence **fences, uint32_t count,
-    uint32_t *idx)
+			    uint32_t *idx)
 {
 	int i;
 
@@ -170,10 +165,11 @@ dma_fence_test_signaled_any(struct dma_fence **fences, uint32_t count,
 
 long
 dma_fence_wait_any_timeout(struct dma_fence **fences, uint32_t count,
-    bool intr, long timeout, uint32_t *idx)
+			   bool intr, long timeout, uint32_t *idx)
 {
 	struct default_wait_cb *cb;
 	long ret = timeout;
+	int wake_id = 0;
 	unsigned long end;
 	int i, err;
 
@@ -194,9 +190,10 @@ dma_fence_wait_any_timeout(struct dma_fence **fences, uint32_t count,
 
 	for (i = 0; i < count; i++) {
 		struct dma_fence *fence = fences[i];
-		cb[i].task = current;
+		cb[i].wake_id = &wake_id;
 		if (dma_fence_add_callback(fence, &cb[i].base,
-		    dma_fence_default_wait_cb)) {
+					   dma_fence_default_wait_cb))
+	        {
 			if (idx)
 				*idx = i;
 			goto cb_cleanup;
@@ -205,9 +202,11 @@ dma_fence_wait_any_timeout(struct dma_fence **fences, uint32_t count,
 
 	end = jiffies + timeout;
 	for (ret = timeout; ret > 0; ret = MAX(0, end - jiffies)) {
+		tsleep_interlock(&wake_id, (intr ? PCATCH : 0));
 		if (dma_fence_test_signaled_any(fences, count, idx))
 			break;
-		err = tsleep(current, intr ? PCATCH : 0, "dfwat", ret);
+		err = tsleep(&wake_id, (intr ? PCATCH : 0) | PINTERLOCKED,
+			     "dfwat", ret);
 		if (err == EINTR || err == ERESTART) {
 			ret = -ERESTARTSYS;
 			break;
@@ -218,12 +217,34 @@ cb_cleanup:
 	while (i-- > 0)
 		dma_fence_remove_callback(fences[i], &cb[i].base);
 	kfree(cb);
+
 	return ret;
 }
 
 int
 dma_fence_signal_locked(struct dma_fence *fence)
 {
+#if 1
+	struct dma_fence_cb *cur, *tmp;
+	int ret = 0;
+
+	if (fence == NULL)
+		return -EINVAL;
+
+	if (test_and_set_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
+		ret = -EINVAL;
+	} else {
+		fence->timestamp = ktime_get();
+		set_bit(DMA_FENCE_FLAG_TIMESTAMP_BIT, &fence->flags);
+	}
+
+	list_for_each_entry_safe(cur, tmp, &fence->cb_list, node) {
+		INIT_LIST_HEAD(&cur->node);
+		cur->func(fence, cur);
+	}
+
+	return ret;
+#else
 	struct dma_fence_cb *cur, *tmp;
 	struct list_head cb_list;
 
@@ -244,11 +265,35 @@ dma_fence_signal_locked(struct dma_fence *fence)
 	}
 
 	return 0;
+#endif
 }
 
 int
 dma_fence_signal(struct dma_fence *fence)
 {
+#if 1
+	struct dma_fence_cb *cur, *tmp;
+
+	if (fence == NULL)
+		return -EINVAL;
+
+	if (test_and_set_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
+		return  -EINVAL;
+	}
+
+	fence->timestamp = ktime_get();
+	set_bit(DMA_FENCE_FLAG_TIMESTAMP_BIT, &fence->flags);
+
+	if (test_bit(DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT, &fence->flags)) {
+		lockmgr(fence->lock, LK_EXCLUSIVE);
+		list_for_each_entry_safe(cur, tmp, &fence->cb_list, node) {
+			INIT_LIST_HEAD(&cur->node);
+			cur->func(fence, cur);
+		}
+		lockmgr(fence->lock, LK_RELEASE);
+	}
+	return 0;
+#else
 	int r;
 
 	if (fence == NULL)
@@ -261,6 +306,7 @@ dma_fence_signal(struct dma_fence *fence)
 	crit_exit();
 
 	return r;
+#endif
 }
 
 void
@@ -269,12 +315,12 @@ dma_fence_enable_sw_signaling(struct dma_fence *fence)
 	if (!test_and_set_bit(DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT, &fence->flags) &&
 	    !test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags) &&
 	    fence->ops->enable_signaling) {
-		crit_enter();
+		//crit_enter();
 		lockmgr(fence->lock, LK_EXCLUSIVE);
 		if (!fence->ops->enable_signaling(fence))
 			dma_fence_signal_locked(fence);
 		lockmgr(fence->lock, LK_RELEASE);
-		crit_exit();
+		//crit_exit();
 	}
 }
 

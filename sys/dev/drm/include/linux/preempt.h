@@ -29,10 +29,21 @@
 
 #include <linux/linkage.h>
 #include <linux/list.h>
+#include <sys/thread.h>
+#include <sys/thread2.h>
+#include <machine/thread.h>
 
+#if 1
+#define preempt_disable()		crit_enter();
+#define preempt_enable()		crit_exit();
+#else
 #define preempt_disable()		cpu_ccfence()
-
 #define preempt_enable()		cpu_ccfence()
+#endif
+
+#define in_interrupt()	((curthread->td_flags & TDF_INTTHREAD) || \
+			 IN_CRITICAL_SECT(curthread) ||	\
+			 mycpu->gd_intr_nesting_level)
 
 #define in_atomic()	(curthread->td_flags & TDF_NOFAULT)
 

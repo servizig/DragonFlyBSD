@@ -517,6 +517,8 @@ static int gmc_v9_0_set_pte_pde(struct amdgpu_device *adev, void *cpu_pt_addr,
 	value = addr & 0x0000FFFFFFFFF000ULL;
 	value |= flags;
 	writeq(value, ptr + (gpu_page_idx * 8));
+	//mb(); /* ZZZ */
+	//gmc_v9_0_flush_gpu_tlb(adev, 0); /* ZZZ */
 	return 0;
 }
 
@@ -871,6 +873,7 @@ static int gmc_v9_0_gart_init(struct amdgpu_device *adev)
 	r = amdgpu_gart_init(adev);
 	if (r)
 		return r;
+	kprintf("gmc_v9_0_gart_init\n");
 	adev->gart.table_size = adev->gart.num_gpu_pages * 8;
 	adev->gart.gart_pte_flags = AMDGPU_PTE_MTYPE(MTYPE_UC) |
 				 AMDGPU_PTE_EXECUTABLE;

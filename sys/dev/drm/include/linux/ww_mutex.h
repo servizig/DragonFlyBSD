@@ -82,6 +82,7 @@ extern int ww_mutex_lock_interruptible(struct ww_mutex *ww,
 			struct ww_acquire_ctx *ctx);
 extern int ww_mutex_lock_slow_interruptible(struct ww_mutex *ww,
 			struct ww_acquire_ctx *ctx);
+extern int ww_mutex_lock_recursive(struct ww_mutex *ww);
 extern void ww_mutex_unlock(struct ww_mutex *ww);
 extern void ww_mutex_destroy(struct ww_mutex *ww);
 
@@ -102,6 +103,8 @@ ww_mutex_is_locked(struct ww_mutex *ww)
 static inline int
 ww_mutex_trylock(struct ww_mutex *ww)
 {
+	if (lockstatus(&ww->base, NULL) == LK_EXCLUSIVE)
+		return 0;
 	return (lockmgr(&ww->base, LK_EXCLUSIVE|LK_NOWAIT) == 0);
 }
 

@@ -962,6 +962,7 @@ static int gmc_v8_0_gart_init(struct amdgpu_device *adev)
 	r = amdgpu_gart_init(adev);
 	if (r)
 		return r;
+	kprintf("gmc_v8_0_gart_init\n");
 	adev->gart.table_size = adev->gart.num_gpu_pages * 8;
 	adev->gart.gart_pte_flags = AMDGPU_PTE_EXECUTABLE;
 	return amdgpu_gart_table_vram_alloc(adev);

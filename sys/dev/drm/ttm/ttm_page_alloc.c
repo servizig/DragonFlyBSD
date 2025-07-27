@@ -55,6 +55,8 @@
 #include <drm/ttm/ttm_page_alloc.h>
 #include <drm/ttm/ttm_set_memory.h>
 
+#include <drm/drm_cache.h>
+
 #define NUM_PAGES_TO_ALLOC		(PAGE_SIZE/sizeof(struct page *))
 #define SMALL_ALLOCATION		16
 #define FREE_ALL_PAGES			(~0U)
@@ -453,10 +455,11 @@ static void ttm_pool_mm_shrink_fini(struct ttm_pool_manager *manager)
 	EVENTHANDLER_DEREGISTER(vm_lowmem, manager->lowmem_handler);
 }
 
-static int ttm_set_pages_caching(struct page **pages,
+int ttm_set_pages_caching(struct page **pages,
 		enum ttm_caching_state cstate, unsigned cpages)
 {
 	int r = 0;
+
 	/* Set page caching */
 	switch (cstate) {
 	case tt_uncached:
@@ -470,6 +473,9 @@ static int ttm_set_pages_caching(struct page **pages,
 			pr_err("Failed to set %d pages to wc!\n", cpages);
 		break;
 	default:
+		r = ttm_set_pages_array_wb(pages, cpages);
+		if (r)
+			pr_err("Failed to set %d pages to wb!\n", cpages);
 		break;
 	}
 	return r;
@@ -509,6 +515,7 @@ static int ttm_alloc_new_pages(struct pglist *pages, gfp_t gfp_flags,
 	unsigned npages = 1 << order;
 	unsigned max_cpages = min(count << order, (unsigned)NUM_PAGES_TO_ALLOC);
 
+//kprintf("alloc_new_pages: cstate %d count %u order %u npages %u max_cpages %u\n", cstate, count, order, npages, max_cpages);
 	/* allocate array for page caching change */
 	caching_array = kmalloc(max_cpages*sizeof(struct page *), M_DRM, M_WAITOK);
 
@@ -552,7 +559,7 @@ static int ttm_alloc_new_pages(struct pglist *pages, gfp_t gfp_flags,
 			if (cpages == max_cpages) {
 
 				r = ttm_set_pages_caching(caching_array,
-						cstate, cpages);
+							  cstate, cpages);
 				if (r) {
 					ttm_handle_caching_state_failure(pages,
 						ttm_flags, cstate,
@@ -670,6 +677,7 @@ static unsigned ttm_page_pool_get_pages(struct ttm_page_pool *pool,
 	count = 0;
 out:
 	spin_unlock_irqrestore(&pool->lock, irq_flags);
+
 	return count;
 }
 
@@ -754,6 +762,8 @@ static int ttm_get_pages(struct page **pages, unsigned npages, int flags,
 			}
 			pages[r] = (struct page *)p;
 		}
+		/* YYY pages from above may not have the correct caching mode */
+		ttm_set_pages_caching(pages, cstate, npages);
 		return 0;
 	}
 
@@ -768,12 +778,16 @@ static int ttm_get_pages(struct page **pages, unsigned npages, int flags,
 		pages[count++] = (struct page *)p;
 	}
 
+	/* YYY pages from above may not have the correct caching mode */
+	ttm_set_pages_caching(pages, cstate, count);
+
 	/* clear the pages coming from the pool if requested */
 	if (flags & TTM_PAGE_FLAG_ZERO_ALLOC) {
 		TAILQ_FOREACH(p, &plist, pageq) {
 			pmap_zero_page(VM_PAGE_TO_PHYS(p));
 		}
 	}
+	drm_clflush_pages(pages, count);
 
 	/* If pool didn't have enough pages allocate new one. */
 	if (npages > 0) {
@@ -899,6 +913,8 @@ int ttm_pool_populate(struct ttm_tt *ttm, struct ttm_operation_ctx *ctx)
 	if (ttm_check_under_lowerlimit(mem_glob, ttm->num_pages, ctx))
 		return -ENOMEM;
 
+	//kprintf("ttm_pool_populate: Get %ld pages cstate %d\n",
+	//	ttm->num_pages, ttm->caching_state);
 	ret = ttm_get_pages(ttm->pages, ttm->num_pages, ttm->page_flags,
 			    ttm->caching_state);
 	if (unlikely(ret != 0)) {
@@ -937,7 +953,10 @@ EXPORT_SYMBOL(ttm_pool_unpopulate);
 int ttm_populate_and_map_pages(struct device *dev, struct ttm_dma_tt *tt,
 					struct ttm_operation_ctx *ctx)
 {
-	unsigned i, j;
+	unsigned i;
+#if 0
+	unsigned j;
+#endif
 	int r;
 
 	r = ttm_pool_populate(&tt->ttm, ctx);
@@ -945,8 +964,9 @@ int ttm_populate_and_map_pages(struct device *dev, struct ttm_dma_tt *tt,
 		return r;
 
 	for (i = 0; i < tt->ttm.num_pages; ++i) {
-		struct page *p = tt->ttm.pages[i];
 		size_t num_pages = 1;
+#if 0
+		struct page *p = tt->ttm.pages[i];
 
 		for (j = i + 1; j < tt->ttm.num_pages; ++j) {
 			if (++p != tt->ttm.pages[j])
@@ -954,10 +974,14 @@ int ttm_populate_and_map_pages(struct device *dev, struct ttm_dma_tt *tt,
 
 			++num_pages;
 		}
+#endif
 
 		tt->dma_address[i] = dma_map_page(dev, tt->ttm.pages[i],
 						  0, num_pages * PAGE_SIZE,
 						  DMA_BIDIRECTIONAL);
+
+//kprintf("map_pages: ttm %p num_pages %ld dma_address[%d] 0x%lx\n", &tt->ttm, tt->ttm.num_pages, i, tt->dma_address[i]);
+#if 0
 		if (dma_mapping_error(dev, tt->dma_address[i])) {
 			while (i--) {
 				dma_unmap_page(dev, tt->dma_address[i],
@@ -972,7 +996,9 @@ int ttm_populate_and_map_pages(struct device *dev, struct ttm_dma_tt *tt,
 			tt->dma_address[i + 1] = tt->dma_address[i] + PAGE_SIZE;
 			++i;
 		}
+#endif
 	}
+//kprintf("map_pages: ttm %p num_pages %ld dma_address 0x%lx-0x%lx\n", &tt->ttm, tt->ttm.num_pages, tt->dma_address[0], tt->dma_address[tt->ttm.num_pages-1]);
 	return 0;
 }
 EXPORT_SYMBOL(ttm_populate_and_map_pages);

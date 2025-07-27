@@ -64,6 +64,7 @@ static inline void io_mapping_free(struct io_mapping *mapping)
 {
 	/* Default memory attribute is write-back */
 	pmap_mapdev_attr(mapping->base, mapping->size, VM_MEMATTR_WRITE_BACK);
+	//pmap_unmapdev(mapping->vaddr, mapping->size);
 	kfree(mapping);
 }
 

@@ -89,6 +89,17 @@ __wwlock(struct ww_mutex *ww, struct ww_acquire_ctx *ctx,
 		flags |= LK_PCATCH;
 
 	/*
+	 * Already held by calling thread (DRM really needs this to work
+	 * properly by returning -EALREADY)
+	 */
+	if (lockstatus(&ww->base, curthread) == LK_EXCLUSIVE) {
+		//kprintf("ww %p already locked\n", ww);
+		//print_backtrace(-1);
+		//tsleep(&flags, 0, "XXX", hz);
+		return -EALREADY;
+	}
+
+	/*
 	 * Normal mutex if ctx is NULL
 	 */
 	if (ctx == NULL) {
@@ -158,6 +169,14 @@ __wwlock(struct ww_mutex *ww, struct ww_acquire_ctx *ctx,
 		}
 		/* retry */
 	}
+}
+
+int
+ww_mutex_lock_recursive(struct ww_mutex *ww)
+{
+    lockmgr(&ww->base, LK_EXCLUSIVE | LK_CANRECURSE);
+
+    return 0;
 }
 
 int

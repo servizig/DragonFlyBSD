@@ -105,7 +105,7 @@ int amdgpu_vram_page_split = 512;
 int amdgpu_vm_update_mode = -1;
 int amdgpu_exp_hw_support = 0;
 int amdgpu_dc = -1;
-int amdgpu_sched_jobs = 32;
+int amdgpu_sched_jobs = 128;
 int amdgpu_sched_hw_submission = 2;
 uint amdgpu_pcie_gen_cap = 0;
 uint amdgpu_pcie_lane_cap = 0;
@@ -125,6 +125,7 @@ int amdgpu_job_hang_limit = 0;
 int amdgpu_lbpw = -1;
 int amdgpu_compute_multipipe = -1;
 int amdgpu_gpu_recovery = -1; /* auto */
+//int amdgpu_gpu_recovery = 1; /* try it */
 int amdgpu_emu_mode = 0;
 uint amdgpu_smu_memory_pool_size = 0;
 /* FBC (bit 0) disabled by default*/

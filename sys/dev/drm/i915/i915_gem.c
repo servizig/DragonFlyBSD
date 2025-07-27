@@ -318,6 +318,7 @@ static int i915_gem_object_get_pages_phys(struct drm_i915_gem_object *obj)
 		}
 
 		src = kmap_atomic(page);
+		drm_clflush_virt_range(src, PAGE_SIZE);
 		memcpy(vaddr, src, PAGE_SIZE);
 		drm_clflush_virt_range(vaddr, PAGE_SIZE);
 		kunmap_atomic(src);
@@ -410,8 +411,8 @@ i915_gem_object_put_pages_phys(struct drm_i915_gem_object *obj,
 				continue;
 
 			dst = kmap_atomic(page);
-			drm_clflush_virt_range(vaddr, PAGE_SIZE);
 			memcpy(dst, vaddr, PAGE_SIZE);
+			drm_clflush_virt_range(vaddr, PAGE_SIZE);
 			kunmap_atomic(dst);
 
 			set_page_dirty(page);

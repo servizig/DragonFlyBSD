@@ -38,6 +38,12 @@ lockdep_assert_held(struct lock *l)
 	KKASSERT(lockinuse(l));
 }
 
+static inline int
+lockdep_is_held(struct lock *l)
+{
+	return(lockstatus(l, curthread) == LK_EXCLUSIVE);
+}
+
 #define might_lock(lock) do { } while (0)
 
 struct lock_class_key {

@@ -1338,7 +1338,7 @@ static uint64_t amdgpu_vm_map_gart(const dma_addr_t *pages_addr, uint64_t addr)
 	result = pages_addr[addr >> PAGE_SHIFT];
 
 	/* in case cpu page size != gpu page size*/
-	result |= addr & (~PAGE_MASK);
+	result |= addr & (~LINUX_PAGE_MASK);
 
 	result &= 0xFFFFFFFFFFFFF000ULL;
 
@@ -3313,7 +3313,7 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 	if (!RB_EMPTY_ROOT(&vm->va.rb_root)) {
 		dev_err(adev->dev, "still active bo inside vm\n");
 	}
-#ifndef __DragonFly__
+#if 1
 	rbtree_postorder_for_each_entry_safe(mapping, tmp,
 					     &vm->va.rb_root, rb) {
 #else
@@ -3513,7 +3513,6 @@ void amdgpu_vm_get_task_info(struct amdgpu_device *adev, unsigned int pasid,
  */
 void amdgpu_vm_set_task_info(struct amdgpu_vm *vm)
 {
-	kprintf("amdgpu_vm_set_task_info: not implemented\n");
 #if 0
 	if (!vm->task_info.pid) {
 		vm->task_info.pid = current->pid;

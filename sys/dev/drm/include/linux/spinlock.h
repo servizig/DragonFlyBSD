@@ -56,14 +56,14 @@
 static inline void spin_lock_irq(spinlock_t *lock)
 {
 	local_irq_disable();
-	lockmgr(lock, LK_EXCLUSIVE);
+	lockmgr(lock, LK_EXCLUSIVE | LK_SPIN);
 }
 
 static inline int spin_trylock_irq(spinlock_t *lock)
 {
 	local_irq_disable();
 	preempt_disable();
-	return lockmgr_try(lock, LK_EXCLUSIVE);
+	return lockmgr_try(lock, LK_EXCLUSIVE | LK_SPIN);
 }
 
 static inline void spin_unlock_irq(spinlock_t *lock)
@@ -75,7 +75,7 @@ static inline void spin_unlock_irq(spinlock_t *lock)
 #define spin_lock_irqsave(lock, flags)  \
 ({                                      \
         local_irq_save(flags);          \
-        lockmgr(lock, LK_EXCLUSIVE);    \
+        lockmgr(lock, LK_EXCLUSIVE | LK_SPIN);    \
 })
 
 static inline void
@@ -86,21 +86,22 @@ spin_unlock_irqrestore(spinlock_t *lock, unsigned long flags)
 }
 
 /*
-  XXX: the spin_lock_bh() and spin_unlock_bh() functions are possibly incorrect
-  XXX: see also in_interrupt()
-*/
+ * In linux, the spin*_bh() functions disable softirqs but not hard
+ * interrupts.  In DragonFly, softirqs cannot interrupt kernel code
+ * anyway.
+ */
 static inline void
 spin_lock_bh(struct lock *lock)
 {
-	crit_enter();
-	lockmgr(lock, LK_EXCLUSIVE);
+	//crit_enter();
+	lockmgr(lock, LK_EXCLUSIVE | LK_SPIN);
 }
 
 static inline void
 spin_unlock_bh(struct lock *lock)
 {
 	lockmgr(lock, LK_RELEASE);
-	crit_exit();
+	//crit_exit();
 }
 
 #define DEFINE_SPINLOCK(x)	struct lock x = LOCK_INITIALIZER("ds##x", 0, 0)

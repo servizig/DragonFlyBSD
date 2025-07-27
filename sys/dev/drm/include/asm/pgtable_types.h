@@ -54,7 +54,7 @@
 static inline pgprot_t
 pgprot_writecombine(pgprot_t prot)
 {
-	return (prot | VM_MEMATTR_WRITE_COMBINING);
+	return (prot | _PAGE_PAT | _PAGE_PCD);
 }
 
 #define __pgprot(value)	((pgprot_t) {(value)})

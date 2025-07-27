@@ -788,7 +788,11 @@ static inline void ttm_bo_unreserve(struct ttm_buffer_object *bo)
 {
 	if (!(bo->mem.placement & TTM_PL_FLAG_NO_EVICT)) {
 		lockmgr(&bo->bdev->glob->lru_lock, LK_EXCLUSIVE);
-		ttm_bo_add_to_lru(bo);
+		if (!(bo->mem.placement & TTM_PL_FLAG_NO_EVICT)) {
+			ttm_bo_add_to_lru(bo);
+		} else {
+			kprintf("ttm_bo_unreserve: FLAG_NO_EVICT race\n");
+		}
 		lockmgr(&bo->bdev->glob->lru_lock, LK_RELEASE);
 	}
 	__ttm_bo_unreserve(bo);

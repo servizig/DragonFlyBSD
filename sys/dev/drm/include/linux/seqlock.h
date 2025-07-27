@@ -70,14 +70,14 @@ static inline void
 write_seqlock(seqlock_t *sl)
 {
 	spin_lock(&sl->lock);
-	sl->sequence++;
+	atomic_add_int(&sl->sequence, 1);
 	cpu_sfence();
 }
 
 static inline void
 write_sequnlock(seqlock_t *sl)
 {
-	sl->sequence--;
+	atomic_add_int(&sl->sequence, 1);
 	spin_unlock(&sl->lock);
 	cpu_sfence();
 }
@@ -121,6 +121,7 @@ __read_seqcount_begin(const seqcount_t *s)
 		if ((ret & 1) == 0)
 			break;
 		cpu_pause();
+		cpu_lfence();
 	} while (1);
 
 	return ret;
@@ -151,14 +152,14 @@ read_seqcount_retry(const seqcount_t *s, unsigned start)
 
 static inline void write_seqcount_begin(seqcount_t *s)
 {
-	s->sequence++;
+	atomic_add_int(&s->sequence, 1);
 	cpu_ccfence();
 }
 
 static inline void write_seqcount_end(seqcount_t *s)
 {
 	cpu_ccfence();
-	s->sequence++;
+	atomic_add_int(&s->sequence, 1);
 }
 
 static inline unsigned int
@@ -174,17 +175,17 @@ raw_read_seqcount(const seqcount_t *s)
 static inline void
 write_seqlock_irqsave(seqlock_t *sl, unsigned long flags)
 {
-	local_irq_save(flags);
 	spin_lock(&sl->lock);
-	sl->sequence++;
+	local_irq_save(flags);
+	atomic_add_int(&sl->sequence, 1);
 }
 
 static inline void
 write_sequnlock_irqrestore(seqlock_t *sl, unsigned long flags)
 {
-	sl->sequence--;
-	spin_unlock(&sl->lock);
+	atomic_add_int(&sl->sequence, 1);
 	local_irq_restore(flags);
+	spin_unlock(&sl->lock);	
 }
 
 #endif	/* _LINUX_SEQLOCK_H_ */

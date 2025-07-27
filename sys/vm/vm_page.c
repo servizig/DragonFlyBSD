@@ -139,7 +139,7 @@ struct vpgqueues vm_page_queues[PQ_COUNT];
 
 static volatile int vm_pages_waiting;
 static struct alist vm_contig_alist;
-static struct almeta vm_contig_ameta[ALIST_RECORDS_65536];
+static struct almeta vm_contig_ameta[ALIST_RECORDS_1048576];
 static struct spinlock vm_contig_spin = SPINLOCK_INITIALIZER(&vm_contig_spin, "vm_contig_spin");
 
 __read_mostly static int vm_page_hash_vnode_only;
@@ -248,7 +248,7 @@ vm_add_new_page(vm_paddr_t pa, int *badcountp)
 	 * which we consider bugs... but don't crash).  Note that m->phys_addr
 	 * is pre-initialized, so use m->queue as a check.
 	 */
-	if (m->queue) {
+	if (m->flags & PG_ADDED) {
 		if (*badcountp < 10) {
 			kprintf("vm_add_new_page: duplicate pa %016jx\n",
 				(intmax_t)pa);
@@ -261,7 +261,7 @@ vm_add_new_page(vm_paddr_t pa, int *badcountp)
 	}
 
 	m->phys_addr = pa;
-	m->flags = 0;
+	m->flags = PG_ADDED;
 	m->pat_mode = PAT_WRITE_BACK;
 	m->pc = (pa >> PAGE_SHIFT);
 
@@ -292,20 +292,19 @@ vm_add_new_page(vm_paddr_t pa, int *badcountp)
 		m->wire_count = 1;
 		atomic_add_long(&vmstats.v_wire_count, 1);
 		alist_free(&vm_contig_alist, pa >> PAGE_SHIFT, 1);
-		return;
+	} else {
+		/*
+		 * General page
+		 */
+		m->queue = m->pc + PQ_FREE;
+		KKASSERT(m->dirty == 0);
+
+		atomic_add_long(&vmstats.v_page_count, 1);
+		atomic_add_long(&vmstats.v_free_count, 1);
+		vpq = &vm_page_queues[m->queue];
+		TAILQ_INSERT_HEAD(&vpq->pl, m, pageq);
+		++vpq->lcnt;
 	}
-
-	/*
-	 * General page
-	 */
-	m->queue = m->pc + PQ_FREE;
-	KKASSERT(m->dirty == 0);
-
-	atomic_add_long(&vmstats.v_page_count, 1);
-	atomic_add_long(&vmstats.v_free_count, 1);
-	vpq = &vm_page_queues[m->queue];
-	TAILQ_INSERT_HEAD(&vpq->pl, m, pageq);
-	++vpq->lcnt;
 }
 
 /*
@@ -423,7 +422,7 @@ vm_page_startup(void)
 	 *
 	 * By default, 128M is left in reserve on machines with 2G+ of ram.
 	 */
-	vm_low_phys_reserved = (vm_paddr_t)65536 << PAGE_SHIFT;
+	vm_low_phys_reserved = (vm_paddr_t)524288 << PAGE_SHIFT;
 	if (vm_low_phys_reserved > total / 4)
 		vm_low_phys_reserved = total / 4;
 	if (vm_dma_reserved == 0) {
@@ -432,8 +431,8 @@ vm_page_startup(void)
 			vm_dma_reserved = total / 16;
 	}
 #endif
-	alist_init(&vm_contig_alist, 65536, vm_contig_ameta,
-		   ALIST_RECORDS_65536);
+	alist_init(&vm_contig_alist, 1048576, vm_contig_ameta,
+		   ALIST_RECORDS_1048576);
 
 	/*
 	 * Initialize the mem entry structures now, and put them in the free
@@ -2860,6 +2859,7 @@ vm_page_free_contig(vm_page_t m, unsigned long size)
 	vm_paddr_t pa = VM_PAGE_TO_PHYS(m);
 	vm_pindex_t start = pa >> PAGE_SHIFT;
 	vm_pindex_t pages = (size + PAGE_MASK) >> PAGE_SHIFT;
+	vm_pindex_t i;
 
 	if (vm_contig_verbose) {
 		kprintf("vm_page_free_contig:  %016jx/%ldk\n",
@@ -2872,6 +2872,20 @@ vm_page_free_contig(vm_page_t m, unsigned long size)
 		KKASSERT(m->wire_count == 1);
 		KKASSERT(m->flags & PG_FICTITIOUS);
 		KKASSERT(pa + size <= vm_low_phys_reserved);
+		for (i = 0; i < pages; ++i) {
+			/*
+			 * Reset state to invalidate, not dirty, normal
+			 * cpu caching
+			 */
+			vm_page_t p = &m[i];
+
+			p->valid = 0;
+			vm_page_undirty(p);
+			if (p->pat_mode != PAT_WRITE_BACK) {
+				p->pat_mode = PAT_WRITE_BACK;
+				pmap_page_set_memattr(p, PAT_WRITE_BACK);
+			}
+		}
 		spin_lock(&vm_contig_spin);
 		alist_free(&vm_contig_alist, start, pages);
 		spin_unlock(&vm_contig_spin);
@@ -3189,8 +3203,15 @@ vm_page_free_toq(vm_page_t m)
 	vm_page_and_queue_spin_lock(m);
 	_vm_page_rem_queue_spinlocked(m);
 
+	/*
+	 * Reset state to invalidate, not dirty, normal cpu caching
+	 */
 	m->valid = 0;
 	vm_page_undirty(m);
+	if (m->pat_mode != PAT_WRITE_BACK) {
+		m->pat_mode = PAT_WRITE_BACK;
+		pmap_page_set_memattr(m, PAT_WRITE_BACK);
+	}
 
 	if (m->wire_count != 0) {
 		if (m->wire_count > 1) {

@@ -49,6 +49,7 @@ static int	   drm_name_info DRM_SYSCTL_HANDLER_ARGS;
 static int	   drm_vm_info DRM_SYSCTL_HANDLER_ARGS;
 static int	   drm_clients_info DRM_SYSCTL_HANDLER_ARGS;
 static int	   drm_bufs_info DRM_SYSCTL_HANDLER_ARGS;
+static int	   drm_busid_info DRM_SYSCTL_HANDLER_ARGS;
 
 struct drm_sysctl_list {
 	const char *name;
@@ -58,6 +59,7 @@ struct drm_sysctl_list {
 	{"vm",	    drm_vm_info},
 	{"clients", drm_clients_info},
 	{"bufs",    drm_bufs_info},
+	{"busid",   drm_busid_info},
 };
 #define DRM_SYSCTL_ENTRIES NELEM(drm_sysctl_list)
 
@@ -296,5 +298,27 @@ static int drm_clients_info DRM_SYSCTL_HANDLER_ARGS
 	SYSCTL_OUT(req, "", 1);
 done:
 	kfree(tempprivs);
+	return retcode;
+}
+
+static int drm_busid_info DRM_SYSCTL_HANDLER_ARGS
+{
+	struct drm_device *dev = arg1;
+	char buf[128];
+	device_t bsddev;
+	int domain, bus, slot, func;
+	int retcode = 0;
+
+	bsddev = dev->dev->bsddev;
+	domain = pci_get_domain(bsddev);
+	bus    = pci_get_bus(bsddev);
+	slot   = pci_get_slot(bsddev);
+	func   = pci_get_function(bsddev);
+
+	DRM_SYSCTL_PRINT("pci:%04x:%02x:%02x.%d", domain, bus, slot, func);
+
+	SYSCTL_OUT(req, "", 1);
+
+done:
 	return retcode;
 }

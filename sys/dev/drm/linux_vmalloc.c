@@ -31,6 +31,8 @@
 #include <linux/slab.h>
 #include <linux/mm.h>
 
+#include <drm/ttm/ttm_placement.h>
+
 struct vmap {
 	void *addr;
 	int npages;
@@ -41,7 +43,26 @@ struct lock vmap_lock = LOCK_INITIALIZER("dlvml", 0, LK_CANRECURSE);
 
 SLIST_HEAD(vmap_list_head, vmap) vmap_list = SLIST_HEAD_INITIALIZER(vmap_list);
 
-/* vmap: map an array of pages into virtually contiguous space */
+#if 0
+static inline int
+place_to_memattr(int placement)
+{
+        if (placement & TTM_PL_FLAG_CACHED)
+                return VM_MEMATTR_WRITE_BACK;
+        if (placement & TTM_PL_FLAG_WC)
+                return VM_MEMATTR_WRITE_COMBINING;
+        if (placement & TTM_PL_FLAG_UNCACHED)
+                return VM_MEMATTR_UNCACHEABLE;
+        return VM_MEMATTR_WRITE_BACK;
+}
+#endif
+
+/*
+ * vmap: map an array of pages into virtually contiguous space
+ *
+ * Passed protection bits may be different from inherent page bits.
+ * prot is passed as linux _PAGE_* flags.
+ */
 void *
 vmap(struct page **pages, unsigned int count,
 	unsigned long flags, pgprot_t prot)
@@ -60,7 +81,11 @@ vmap(struct page **pages, unsigned int count,
 
 	vmp->addr = (void *)off;
 	vmp->npages = count;
-	pmap_qenter(off, (struct vm_page **)pages, count);
+	pmap_qenter_memattr(off, (struct vm_page **)pages, count,
+			    //VM_MEMATTR_UNCACHEABLE);
+			    //place_to_memattr(prot)); /* YYY */
+			    pgflags_to_memattr(prot)); /* YYY */
+
 	lockmgr(&vmap_lock, LK_EXCLUSIVE);
 	SLIST_INSERT_HEAD(&vmap_list, vmp, vm_vmaps);
 	lockmgr(&vmap_lock, LK_RELEASE);
@@ -135,9 +160,6 @@ vfree(const void *addr)
 void *
 kvmalloc_array(size_t n, size_t size, gfp_t flags)
 {
-	if (n == 0)
-		return NULL;
-
 	if (n > SIZE_MAX / size)
 		return NULL;
 

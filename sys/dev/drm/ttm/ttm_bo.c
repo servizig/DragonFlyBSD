@@ -171,8 +171,10 @@ void ttm_bo_add_to_lru(struct ttm_buffer_object *bo)
 	if (!(bo->mem.placement & TTM_PL_FLAG_NO_EVICT)) {
 
 #ifdef __DragonFly__
-		if (WARN_ON(!list_empty(&bo->lru)))
+		if (WARN_ON(!list_empty(&bo->lru))) {
+			print_backtrace(-1);
 			return;
+		}
 #endif
 
 		man = &bdev->man[bo->mem.mem_type];
@@ -910,6 +912,7 @@ static int ttm_bo_mem_force_space(struct ttm_buffer_object *bo,
 			return ret;
 		if (mem->mm_node)
 			break;
+		kprintf("ttm_bo_force_space: ttm_mem_evict_first\n");
 		ret = ttm_mem_evict_first(bdev, mem_type, place, ctx);
 		if (unlikely(ret != 0))
 			return ret;
@@ -1404,6 +1407,7 @@ static int ttm_bo_force_list_clean(struct ttm_bo_device *bdev,
 	for (i = 0; i < TTM_MAX_BO_PRIORITY; ++i) {
 		while (!list_empty(&man->lru[i])) {
 			lockmgr(&glob->lru_lock, LK_RELEASE);
+			kprintf("ttm_bo_force_list_clean: ttm_mem_evict_first\n");
 			ret = ttm_mem_evict_first(bdev, mem_type, NULL, &ctx);
 			if (ret)
 				return ret;
@@ -1800,11 +1804,12 @@ int ttm_bo_swapout(struct ttm_bo_global *glob, struct ttm_operation_ctx *ctx)
 	ttm_bo_del_from_lru(bo);
 	lockmgr(&glob->lru_lock, LK_RELEASE);
 
-	/**
+	/*
 	 * Move to system cached
+	 *
+	 * Apply https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/?id=db9c1734ad69c0ba5e5e420ba31ebc1048976be6
 	 */
-
-	if (bo->mem.mem_type != TTM_PL_SYSTEM ||
+	if (bo->mem.mem_type != TTM_PL_SYSTEM ||	/* ZZZ */
 	    bo->ttm->caching_state != tt_cached) {
 		struct ttm_operation_ctx ctx = { false, false };
 		struct ttm_mem_reg evict_mem;
@@ -1812,6 +1817,7 @@ int ttm_bo_swapout(struct ttm_bo_global *glob, struct ttm_operation_ctx *ctx)
 		evict_mem = bo->mem;
 		evict_mem.mm_node = NULL;
 		evict_mem.placement = TTM_PL_FLAG_SYSTEM | TTM_PL_FLAG_CACHED;
+		//evict_mem.placement = TTM_PL_MASK_CACHING; / *ZZZ */
 		evict_mem.mem_type = TTM_PL_SYSTEM;
 
 		ret = ttm_bo_handle_move_mem(bo, &evict_mem, true, &ctx);
@@ -1869,6 +1875,8 @@ EXPORT_SYMBOL(ttm_bo_swapout_all);
  * unreserved
  *
  * @bo: Pointer to buffer
+ *
+ * YYY - make it uninterruptable, called from ttm_bo_vm.c w/return value ignored
  */
 int ttm_bo_wait_unreserved(struct ttm_buffer_object *bo)
 {
@@ -1881,12 +1889,21 @@ int ttm_bo_wait_unreserved(struct ttm_buffer_object *bo)
 	 * bo::wu_mutex can go away if we change locking order to
 	 * mmap_sem -> bo::reserve.
 	 */
+#if 1
+	mutex_lock(&bo->wu_mutex);	/* YYY make uninterruptible */
+	ret = 0;
+#else
 	ret = mutex_lock_interruptible(&bo->wu_mutex);
+#endif
 	if (unlikely(ret != 0))
 		return -ERESTARTSYS;
 	if (!ww_mutex_is_locked(&bo->resv->lock))
 		goto out_unlock;
+#if 1
+	ret = reservation_object_lock(bo->resv, NULL);	/* YYY make uninterruptible */
+#else
 	ret = reservation_object_lock_interruptible(bo->resv, NULL);
+#endif
 	if (ret == -EINTR)
 		ret = -ERESTARTSYS;
 	if (unlikely(ret != 0))

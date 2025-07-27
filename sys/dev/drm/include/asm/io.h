@@ -35,46 +35,89 @@
 #include <linux/string.h>
 #include <linux/types.h>
 
+/*
+ * Generally use atomic_read*() and atomic_write*() for these operations.
+ * These functions are ordered with respect to both read and write and
+ * both before and after the MOV.  Probably vast overkill but...
+ */
+
 #undef readb
 static inline u8
 readb(const volatile void __iomem *addr)
 {
-	return *(const volatile u8*)addr;
+	return atomic_read_8(__DEQUALIFY(void *, addr));
+#if 0
+	u8 res;
+
+	res = *(const volatile u8*)addr;
+
+	return res;
+#endif
 }
 
 #undef readw
 static inline u16
 readw(const volatile void __iomem *addr)
 {
-	return *(const volatile u16*)addr;
+	return atomic_read_16(__DEQUALIFY(void *, addr));
+#if 0
+	u16 res;
+
+	res = *(const volatile u16*)addr;
+
+	return res;
+#endif
 }
 
 #undef readl
 static inline u32
 readl(const volatile void __iomem *addr)
 {
-	return *(const volatile u32*)addr;
+	return atomic_read_32(__DEQUALIFY(void *, addr));
+#if 0
+	u32 res;
+
+	res = *(const volatile u32*)addr;
+
+	return res;
+#endif
+}
+
+#undef readq
+static inline u64
+readq(const volatile void __iomem *addr)
+{
+	return atomic_read_64(__DEQUALIFY(void *, addr));
 }
 
 #undef writeb
 static inline void
 writeb(u8 value, volatile void __iomem *addr)
 {
+	atomic_write_8(addr, value);
+#if 0
 	*(volatile uint8_t *)addr = value;
+#endif
 }
 
 #undef writew
 static inline void
 writew(u16 value, volatile void __iomem *addr)
 {
+	atomic_write_16(addr, value);
+#if 0
 	*(volatile uint16_t *)addr = value;
+#endif
 }
 
 #undef writel
 static inline void
 writel(u32 value, volatile void __iomem *addr)
 {
+	atomic_write_32(addr, value);
+#if 0
 	*(volatile uint32_t *)addr = value;
+#endif
 }
 
 #define writel_relaxed(v, a)	writel(v, a)
@@ -83,9 +126,21 @@ writel(u32 value, volatile void __iomem *addr)
 static inline void
 writeq(u64 value, volatile void __iomem *addr)
 {
+	atomic_write_64(addr, value);
+#if 0
 	*(volatile uint64_t *)addr = value;
+#endif
 }
 
+#define ioread8(addr)		atomic_read_8(__DEQUALIFY(void *, addr))
+#define ioread16(addr)		atomic_read_16(__DEQUALIFY(void *, addr))
+#define ioread32(addr)		atomic_read_32(__DEQUALIFY(void *, addr))
+
+#define iowrite8(data, addr)	atomic_write_8(__DEQUALIFY(volatile void *, addr), data)
+#define iowrite16(data, addr)	atomic_write_16(__DEQUALIFY(volatile void *, addr), data)
+#define iowrite32(data, addr)	atomic_write_32(__DEQUALIFY(volatile void *, addr), data)
+
+#if 0
 #define ioread8(addr)		*(volatile uint8_t *)((char *)addr)
 #define ioread16(addr)		*(volatile uint16_t *)((char *)addr)
 #define ioread32(addr)		*(volatile uint32_t *)((char *)addr)
@@ -104,6 +159,7 @@ writeq(u64 value, volatile void __iomem *addr)
 	do {							\
 		*(volatile uint32_t *)((char *)addr) = data;	\
 	} while (0)
+#endif
 
 #include <linux/vmalloc.h>
 
@@ -146,11 +202,52 @@ ioremap_wt(resource_size_t phys_addr, unsigned long size)
 void iounmap(void __iomem *ptr);
 
 /* XXX these should have volatile */
+
+static inline void *
+memcpy_fromio(void * restrict dst, const volatile void * restrict src,
+	      size_t len)
+{
+	void *res;
+
+	cpu_mfence();
+	res = memcpy(dst, src, len);
+	cpu_mfence();
+
+	return res;
+}
+
+static inline void *
+memcpy_toio(volatile void * restrict dst, const void * restrict src,
+	    size_t len)
+{
+	void *res;
+
+	cpu_mfence();
+	res = memcpy(dst, src, len);
+	cpu_mfence();
+
+	return res;
+}
+
+static inline void *
+memset_io(volatile void *dst, int c, size_t len)
+{
+	void *res;
+
+	cpu_mfence();
+	res = memset(dst, c, len);
+	cpu_mfence();
+
+	return res;
+}
+
+#if 0
 #define	memset_io(a, b, c)	memset((a), (b), (c))
 #define	memcpy_fromio(a, b, c)	memcpy((a), (b), (c))
 #define	memcpy_toio(a, b, c)	memcpy((a), (b), (c))
+#endif
 
-#define mmiowb cpu_sfence
+#define mmiowb() __asm __volatile("sfence" : : : "memory")
 
 int arch_io_reserve_memtype_wc(resource_size_t start, resource_size_t size);
 

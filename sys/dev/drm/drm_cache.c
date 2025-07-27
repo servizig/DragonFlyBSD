@@ -40,21 +40,15 @@
  * clflushopt is an unordered instruction which needs fencing with mfence or
  * sfence to avoid ordering issues.  For drm_clflush_page this fencing happens
  * in the caller.
+ *
+ * The page may represent PCIe mapped memory or real physical memory.  Note
+ * that the DMAP only works with real physical memory.
  */
 static void
 drm_clflush_page(struct page *page)
 {
-	uint8_t *page_virtual;
-	unsigned int i;
-	const int size = boot_cpu_data.x86_clflush_size;
-
-	if (unlikely(page == NULL))
-		return;
-
-	page_virtual = kmap_atomic(page);
-	for (i = 0; i < PAGE_SIZE; i += size)
-		clflushopt(page_virtual + i);
-	kunmap_atomic(page_virtual);
+	if (page)
+		pmap_invalidate_cache_page((vm_page_t)page);
 }
 
 static void drm_cache_flush_clflush(struct page *pages[],
@@ -64,7 +58,7 @@ static void drm_cache_flush_clflush(struct page *pages[],
 
 	mb();
 	for (i = 0; i < num_pages; i++)
-		drm_clflush_page(*pages++);
+		drm_clflush_page(pages[i]);
 	mb();
 }
 #endif
