@@ -463,19 +463,19 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 #if 1
 	/* ZZZ force alignment to fit the allocation size */
 	if (size > 2048 * 1024) {
-		unsigned long opa = page_align;
+//		unsigned long opa = page_align;
 		if (page_align == 0)
 			page_align = 1;
 		while (page_align * PAGE_SIZE < size) {
 			page_align <<= 1;
-			kprintf("ZZZ increase page_align from %ld to %ld\n",
-				opa, page_align);
+//			kprintf("ZZZ increase page_align from %ld to %ld\n",
+//				opa, page_align);
 		}
 	}
 #endif
 
-	kprintf("amdgpu_bo_create: size=%ld pga=%ld (ba=%d)\n", /* ZZZ */
-		size, page_align, bp->byte_align);
+//	kprintf("amdgpu_bo_create: size=%ld pga=%ld (ba=%d)\n", /* ZZZ */
+//		size, page_align, bp->byte_align);
 
 	if (!amdgpu_bo_validate_size(adev, size, bp->domain))
 		return -ENOMEM;
