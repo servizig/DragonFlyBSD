@@ -1488,9 +1488,7 @@ void dpp1_cnv_setup (
 		struct dc_csc_transform input_csc_color_matrix,
 		enum dc_color_space input_color_space);
 
-#if 0 /* redundant */
 void dpp1_full_bypass(struct dpp *dpp_base);
-#endif
 
 void dpp1_dppclk_control(
 		struct dpp *dpp_base,

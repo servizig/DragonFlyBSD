@@ -462,7 +462,7 @@ static int drm_cpu_valid(void)
 }
 
 /*
- * Called whenever a process opens a drm node
+ * Called whenever a process opens /dev/drm.
  *
  * \param filp file pointer.
  * \param minor acquired minor-object.
@@ -613,11 +613,9 @@ int drm_release(struct inode *inode, struct file *filp)
 
 	drm_file_free(file_priv);
 
-	if (!--dev->open_count) {
+	if (!--dev->open_count)
 		drm_lastclose(dev);
-		if (drm_dev_is_unplugged(dev))
-			drm_put_dev(dev);
-	}
+
 	mutex_unlock(&drm_global_mutex);
 
 	drm_minor_release(minor);

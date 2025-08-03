@@ -236,7 +236,6 @@ static int iceland_start_smu(struct pp_hwmgr *hwmgr)
 	int result;
 
 	if (!smu7_is_smc_ram_running(hwmgr)) {
-		pr_info("smu not running, upload firmware again \n");
 		result = iceland_smu_upload_firmware_image(hwmgr);
 		if (result)
 			return result;
@@ -2082,7 +2081,6 @@ static int iceland_init_smc_table(struct pp_hwmgr *hwmgr)
 	return 0;
 }
 
-int iceland_thermal_setup_fan_table(struct pp_hwmgr *hwmgr);
 int iceland_thermal_setup_fan_table(struct pp_hwmgr *hwmgr)
 {
 	struct smu7_smumgr *smu7_data = (struct smu7_smumgr *)(hwmgr->smu_backend);

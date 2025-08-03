@@ -30,6 +30,7 @@
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/console.h>
+#include <linux/dma-buf.h>
 #include <linux/kernel.h>
 #include <linux/sysrq.h>
 #include <linux/slab.h>
@@ -1733,6 +1734,10 @@ int drm_fb_helper_check_var(struct fb_var_screeninfo *var,
 		var->pixclock = 0;
 	}
 
+	if ((drm_format_info_block_width(fb->format, 0) > 1) ||
+	    (drm_format_info_block_height(fb->format, 0) > 1))
+		return -EINVAL;
+
 	/*
 	 * Changes struct fb_var_screeninfo are currently not pushed back
 	 * to KMS, hence fail if different settings are requested.
@@ -2076,6 +2081,8 @@ void drm_fb_helper_fill_var(struct fb_info *info, struct drm_fb_helper *fb_helpe
 #if 0
 	struct drm_framebuffer *fb = fb_helper->fb;
 
+	WARN_ON((drm_format_info_block_width(fb->format, 0) > 1) ||
+		(drm_format_info_block_height(fb->format, 0) > 1));
 	info->pseudo_palette = fb_helper->pseudo_palette;
 	info->var.xres_virtual = fb->width;
 	info->var.yres_virtual = fb->height;
@@ -2946,7 +2953,7 @@ int drm_fb_helper_fbdev_setup(struct drm_device *dev,
 	return 0;
 
 err_drm_fb_helper_fini:
-	drm_fb_helper_fini(fb_helper);
+	drm_fb_helper_fbdev_teardown(dev);
 
 	return ret;
 }
@@ -3212,6 +3219,7 @@ int drm_fb_helper_generic_probe(struct drm_fb_helper *fb_helper,
 		fbi->screen_buffer = shadow;
 #if 0
 		fbi->fbdefio = &drm_fbdev_defio;
+
 		fb_deferred_io_init(fbi);
 #endif
 	}
@@ -3255,9 +3263,7 @@ static void drm_fbdev_client_unregister(struct drm_client_dev *client)
 
 static int drm_fbdev_client_restore(struct drm_client_dev *client)
 {
-	struct drm_fb_helper *fb_helper = drm_fb_helper_from_client(client);
-
-	drm_fb_helper_restore_fbdev_mode_unlocked(fb_helper);
+	drm_fb_helper_lastclose(client->dev);
 
 	return 0;
 }

@@ -86,7 +86,7 @@ static void amdgpu_bo_destroy(struct ttm_buffer_object *tbo)
 		amdgpu_bo_subtract_pin_size(bo);
 
 	if (bo->kfd_bo)
-		amdgpu_amdkfd_unreserve_system_memory_limit(bo);
+		amdgpu_amdkfd_unreserve_memory_limit(bo);
 
 	amdgpu_bo_kunmap(bo);
 
@@ -431,34 +431,12 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 	size_t acc_size;
 	int r;
 
-#if 1
 	page_align = roundup(bp->byte_align, PAGE_SIZE) >> PAGE_SHIFT;
 	if (bp->domain & (AMDGPU_GEM_DOMAIN_GDS | AMDGPU_GEM_DOMAIN_GWS |
 			  AMDGPU_GEM_DOMAIN_OA))
 		size <<= PAGE_SHIFT;
 	else
 		size = ALIGN(size, PAGE_SIZE);
-#endif
-
-#if 0	/* ZZZ linux patch, not consistent for GSD and GWS/OA vs DEFAULT */
-	/* Note that GDS/GWS/OA allocates 1 page per byte/resource. */
-	if (bp->domain & (AMDGPU_GEM_DOMAIN_GWS | AMDGPU_GEM_DOMAIN_OA)) {
-		/* GWS and OA don't need any alignment. */
-		page_align = bp->byte_align;
-		size <<= PAGE_SHIFT;
-		kprintf("GWS/OA: page_align %ld size %ld\n", page_align, size);
-	} else if (bp->domain & AMDGPU_GEM_DOMAIN_GDS) {
-		/* Both size and alignment must be a multiple of 4. */
-		page_align = ALIGN(bp->byte_align, 4);
-		size = ALIGN(size, 4) << PAGE_SHIFT;
-		kprintf("   GDS: page_align %ld size %ld\n", page_align, size);
-	} else {
-		/* Memory should be aligned at least to a page size. */
-		page_align = ALIGN(bp->byte_align, PAGE_SIZE) >> PAGE_SHIFT;
-		size = ALIGN(size, PAGE_SIZE);
-		kprintf("DEFALT: page_align %ld size %ld\n", page_align, size);
-	}
-#endif
 
 #if 1
 	/* ZZZ force alignment to fit the allocation size */
@@ -648,53 +626,6 @@ int amdgpu_bo_create(struct amdgpu_device *adev,
 			amdgpu_bo_unref(bo_ptr);
 	}
 
-	return r;
-}
-
-/**
- * amdgpu_bo_backup_to_shadow - Backs up an &amdgpu_bo buffer object
- * @adev: amdgpu device object
- * @ring: amdgpu_ring for the engine handling the buffer operations
- * @bo: &amdgpu_bo buffer to be backed up
- * @resv: reservation object with embedded fence
- * @fence: dma_fence associated with the operation
- * @direct: whether to submit the job directly
- *
- * Copies an &amdgpu_bo buffer object to its shadow object.
- * Not used for now.
- *
- * Returns:
- * 0 for success or a negative error code on failure.
- */
-int amdgpu_bo_backup_to_shadow(struct amdgpu_device *adev,
-			       struct amdgpu_ring *ring,
-			       struct amdgpu_bo *bo,
-			       struct reservation_object *resv,
-			       struct dma_fence **fence,
-			       bool direct)
-
-{
-	struct amdgpu_bo *shadow = bo->shadow;
-	uint64_t bo_addr, shadow_addr;
-	int r;
-
-	if (!shadow)
-		return -EINVAL;
-
-	bo_addr = amdgpu_bo_gpu_offset(bo);
-	shadow_addr = amdgpu_bo_gpu_offset(bo->shadow);
-
-	r = reservation_object_reserve_shared(bo->tbo.resv);
-	if (r)
-		goto err;
-
-	r = amdgpu_copy_buffer(ring, bo_addr, shadow_addr,
-			       amdgpu_bo_size(bo), resv, fence,
-			       direct, false);
-	if (!r)
-		amdgpu_bo_fence(bo, *fence, true);
-
-err:
 	return r;
 }
 
@@ -1003,7 +934,7 @@ int amdgpu_bo_unpin(struct amdgpu_bo *bo)
 	struct ttm_operation_ctx ctx = { false, false };
 	int r, i;
 
-	if (!bo->pin_count) {
+	if (WARN_ON_ONCE(!bo->pin_count)) {
 		dev_warn(adev->dev, "%p unpin not necessary\n", bo);
 		return 0;
 	}

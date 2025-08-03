@@ -2572,9 +2572,16 @@ struct edid *drm_dp_mst_get_edid(struct drm_connector *connector, struct drm_dp_
 EXPORT_SYMBOL(drm_dp_mst_get_edid);
 
 /**
- * drm_dp_find_vcpi_slots() - find slots for this PBN value
+ * drm_dp_find_vcpi_slots() - Find VCPI slots for this PBN value
  * @mgr: manager to use
  * @pbn: payload bandwidth to convert into slots.
+ *
+ * Calculate the number of VCPI slots that will be required for the given PBN
+ * value. This function is deprecated, and should not be used in atomic
+ * drivers.
+ *
+ * RETURNS:
+ * The total slots required for this port, or error.
  */
 int drm_dp_find_vcpi_slots(struct drm_dp_mst_topology_mgr *mgr,
 			   int pbn)
@@ -2828,31 +2835,6 @@ fail:
  */
 int drm_dp_check_act_status(struct drm_dp_mst_topology_mgr *mgr)
 {
-#if 0
-	/*
-	 * There doesn't seem to be any recommended retry count or timeout in
-	 * the MST specification. Since some hubs have been observed to take
-	 * over 1 second to update their payload allocations under certain
-	 * conditions, we use a rather large timeout value.
-	 */
-	const int timeout_ms = 3000;
-	int ret, status;
-
-	ret = readx_poll_timeout(do_get_act_status, mgr->aux, status,
-				 status & DP_PAYLOAD_ACT_HANDLED || status < 0,
-				 200, timeout_ms * USEC_PER_MSEC);
-	if (ret < 0 && status >= 0) {
-		DRM_DEBUG_KMS("Failed to get ACT after %dms, last status: %02x\n",
-			      timeout_ms, status);
-		return -EINVAL;
-	} else if (status < 0) {
-		DRM_DEBUG_KMS("Failed to read payload table status: %d\n",
-			      status);
-		return status;
-	}
-
-	return 0;
-#else /* taken from FreeBSD */
 	u8 status;
 	int ret;
 	int count = 0;
@@ -2880,7 +2862,6 @@ int drm_dp_check_act_status(struct drm_dp_mst_topology_mgr *mgr)
 	return 0;
 fail:
 	return ret;
-#endif
 }
 EXPORT_SYMBOL(drm_dp_check_act_status);
 
@@ -3305,6 +3286,7 @@ static int drm_dp_mst_i2c_xfer(struct i2c_adapter *adapter, struct i2c_msg *msgs
 		msg.u.i2c_read.transactions[i].i2c_dev_id = msgs[i].addr;
 		msg.u.i2c_read.transactions[i].num_bytes = msgs[i].len;
 		msg.u.i2c_read.transactions[i].bytes = msgs[i].buf;
+		msg.u.i2c_read.transactions[i].no_stop_bit = !(msgs[i].flags & I2C_M_STOP);
 	}
 	msg.u.i2c_read.read_i2c_device_id = msgs[num - 1].addr;
 	msg.u.i2c_read.num_bytes_read = msgs[num - 1].len;

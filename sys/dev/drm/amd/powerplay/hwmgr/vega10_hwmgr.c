@@ -85,8 +85,6 @@ struct vega10_power_state *cast_phw_vega10_power_state(
 }
 
 const struct vega10_power_state *cast_const_phw_vega10_power_state(
-				 const struct pp_hw_power_state *hw_ps);
-const struct vega10_power_state *cast_const_phw_vega10_power_state(
 				 const struct pp_hw_power_state *hw_ps)
 {
 	PP_ASSERT_WITH_CODE((PhwVega10_Magic == hw_ps->magic),
@@ -807,9 +805,9 @@ static int vega10_hwmgr_backend_init(struct pp_hwmgr *hwmgr)
 
 	hwmgr->backend = data;
 
-	hwmgr->workload_mask = 1 << hwmgr->workload_prority[PP_SMC_POWER_PROFILE_VIDEO];
-	hwmgr->power_profile_mode = PP_SMC_POWER_PROFILE_VIDEO;
-	hwmgr->default_power_profile_mode = PP_SMC_POWER_PROFILE_VIDEO;
+	hwmgr->workload_mask = 1 << hwmgr->workload_prority[PP_SMC_POWER_PROFILE_BOOTUP_DEFAULT];
+	hwmgr->power_profile_mode = PP_SMC_POWER_PROFILE_BOOTUP_DEFAULT;
+	hwmgr->default_power_profile_mode = PP_SMC_POWER_PROFILE_BOOTUP_DEFAULT;
 
 	vega10_set_default_registry_data(hwmgr);
 	data->disable_dpm_mask = 0xff;
@@ -3773,8 +3771,6 @@ static void vega10_notify_smc_display_change(struct pp_hwmgr *hwmgr,
 }
 
 int vega10_display_clock_voltage_request(struct pp_hwmgr *hwmgr,
-		struct pp_display_clock_request *clock_req);
-int vega10_display_clock_voltage_request(struct pp_hwmgr *hwmgr,
 		struct pp_display_clock_request *clock_req)
 {
 	int result = 0;
@@ -4380,7 +4376,6 @@ static int vega10_display_configuration_changed_task(struct pp_hwmgr *hwmgr)
 	return result;
 }
 
-int vega10_enable_disable_uvd_dpm(struct pp_hwmgr *hwmgr, bool enable);
 int vega10_enable_disable_uvd_dpm(struct pp_hwmgr *hwmgr, bool enable)
 {
 	struct vega10_hwmgr *data = hwmgr->backend;
@@ -4674,13 +4669,15 @@ static int vega10_get_power_profile_mode(struct pp_hwmgr *hwmgr, char *buf)
 {
 	struct vega10_hwmgr *data = hwmgr->backend;
 	uint32_t i, size = 0;
-	static const uint8_t profile_mode_setting[5][4] = {{70, 60, 1, 3,},
+	static const uint8_t profile_mode_setting[6][4] = {{70, 60, 0, 0,},
+						{70, 60, 1, 3,},
 						{90, 60, 0, 0,},
 						{70, 60, 0, 0,},
 						{70, 90, 0, 0,},
 						{30, 60, 0, 6,},
 						};
-	static const char *profile_name[6] = {"3D_FULL_SCREEN",
+	static const char *profile_name[7] = {"BOOTUP_DEFAULT",
+					"3D_FULL_SCREEN",
 					"POWER_SAVING",
 					"VIDEO",
 					"VR",
@@ -4986,7 +4983,6 @@ static const struct pp_hwmgr_func vega10_hwmgr_funcs = {
 	.get_performance_level = vega10_get_performance_level,
 };
 
-int vega10_hwmgr_init(struct pp_hwmgr *hwmgr);
 int vega10_hwmgr_init(struct pp_hwmgr *hwmgr)
 {
 	hwmgr->hwmgr_func = &vega10_hwmgr_funcs;

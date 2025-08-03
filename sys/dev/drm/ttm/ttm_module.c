@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 OR MIT */
 /**************************************************************************
  *
  * Copyright (c) 2006-2009 VMware, Inc., Palo Alto, CA., USA
@@ -103,3 +104,4 @@ module_exit(ttm_exit);
 
 MODULE_AUTHOR("Thomas Hellstrom, Jerome Glisse");
 MODULE_DESCRIPTION("TTM memory manager subsystem (for DRM device)");
+MODULE_LICENSE("GPL and additional rights");

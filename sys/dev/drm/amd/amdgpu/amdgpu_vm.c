@@ -682,7 +682,8 @@ void amdgpu_vm_get_pd_bo(struct amdgpu_vm *vm,
 {
 	entry->priority = 0;
 	entry->tv.bo = &vm->root.base.bo->tbo;
-	entry->tv.shared = true;
+	/* One for the VM updates, one for TTM and one for the CS job */
+	entry->tv.num_shared = 3;
 	entry->user_pages = NULL;
 	list_add(&entry->tv.head, validated);
 }
@@ -839,10 +840,6 @@ static int amdgpu_vm_clear_bo(struct amdgpu_device *adev,
 	}
 
 	ring = container_of(vm->entity.rq->sched, struct amdgpu_ring, sched);
-
-	r = reservation_object_reserve_shared(bo->tbo.resv);
-	if (r)
-		return r;
 
 	r = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
 	if (r)
@@ -1908,10 +1905,6 @@ static int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 	if (r)
 		goto error_free;
 
-	r = reservation_object_reserve_shared(vm->root.base.bo->tbo.resv);
-	if (r)
-		goto error_free;
-
 	r = amdgpu_vm_update_ptes(&params, start, last + 1, addr, flags);
 	if (r)
 		goto error_free;
@@ -2145,12 +2138,10 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 	list_splice_init(&bo_va->invalids, &bo_va->valids);
 	bo_va->cleared = clear;
 
-#if 0
 	if (trace_amdgpu_vm_bo_mapping_enabled()) {
 		list_for_each_entry(mapping, &bo_va->valids, list)
 			trace_amdgpu_vm_bo_mapping(mapping);
 	}
-#endif
 
 	return 0;
 }
@@ -2468,9 +2459,7 @@ static void amdgpu_vm_bo_insert_map(struct amdgpu_device *adev,
 	    !bo_va->base.moved) {
 		list_move(&bo_va->base.vm_status, &vm->moved);
 	}
-#if 0
 	trace_amdgpu_vm_bo_map(bo_va, mapping);
-#endif
 }
 
 /**
@@ -3098,6 +3087,10 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	if (r)
 		goto error_free_root;
 
+	r = reservation_object_reserve_shared(root->tbo.resv, 1);
+	if (r)
+		goto error_unreserve;
+
 	r = amdgpu_vm_clear_bo(adev, vm, root,
 			       adev->vm_manager.root_level,
 			       vm->pte_support_ats);
@@ -3129,7 +3122,6 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 #if 0
 	INIT_KFIFO(vm->faults);
 #endif
-	vm->fault_credit = 16;
 
 	return 0;
 
@@ -3294,7 +3286,7 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 #if 0
 	/* Clear pending page faults from IH when the VM is destroyed */
 	while (kfifo_get(&vm->faults, &fault))
-		amdgpu_ih_clear_fault(adev, fault);
+		amdgpu_vm_clear_fault(vm->fault_hash, fault);
 #endif
 
 	if (vm->pasid) {
@@ -3329,7 +3321,6 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 		 * rebalance and the tree is about to be destroyed anyway.
 		 */
 		list_del(&mapping->list);
-		amdgpu_vm_it_remove(mapping, &vm->va);
 		kfree(mapping);
 	}
 	list_for_each_entry_safe(mapping, tmp, &vm->freed, list) {
@@ -3354,42 +3345,6 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 	dma_fence_put(vm->last_update);
 	for (i = 0; i < AMDGPU_MAX_VMHUBS; i++)
 		amdgpu_vmid_free_reserved(adev, vm, i);
-}
-
-/**
- * amdgpu_vm_pasid_fault_credit - Check fault credit for given PASID
- *
- * @adev: amdgpu_device pointer
- * @pasid: PASID do identify the VM
- *
- * This function is expected to be called in interrupt context.
- *
- * Returns:
- * True if there was fault credit, false otherwise
- */
-bool amdgpu_vm_pasid_fault_credit(struct amdgpu_device *adev,
-				  unsigned int pasid)
-{
-	struct amdgpu_vm *vm;
-
-	lockmgr(&adev->vm_manager.pasid_lock, LK_EXCLUSIVE);
-	vm = idr_find(&adev->vm_manager.pasid_idr, pasid);
-	if (!vm) {
-		/* VM not found, can't track fault credit */
-		lockmgr(&adev->vm_manager.pasid_lock, LK_RELEASE);
-		return true;
-	}
-
-	/* No lock needed. only accessed by IRQ handler */
-	if (!vm->fault_credit) {
-		/* Too many faults in this VM */
-		lockmgr(&adev->vm_manager.pasid_lock, LK_RELEASE);
-		return false;
-	}
-
-	vm->fault_credit--;
-	lockmgr(&adev->vm_manager.pasid_lock, LK_RELEASE);
-	return true;
 }
 
 /**
@@ -3442,9 +3397,7 @@ void amdgpu_vm_manager_init(struct amdgpu_device *adev)
  */
 void amdgpu_vm_manager_fini(struct amdgpu_device *adev)
 {
-#if 0
 	WARN_ON(!idr_is_empty(&adev->vm_manager.pasid_idr));
-#endif
 	idr_destroy(&adev->vm_manager.pasid_idr);
 
 	amdgpu_vmid_mgr_fini(adev);

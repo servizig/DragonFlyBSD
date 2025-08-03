@@ -140,9 +140,7 @@ static int drm_new_set_master(struct drm_device *dev, struct drm_file *fpriv)
 	struct drm_master *old_master;
 	int ret;
 
-#if 0
 	lockdep_assert_held_once(&dev->master_mutex);
-#endif
 
 	WARN_ON(fpriv->is_master);
 	old_master = fpriv->master;

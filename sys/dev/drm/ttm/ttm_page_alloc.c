@@ -98,7 +98,7 @@ struct ttm_pool_opts {
 	unsigned	small;
 };
 
-#define NUM_POOLS 4
+#define NUM_POOLS 6
 
 /**
  * struct ttm_pool_manager - Holds memory pools for fst allocation
@@ -459,7 +459,6 @@ int ttm_set_pages_caching(struct page **pages,
 		enum ttm_caching_state cstate, unsigned cpages)
 {
 	int r = 0;
-
 	/* Set page caching */
 	switch (cstate) {
 	case tt_uncached:
@@ -473,9 +472,6 @@ int ttm_set_pages_caching(struct page **pages,
 			pr_err("Failed to set %d pages to wc!\n", cpages);
 		break;
 	default:
-		r = ttm_set_pages_array_wb(pages, cpages);
-		if (r)
-			pr_err("Failed to set %d pages to wb!\n", cpages);
 		break;
 	}
 	return r;
@@ -515,7 +511,6 @@ static int ttm_alloc_new_pages(struct pglist *pages, gfp_t gfp_flags,
 	unsigned npages = 1 << order;
 	unsigned max_cpages = min(count << order, (unsigned)NUM_PAGES_TO_ALLOC);
 
-//kprintf("alloc_new_pages: cstate %d count %u order %u npages %u max_cpages %u\n", cstate, count, order, npages, max_cpages);
 	/* allocate array for page caching change */
 	caching_array = kmalloc(max_cpages*sizeof(struct page *), M_DRM, M_WAITOK);
 
@@ -559,7 +554,7 @@ static int ttm_alloc_new_pages(struct pglist *pages, gfp_t gfp_flags,
 			if (cpages == max_cpages) {
 
 				r = ttm_set_pages_caching(caching_array,
-							  cstate, cpages);
+						cstate, cpages);
 				if (r) {
 					ttm_handle_caching_state_failure(pages,
 						ttm_flags, cstate,

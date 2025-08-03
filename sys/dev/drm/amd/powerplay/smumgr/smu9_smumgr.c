@@ -35,7 +35,6 @@
 
 #define smnMP1_FIRMWARE_FLAGS                                                                           0x3010028
 
-bool smu9_is_smc_ram_running(struct pp_hwmgr *hwmgr);
 bool smu9_is_smc_ram_running(struct pp_hwmgr *hwmgr)
 {
 	struct amdgpu_device *adev = hwmgr->adev;
@@ -97,7 +96,6 @@ static int smu9_send_msg_to_smc_without_waiting(struct pp_hwmgr *hwmgr,
  * @param    msg the message to send.
  * @return   Always return 0.
  */
-int smu9_send_msg_to_smc(struct pp_hwmgr *hwmgr, uint16_t msg);
 int smu9_send_msg_to_smc(struct pp_hwmgr *hwmgr, uint16_t msg)
 {
 	struct amdgpu_device *adev = hwmgr->adev;
@@ -124,8 +122,6 @@ int smu9_send_msg_to_smc(struct pp_hwmgr *hwmgr, uint16_t msg)
  * @return   Always return 0.
  */
 int smu9_send_msg_to_smc_with_parameter(struct pp_hwmgr *hwmgr,
-					uint16_t msg, uint32_t parameter);
-int smu9_send_msg_to_smc_with_parameter(struct pp_hwmgr *hwmgr,
 					uint16_t msg, uint32_t parameter)
 {
 	struct amdgpu_device *adev = hwmgr->adev;
@@ -146,7 +142,6 @@ int smu9_send_msg_to_smc_with_parameter(struct pp_hwmgr *hwmgr,
 	return 0;
 }
 
-uint32_t smu9_get_argument(struct pp_hwmgr *hwmgr);
 uint32_t smu9_get_argument(struct pp_hwmgr *hwmgr)
 {
 	struct amdgpu_device *adev = hwmgr->adev;

@@ -23,16 +23,6 @@
 
 #include "amdgpu.h"
 
-uint64_t amdgpu_csa_vaddr(struct amdgpu_device *adev)
-{
-	uint64_t addr = adev->vm_manager.max_pfn << AMDGPU_GPU_PAGE_SHIFT;
-
-	addr -= AMDGPU_VA_RESERVED_SIZE;
-	addr = amdgpu_gmc_sign_extend(addr);
-
-	return addr;
-}
-
 bool amdgpu_virt_mmio_blocked(struct amdgpu_device *adev)
 {
 	/* By now all MMIO pages except mailbox are blocked */
@@ -163,8 +153,7 @@ uint32_t amdgpu_virt_kiq_rreg(struct amdgpu_device *adev, uint32_t reg)
 	if (r < 1 && (adev->in_gpu_reset || in_interrupt()))
 		goto failed_kiq_read;
 
-	if (in_interrupt())
-		might_sleep();
+	might_sleep();
 #endif
 	kprintf("amdgpu_virt_kiq_rreg: implement in_interrupt() function\n");
 	if (r < 1 && (adev->in_gpu_reset))
@@ -205,6 +194,8 @@ void amdgpu_virt_kiq_wreg(struct amdgpu_device *adev, uint32_t reg, uint32_t v)
 
 	r = amdgpu_fence_wait_polling(ring, seq, MAX_KIQ_REG_WAIT);
 
+	kprintf("amdgpu_virt_kiq_wreg: implement in_interrupt() function\n");
+
 	/* don't wait anymore for gpu reset case because this way may
 	 * block gpu_recover() routine forever, e.g. this virt_kiq_rreg
 	 * is triggered in TTM and ttm_bo_lock_delayed_workqueue() will
@@ -217,13 +208,8 @@ void amdgpu_virt_kiq_wreg(struct amdgpu_device *adev, uint32_t reg, uint32_t v)
 	if (r < 1 && (adev->in_gpu_reset || in_interrupt()))
 		goto failed_kiq_write;
 
-	if (in_interrupt())
-		might_sleep();
+	might_sleep();
 #endif
-	kprintf("amdgpu_virt_kiq_wreg: implement in_interrupt() function\n");
-	if (r < 1 && (adev->in_gpu_reset))
-		goto failed_kiq_write;
-
 	while (r < 1 && cnt++ < MAX_KIQ_REG_TRY) {
 
 		msleep(MAX_KIQ_REG_BAILOUT_INTERVAL);
@@ -237,6 +223,46 @@ void amdgpu_virt_kiq_wreg(struct amdgpu_device *adev, uint32_t reg, uint32_t v)
 
 failed_kiq_write:
 	pr_err("failed to write reg:%x\n", reg);
+}
+
+void amdgpu_virt_kiq_reg_write_reg_wait(struct amdgpu_device *adev,
+					uint32_t reg0, uint32_t reg1,
+					uint32_t ref, uint32_t mask)
+{
+	struct amdgpu_kiq *kiq = &adev->gfx.kiq;
+	struct amdgpu_ring *ring = &kiq->ring;
+	signed long r, cnt = 0;
+	unsigned long flags;
+	uint32_t seq;
+
+	spin_lock_irqsave(&kiq->ring_lock, flags);
+	amdgpu_ring_alloc(ring, 32);
+	amdgpu_ring_emit_reg_write_reg_wait(ring, reg0, reg1,
+					    ref, mask);
+	amdgpu_fence_emit_polling(ring, &seq);
+	amdgpu_ring_commit(ring);
+	spin_unlock_irqrestore(&kiq->ring_lock, flags);
+
+	r = amdgpu_fence_wait_polling(ring, seq, MAX_KIQ_REG_WAIT);
+
+	/* don't wait anymore for IRQ context */
+	if (r < 1 && in_interrupt())
+		goto failed_kiq;
+
+	might_sleep();
+	while (r < 1 && cnt++ < MAX_KIQ_REG_TRY) {
+
+		msleep(MAX_KIQ_REG_BAILOUT_INTERVAL);
+		r = amdgpu_fence_wait_polling(ring, seq, MAX_KIQ_REG_WAIT);
+	}
+
+	if (cnt > MAX_KIQ_REG_TRY)
+		goto failed_kiq;
+
+	return;
+
+failed_kiq:
+	pr_err("failed to write reg %x wait reg %x\n", reg0, reg1);
 }
 
 /**
@@ -401,7 +427,7 @@ void amdgpu_virt_init_data_exchange(struct amdgpu_device *adev)
 
 	if (adev->fw_vram_usage.va != NULL) {
 		adev->virt.fw_reserve.p_pf2vf =
-			(struct amdgim_pf2vf_info_header *)(
+			(struct amd_sriov_msg_pf2vf_info_header *)(
 			adev->fw_vram_usage.va + AMDGIM_DATAEXCHANGE_OFFSET);
 		AMDGPU_FW_VRAM_PF2VF_READ(adev, header.size, &pf2vf_size);
 		AMDGPU_FW_VRAM_PF2VF_READ(adev, checksum, &checksum);

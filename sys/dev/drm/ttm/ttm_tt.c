@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 OR MIT */
 /**************************************************************************
  *
  * Copyright (c) 2006-2009 VMware, Inc., Palo Alto, CA., USA
@@ -146,8 +147,6 @@ static int ttm_tt_set_page_caching(struct page *p,
 			return ret;
 	}
 
-	// if (c_new == tt_wc)
-	//	pmap_page_set_memattr((struct vm_page *)p, VM_MEMATTR_WRITE_COMBINING);
 	if (c_new == tt_wc)
 		ret = ttm_set_pages_wc(p, 1);
 	else if (c_new == tt_uncached)

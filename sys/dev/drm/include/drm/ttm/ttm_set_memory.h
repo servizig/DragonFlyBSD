@@ -146,12 +146,6 @@ static inline int ttm_set_pages_wb(struct page *page, int numpages)
 
 #endif /* for CONFIG_AGP */
 
-/*
- * Removed
- *
- * https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/?id=db9c1734ad69c0ba5e5e420ba31ebc1048976be6
- */
-#if 1 /* ZZZ */
 static inline int ttm_set_pages_wc(struct page *page, int numpages)
 {
 	return 0;
@@ -161,7 +155,6 @@ static inline int ttm_set_pages_uc(struct page *page, int numpages)
 {
 	return 0;
 }
-#endif
 
 #endif /* for CONFIG_X86 */
 

@@ -633,7 +633,7 @@ static int gmc_v8_0_mc_init(struct amdgpu_device *adev)
  * Flush the TLB for the requested page table (CIK).
  */
 static void gmc_v8_0_flush_gpu_tlb(struct amdgpu_device *adev,
-					uint32_t vmid)
+				uint32_t vmid, uint32_t flush_type)
 {
 	/* bits 0-15 are the VM contexts0-15 */
 	WREG32(mmVM_INVALIDATE_REQUEST, 1 << vmid);
@@ -942,7 +942,7 @@ static int gmc_v8_0_gart_enable(struct amdgpu_device *adev)
 	else
 		gmc_v8_0_set_fault_enable_default(adev, true);
 
-	gmc_v8_0_flush_gpu_tlb(adev, 0);
+	gmc_v8_0_flush_gpu_tlb(adev, 0, 0);
 	DRM_INFO("PCIE GART of %uM enabled (table at 0x%016llX).\n",
 		 (unsigned)(adev->gmc.gart_size >> 20),
 		 (unsigned long long)table_addr);
@@ -962,7 +962,6 @@ static int gmc_v8_0_gart_init(struct amdgpu_device *adev)
 	r = amdgpu_gart_init(adev);
 	if (r)
 		return r;
-	kprintf("gmc_v8_0_gart_init\n");
 	adev->gart.table_size = adev->gart.num_gpu_pages * 8;
 	adev->gart.gart_pte_flags = AMDGPU_PTE_EXECUTABLE;
 	return amdgpu_gart_table_vram_alloc(adev);

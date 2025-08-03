@@ -613,6 +613,7 @@ void drm_display_mode_from_videomode(const struct videomode *vm,
 		dmode->flags |= DRM_MODE_FLAG_DBLCLK;
 	drm_mode_set_name(dmode);
 }
+EXPORT_SYMBOL_GPL(drm_display_mode_from_videomode);
 
 /**
  * drm_display_mode_to_videomode - fill in @vm using @dmode,
@@ -652,6 +653,7 @@ void drm_display_mode_to_videomode(const struct drm_display_mode *dmode,
 	if (dmode->flags & DRM_MODE_FLAG_DBLCLK)
 		vm->flags |= DISPLAY_FLAGS_DOUBLECLK;
 }
+EXPORT_SYMBOL_GPL(drm_display_mode_to_videomode);
 
 /**
  * drm_bus_flags_from_videomode - extract information about pixelclk and
@@ -714,12 +716,13 @@ int of_get_drm_display_mode(struct device_node *np,
 	if (bus_flags)
 		drm_bus_flags_from_videomode(&vm, bus_flags);
 
-	pr_debug("%pOF: got %dx%d display mode from %s\n",
-		np, vm.hactive, vm.vactive, np->name);
+	pr_debug("%pOF: got %dx%d display mode\n",
+		np, vm.hactive, vm.vactive);
 	drm_mode_debug_printmodeline(dmode);
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(of_get_drm_display_mode);
 #endif /* CONFIG_OF */
 #endif /* CONFIG_VIDEOMODE_HELPERS */
 

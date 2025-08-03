@@ -25,8 +25,6 @@ void drm_fbdev_cma_fini(struct drm_fbdev_cma *fbdev_cma);
 
 void drm_fbdev_cma_restore_mode(struct drm_fbdev_cma *fbdev_cma);
 void drm_fbdev_cma_hotplug_event(struct drm_fbdev_cma *fbdev_cma);
-void drm_fbdev_cma_set_suspend_unlocked(struct drm_fbdev_cma *fbdev_cma,
-					bool state);
 
 struct drm_gem_cma_object *drm_fb_cma_get_gem_obj(struct drm_framebuffer *fb,
 	unsigned int plane);
@@ -34,12 +32,6 @@ struct drm_gem_cma_object *drm_fb_cma_get_gem_obj(struct drm_framebuffer *fb,
 dma_addr_t drm_fb_cma_get_gem_addr(struct drm_framebuffer *fb,
 				   struct drm_plane_state *state,
 				   unsigned int plane);
-
-#ifdef CONFIG_DEBUG_FS
-struct seq_file;
-
-int drm_fb_cma_debugfs_show(struct seq_file *m, void *arg);
-#endif
 
 #endif
 

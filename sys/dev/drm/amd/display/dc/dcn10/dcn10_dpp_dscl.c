@@ -408,15 +408,25 @@ void dpp1_dscl_calc_lb_num_partitions(
 		int *num_part_y,
 		int *num_part_c)
 {
+	int lb_memory_size, lb_memory_size_c, lb_memory_size_a, num_partitions_a,
+	lb_bpc, memory_line_size_y, memory_line_size_c, memory_line_size_a;
+
 	int line_size = scl_data->viewport.width < scl_data->recout.width ?
 			scl_data->viewport.width : scl_data->recout.width;
 	int line_size_c = scl_data->viewport_c.width < scl_data->recout.width ?
 			scl_data->viewport_c.width : scl_data->recout.width;
-	int lb_bpc = dpp1_dscl_get_lb_depth_bpc(scl_data->lb_params.depth);
-	int memory_line_size_y = (line_size * lb_bpc + 71) / 72; /* +71 to ceil */
-	int memory_line_size_c = (line_size_c * lb_bpc + 71) / 72; /* +71 to ceil */
-	int memory_line_size_a = (line_size + 5) / 6; /* +5 to ceil */
-	int lb_memory_size, lb_memory_size_c, lb_memory_size_a, num_partitions_a;
+
+	if (line_size == 0)
+		line_size = 1;
+
+	if (line_size_c == 0)
+		line_size_c = 1;
+
+
+	lb_bpc = dpp1_dscl_get_lb_depth_bpc(scl_data->lb_params.depth);
+	memory_line_size_y = (line_size * lb_bpc + 71) / 72; /* +71 to ceil */
+	memory_line_size_c = (line_size_c * lb_bpc + 71) / 72; /* +71 to ceil */
+	memory_line_size_a = (line_size + 5) / 6; /* +5 to ceil */
 
 	if (lb_config == LB_MEMORY_CONFIG_1) {
 		lb_memory_size = 816;
@@ -507,7 +517,6 @@ static enum lb_memory_config dpp1_dscl_find_lb_memory_config(struct dcn10_dpp *d
 	return LB_MEMORY_CONFIG_0;
 }
 
-#if 0
 void dpp1_dscl_set_scaler_auto_scale(
 	struct dpp *dpp_base,
 	const struct scaler_data *scl_data)
@@ -559,7 +568,6 @@ void dpp1_dscl_set_scaler_auto_scale(
 
 	dpp1_dscl_set_scl_filter(dpp, scl_data, ycbcr);
 }
-#endif
 
 
 static void dpp1_dscl_set_manual_ratio_init(

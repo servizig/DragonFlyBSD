@@ -383,3 +383,4 @@ EXPORT_SYMBOL(of_drm_find_bridge);
 
 MODULE_AUTHOR("Ajay Kumar <ajaykumar.rs@samsung.com>");
 MODULE_DESCRIPTION("DRM bridge infrastructure");
+MODULE_LICENSE("GPL and additional rights");

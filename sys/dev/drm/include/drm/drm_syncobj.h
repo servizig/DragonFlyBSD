@@ -131,10 +131,10 @@ drm_syncobj_fence_get(struct drm_syncobj *syncobj)
 
 struct drm_syncobj *drm_syncobj_find(struct drm_file *file_private,
 				     u32 handle);
-void drm_syncobj_replace_fence(struct drm_syncobj *syncobj, u64 point,
+void drm_syncobj_replace_fence(struct drm_syncobj *syncobj,
 			       struct dma_fence *fence);
 int drm_syncobj_find_fence(struct drm_file *file_private,
-			   u32 handle, u64 point,
+			   u32 handle, u64 point, u64 flags,
 			   struct dma_fence **fence);
 #if 0 /* redundant redeclaration */
 void drm_syncobj_free(struct kref *kref);

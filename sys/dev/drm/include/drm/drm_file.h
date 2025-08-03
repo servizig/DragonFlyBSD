@@ -172,14 +172,14 @@ struct drm_file {
 	 * See also the :ref:`section on primary nodes and authentication
 	 * <drm_primary_node>`.
 	 */
-	unsigned authenticated :1;
+	bool authenticated;
 
 	/**
 	 * @stereo_allowed:
 	 *
 	 * True when the client has asked us to expose stereo 3D mode flags.
 	 */
-	unsigned stereo_allowed :1;
+	bool stereo_allowed;
 
 	/**
 	 * @universal_planes:
@@ -187,10 +187,10 @@ struct drm_file {
 	 * True if client understands CRTC primary planes and cursor planes
 	 * in the plane list. Automatically set when @atomic is set.
 	 */
-	unsigned universal_planes:1;
+	bool universal_planes;
 
 	/** @atomic: True if client understands atomic properties. */
-	unsigned atomic:1;
+	bool atomic;
 
 	/**
 	 * @aspect_ratio_allowed:
@@ -198,14 +198,14 @@ struct drm_file {
 	 * True, if client can handle picture aspect ratios, and has requested
 	 * to pass this information along with the mode.
 	 */
-	unsigned aspect_ratio_allowed:1;
+	bool aspect_ratio_allowed;
 
 	/**
 	 * @writeback_connectors:
 	 *
 	 * True if client understands writeback connectors
 	 */
-	unsigned writeback_connectors:1;
+	bool writeback_connectors;
 
 	/**
 	 * @is_master:
@@ -216,7 +216,7 @@ struct drm_file {
 	 * See also the :ref:`section on primary nodes and authentication
 	 * <drm_primary_node>`.
 	 */
-	unsigned is_master:1;
+	bool is_master;
 
 	/**
 	 * @master:

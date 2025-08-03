@@ -753,6 +753,22 @@ static int vega12_init_smc_table(struct pp_hwmgr *hwmgr)
 	return 0;
 }
 
+static int vega12_run_acg_btc(struct pp_hwmgr *hwmgr)
+{
+	uint32_t result;
+
+	PP_ASSERT_WITH_CODE(
+		smum_send_msg_to_smc(hwmgr, PPSMC_MSG_RunAcgBtc) == 0,
+		"[Run_ACG_BTC] Attempt to run ACG BTC failed!",
+		return -EINVAL);
+
+	result = smum_get_argument(hwmgr);
+	PP_ASSERT_WITH_CODE(result == 1,
+			"Failed to run ACG BTC!", return -EINVAL);
+
+	return 0;
+}
+
 static int vega12_set_allowed_featuresmask(struct pp_hwmgr *hwmgr)
 {
 	struct vega12_hwmgr *data =
@@ -929,6 +945,11 @@ static int vega12_enable_dpm_tasks(struct pp_hwmgr *hwmgr)
 	tmp_result = vega12_init_smc_table(hwmgr);
 	PP_ASSERT_WITH_CODE(!tmp_result,
 			"Failed to initialize SMC table!",
+			result = tmp_result);
+
+	tmp_result = vega12_run_acg_btc(hwmgr);
+	PP_ASSERT_WITH_CODE(!tmp_result,
+			"Failed to run ACG BTC!",
 			result = tmp_result);
 
 	result = vega12_enable_all_smu_features(hwmgr);
@@ -1343,8 +1364,6 @@ static int vega12_notify_smc_display_change(struct pp_hwmgr *hwmgr,
 	return 0;
 }
 
-int vega12_display_clock_voltage_request(struct pp_hwmgr *hwmgr,
-		struct pp_display_clock_request *clock_req);
 int vega12_display_clock_voltage_request(struct pp_hwmgr *hwmgr,
 		struct pp_display_clock_request *clock_req)
 {
@@ -2124,7 +2143,6 @@ static int vega12_display_configuration_changed_task(struct pp_hwmgr *hwmgr)
 	return result;
 }
 
-int vega12_enable_disable_uvd_dpm(struct pp_hwmgr *hwmgr, bool enable);
 int vega12_enable_disable_uvd_dpm(struct pp_hwmgr *hwmgr, bool enable)
 {
 	struct vega12_hwmgr *data =
@@ -2416,7 +2434,6 @@ static const struct pp_hwmgr_func vega12_hwmgr_funcs = {
 	.get_performance_level = vega12_get_performance_level,
 };
 
-int vega12_hwmgr_init(struct pp_hwmgr *hwmgr);
 int vega12_hwmgr_init(struct pp_hwmgr *hwmgr)
 {
 	hwmgr->hwmgr_func = &vega12_hwmgr_funcs;

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 OR MIT */
 /**************************************************************************
  *
  * Copyright (c) 2007-2009 VMware, Inc., Palo Alto, CA., USA
@@ -261,6 +262,54 @@ static int ttm_copy_io_page(void *dst, void *src, unsigned long page)
 	return 0;
 }
 
+#ifdef CONFIG_X86
+#define __ttm_kmap_atomic_prot(__page, __prot) kmap_atomic_prot(__page, __prot)
+#define __ttm_kunmap_atomic(__addr) kunmap_atomic(__addr)
+#else
+#define __ttm_kmap_atomic_prot(__page, __prot) vmap(&__page, 1, 0,  __prot)
+#define __ttm_kunmap_atomic(__addr) vunmap(__addr)
+#endif
+
+
+/**
+ * ttm_kmap_atomic_prot - Efficient kernel map of a single page with
+ * specified page protection.
+ *
+ * @page: The page to map.
+ * @prot: The page protection.
+ *
+ * This function maps a TTM page using the kmap_atomic api if available,
+ * otherwise falls back to vmap. The user must make sure that the
+ * specified page does not have an aliased mapping with a different caching
+ * policy unless the architecture explicitly allows it. Also mapping and
+ * unmapping using this api must be correctly nested. Unmapping should
+ * occur in the reverse order of mapping.
+ */
+void *ttm_kmap_atomic_prot(struct page *page, pgprot_t prot)
+{
+	if (pgprot_val(prot) == pgprot_val(PAGE_KERNEL))
+		return kmap_atomic(page);
+	else
+		return __ttm_kmap_atomic_prot(page, prot);
+}
+EXPORT_SYMBOL(ttm_kmap_atomic_prot);
+
+/**
+ * ttm_kunmap_atomic_prot - Unmap a page that was mapped using
+ * ttm_kmap_atomic_prot.
+ *
+ * @addr: The virtual address from the map.
+ * @prot: The page protection.
+ */
+void ttm_kunmap_atomic_prot(void *addr, pgprot_t prot)
+{
+	if (pgprot_val(prot) == pgprot_val(PAGE_KERNEL))
+		kunmap_atomic(addr);
+	else
+		__ttm_kunmap_atomic(addr);
+}
+EXPORT_SYMBOL(ttm_kunmap_atomic_prot);
+
 static int ttm_copy_io_ttm_page(struct ttm_tt *ttm, void *src,
 				unsigned long page,
 				pgprot_t prot) /* pgflags */
@@ -287,11 +336,7 @@ static int ttm_copy_io_ttm_page(struct ttm_tt *ttm, void *src,
 	if (!dst)
 		return -ENOMEM;
 
-	//drm_clflush_virt_range(src, PAGE_SIZE); /* YYY */
-	//drm_clflush_virt_range(dst, PAGE_SIZE); /* YYY */
 	memcpy_fromio(dst, src, PAGE_SIZE);
-	//drm_clflush_virt_range(src, PAGE_SIZE); /* YYY */
-	//drm_clflush_virt_range(dst, PAGE_SIZE); /* YYY */
 
 #ifdef CONFIG_X86
 	kunmap_atomic_quick();
@@ -328,11 +373,7 @@ static int ttm_copy_ttm_io_page(struct ttm_tt *ttm, void *dst,
 	if (!src)
 		return -ENOMEM;
 
-	//drm_clflush_virt_range(src, PAGE_SIZE); /* YYY */
-	//drm_clflush_virt_range(dst, PAGE_SIZE); /* YYY */
 	memcpy_toio(dst, src, PAGE_SIZE);
-	//drm_clflush_virt_range(src, PAGE_SIZE); /* YYY */
-	//drm_clflush_virt_range(dst, PAGE_SIZE); /* YYY */
 
 #ifdef CONFIG_X86
 	kunmap_atomic_quick();
@@ -512,7 +553,7 @@ static int ttm_buffer_object_transfer(struct ttm_buffer_object *bo,
 	fbo->base.acc_size = 0;
 	fbo->base.resv = &fbo->base.ttm_resv;
 	reservation_object_init(fbo->base.resv);
-	ret = ww_mutex_trylock(&fbo->base.resv->lock);
+	ret = reservation_object_trylock(fbo->base.resv);
 	WARN_ON(!ret);
 
 	*new_obj = &fbo->base;

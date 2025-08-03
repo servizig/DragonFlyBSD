@@ -1082,7 +1082,6 @@ static int tonga_populate_single_memory_level(
 	return result;
 }
 
-int tonga_populate_all_memory_levels(struct pp_hwmgr *hwmgr);
 int tonga_populate_all_memory_levels(struct pp_hwmgr *hwmgr)
 {
 	struct smu7_hwmgr *data = (struct smu7_hwmgr *)(hwmgr->backend);

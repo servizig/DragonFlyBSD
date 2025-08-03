@@ -35,6 +35,8 @@
 #include "sdma0/sdma0_4_1_offset.h"
 
 MODULE_FIRMWARE("amdgpufw_raven_asd");
+MODULE_FIRMWARE("amdgpufw_picasso_asd");
+MODULE_FIRMWARE("amdgpufw_raven2_asd");
 
 static int
 psp_v10_0_get_fw_type(struct amdgpu_firmware_info *ucode, enum psp_gfx_fw_type *type)
@@ -238,11 +240,8 @@ static int psp_v10_0_ring_stop(struct psp_context *psp,
 			       enum psp_ring_type ring_type)
 {
 	int ret = 0;
-	struct psp_ring *ring;
 	unsigned int psp_ring_reg = 0;
 	struct amdgpu_device *adev = psp->adev;
-
-	ring = &psp->km_ring;
 
 	/* Write the ring destroy command to C2PMSG_64 */
 	psp_ring_reg = 3 << 16;

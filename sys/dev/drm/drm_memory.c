@@ -54,7 +54,7 @@
 
 #else /*  CONFIG_AGP  */
 static inline void *agp_remap(unsigned long offset, unsigned long size,
-			      struct drm_device * dev)
+			      struct drm_device *dev)
 {
 	return NULL;
 }

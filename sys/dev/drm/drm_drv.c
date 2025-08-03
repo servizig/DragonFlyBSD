@@ -70,6 +70,7 @@ EXPORT_SYMBOL(drm_debug);
 
 MODULE_AUTHOR("Gareth Hughes, Leif Delgass, José Fonseca, Jon Smirl");
 MODULE_DESCRIPTION("DRM shared core routines");
+MODULE_LICENSE("GPL and additional rights");
 MODULE_PARM_DESC(debug, "Enable debug output, where each bit enables a debug category.\n"
 "\t\tBit 0 (0x01)  will enable CORE messages (drm core code)\n"
 "\t\tBit 1 (0x02)  will enable DRIVER messages (drm controller code)\n"
@@ -422,11 +423,7 @@ void drm_dev_unplug(struct drm_device *dev)
 	synchronize_srcu(&drm_unplug_srcu);
 
 	drm_dev_unregister(dev);
-
-	mutex_lock(&drm_global_mutex);
-	if (dev->open_count == 0)
-		drm_dev_put(dev);
-	mutex_unlock(&drm_global_mutex);
+	drm_dev_put(dev);
 #endif
 }
 EXPORT_SYMBOL(drm_dev_unplug);
@@ -519,8 +516,6 @@ static void drm_fs_inode_free(struct inode *inode)
  *
  * The initial ref-count of the object is 1. Use drm_dev_get() and
  * drm_dev_put() to take and drop further ref-counts.
- *
- * Note that for purely virtual devices @parent can be NULL.
  *
  * Drivers that do not want to allocate their own device struct
  * embedding &struct drm_device can call drm_dev_alloc() instead. For drivers
@@ -617,7 +612,7 @@ int drm_dev_init(struct drm_device *dev,
 	/* Use the parent device name as DRM device unique identifier, but fall
 	 * back to the driver name for virtual devices like vgem. */
 #if 0
-	ret = drm_dev_set_unique(dev, parent ? dev_name(parent) : driver->name);
+	ret = drm_dev_set_unique(dev, dev_name(parent));
 	if (ret)
 		goto err_setunique;
 #endif
@@ -778,19 +773,6 @@ void drm_dev_put(struct drm_device *dev)
 		kref_put(&dev->ref, drm_dev_release);
 }
 EXPORT_SYMBOL(drm_dev_put);
-
-/**
- * drm_dev_unref - Drop reference of a DRM device
- * @dev: device to drop reference of or NULL
- *
- * This is a compatibility alias for drm_dev_put() and should not be used by new
- * code.
- */
-void drm_dev_unref(struct drm_device *dev)
-{
-	drm_dev_put(dev);
-}
-EXPORT_SYMBOL(drm_dev_unref);
 
 static int create_compat_control_link(struct drm_device *dev)
 {

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 OR MIT */
 /**************************************************************************
  *
  * Copyright (c) 2006-2009 VMware, Inc., Palo Alto, CA., USA
@@ -38,6 +39,9 @@
 #include <linux/slab.h>
 
 #define TTM_MEMORY_ALLOC_RETRIES 4
+
+struct ttm_mem_global ttm_mem_glob;
+EXPORT_SYMBOL(ttm_mem_glob);
 
 struct ttm_mem_zone {
 	struct kobject kobj;
@@ -166,16 +170,67 @@ static struct kobj_type ttm_mem_zone_kobj_type = {
 	.default_attrs = ttm_mem_zone_attrs,
 };
 
-static void ttm_mem_global_kobj_release(struct kobject *kobj)
+static struct attribute ttm_mem_global_lower_mem_limit = {
+	.name = "lower_mem_limit",
+	.mode = S_IRUGO | S_IWUSR
+};
+
+static ssize_t ttm_mem_global_show(struct kobject *kobj,
+				 struct attribute *attr,
+				 char *buffer)
 {
 	struct ttm_mem_global *glob =
 		container_of(kobj, struct ttm_mem_global, kobj);
+	uint64_t val = 0;
 
-	kfree(glob);
+	spin_lock(&glob->lock);
+	val = glob->lower_mem_limit;
+	spin_unlock(&glob->lock);
+	/* convert from number of pages to KB */
+	val <<= (PAGE_SHIFT - 10);
+	return snprintf(buffer, PAGE_SIZE, "%llu\n",
+			(unsigned long long) val);
 }
 
+static ssize_t ttm_mem_global_store(struct kobject *kobj,
+				  struct attribute *attr,
+				  const char *buffer,
+				  size_t size)
+{
+	int chars;
+	uint64_t val64;
+	unsigned long val;
+	struct ttm_mem_global *glob =
+		container_of(kobj, struct ttm_mem_global, kobj);
+
+	chars = sscanf(buffer, "%lu", &val);
+	if (chars == 0)
+		return size;
+
+	val64 = val;
+	/* convert from KB to number of pages */
+	val64 >>= (PAGE_SHIFT - 10);
+
+	spin_lock(&glob->lock);
+	glob->lower_mem_limit = val64;
+	spin_unlock(&glob->lock);
+
+	return size;
+}
+
+static struct attribute *ttm_mem_global_attrs[] = {
+	&ttm_mem_global_lower_mem_limit,
+	NULL
+};
+
+static const struct sysfs_ops ttm_mem_global_ops = {
+	.show = &ttm_mem_global_show,
+	.store = &ttm_mem_global_store,
+};
+
 static struct kobj_type ttm_mem_glob_kobj_type = {
-	.release = &ttm_mem_global_kobj_release,
+	.sysfs_ops = &ttm_mem_global_ops,
+	.default_attrs = ttm_mem_global_attrs,
 };
 
 static bool ttm_zones_above_swap_target(struct ttm_mem_global *glob,
@@ -369,12 +424,11 @@ out_no_zone:
 	ttm_mem_global_release(glob);
 	return ret;
 }
-EXPORT_SYMBOL(ttm_mem_global_init);
 
 void ttm_mem_global_release(struct ttm_mem_global *glob)
 {
-	unsigned int i;
 	struct ttm_mem_zone *zone;
+	unsigned int i;
 
 	/* let the page allocator first stop the shrink work. */
 	ttm_page_alloc_fini();
@@ -387,11 +441,11 @@ void ttm_mem_global_release(struct ttm_mem_global *glob)
 		zone = glob->zones[i];
 		kobject_del(&zone->kobj);
 		kobject_put(&zone->kobj);
-			}
+	}
 	kobject_del(&glob->kobj);
 	kobject_put(&glob->kobj);
+	memset(glob, 0, sizeof(*glob));
 }
-EXPORT_SYMBOL(ttm_mem_global_release);
 
 static void ttm_check_swapping(struct ttm_mem_global *glob)
 {

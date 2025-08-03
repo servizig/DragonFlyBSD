@@ -34,37 +34,6 @@
 #include "amdgpu_gmc.h"
 #include "amdgpu_gem.h"
 
-#if 0
-static void amdgpu_cs_check_duplicates(struct amdgpu_cs_parser *p,
-					const char *str)
-{
-	struct amdgpu_bo_list_entry *e1;
-	struct amdgpu_bo_list_entry *e2;
-	int i;
-	int j;
-
-	if (list_empty(&p->validated))
-		return;
-
-	i = 0;
-	list_for_each_entry(e1, &p->validated, tv.head) {
-		struct amdgpu_bo *b1 = ttm_to_amdgpu_bo(e1->tv.bo);
-		j = 0;
-		list_for_each_entry(e2, &p->validated, tv.head) {
-			struct amdgpu_bo *b2 = ttm_to_amdgpu_bo(e2->tv.bo);
-
-			if (e1 == e2)
-				break;
-			if (b1 == b2) {
-				kprintf("conflicting entries %s amdgpu_bo=%p %d/%d\n", str, b1, j, i);
-			}
-			++j;
-		}
-		++i;
-	}
-}
-#endif
-
 static int amdgpu_cs_user_fence_chunk(struct amdgpu_cs_parser *p,
 				      struct drm_amdgpu_cs_chunk_fence *data,
 				      uint32_t *offset)
@@ -81,7 +50,8 @@ static int amdgpu_cs_user_fence_chunk(struct amdgpu_cs_parser *p,
 	bo = amdgpu_bo_ref(gem_to_amdgpu_bo(gobj));
 	p->uf_entry.priority = 0;
 	p->uf_entry.tv.bo = &bo->tbo;
-	p->uf_entry.tv.shared = true;
+	/* One for TTM and one for the CS job */
+	p->uf_entry.tv.num_shared = 2;
 	p->uf_entry.user_pages = NULL;
 
 	drm_gem_object_put_unlocked(gobj);
@@ -631,8 +601,11 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 			return r;
 	}
 
+	/* One for TTM and one for the CS job */
+	amdgpu_bo_list_for_each_entry(e, p->bo_list)
+		e->tv.num_shared = 2;
+
 	amdgpu_bo_list_get_list(p->bo_list, &p->validated);
-	//amdgpu_cs_check_duplicates(p, "J");
 	if (p->bo_list->first_userptr != p->bo_list->num_entries)
 		p->mn = amdgpu_mn_get(p->adev, AMDGPU_MN_TYPE_GFX);
 
@@ -751,8 +724,14 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 	gws = p->bo_list->gws_obj;
 	oa = p->bo_list->oa_obj;
 
-	amdgpu_bo_list_for_each_entry(e, p->bo_list)
-		e->bo_va = amdgpu_vm_bo_find(vm, ttm_to_amdgpu_bo(e->tv.bo));
+	amdgpu_bo_list_for_each_entry(e, p->bo_list) {
+		struct amdgpu_bo *bo = ttm_to_amdgpu_bo(e->tv.bo);
+
+		/* Make sure we use the exclusive slot for shared BOs */
+		if (bo->prime_shared_count)
+			e->tv.num_shared = 0;
+		e->bo_va = amdgpu_vm_bo_find(vm, bo);
+	}
 
 	if (gds) {
 		p->job->gds_base = amdgpu_bo_gpu_offset(gds) >> PAGE_SHIFT;
@@ -822,10 +801,9 @@ static void amdgpu_cs_parser_fini(struct amdgpu_cs_parser *parser, int error,
 {
 	unsigned i;
 
-	if (error && backoff) {
+	if (error && backoff)
 		ttm_eu_backoff_reservation(&parser->ticket,
 					   &parser->validated);
-	}
 
 	for (i = 0; i < parser->num_post_dep_syncobjs; i++)
 		drm_syncobj_put(parser->post_dep_syncobjs[i]);
@@ -990,10 +968,6 @@ static int amdgpu_cs_vm_handling(struct amdgpu_cs_parser *p)
 	if (r)
 		return r;
 
-	r = reservation_object_reserve_shared(vm->root.base.bo->tbo.resv);
-	if (r)
-		return r;
-
 	p->job->vm_pd_addr = amdgpu_gmc_pd_addr(vm->root.base.bo);
 
 	if (amdgpu_vm_debug) {
@@ -1139,7 +1113,7 @@ static int amdgpu_syncobj_lookup_and_add_to_sync(struct amdgpu_cs_parser *p,
 {
 	int r;
 	struct dma_fence *fence;
-	r = drm_syncobj_find_fence(p->filp, handle, 0, &fence);
+	r = drm_syncobj_find_fence(p->filp, handle, 0, 0, &fence);
 	if (r)
 		return r;
 
@@ -1228,7 +1202,7 @@ static void amdgpu_cs_post_dependencies(struct amdgpu_cs_parser *p)
 	int i;
 
 	for (i = 0; i < p->num_post_dep_syncobjs; ++i)
-		drm_syncobj_replace_fence(p->post_dep_syncobjs[i], 0, p->fence);
+		drm_syncobj_replace_fence(p->post_dep_syncobjs[i], p->fence);
 }
 
 static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
@@ -1279,9 +1253,7 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 
 	amdgpu_job_free_resources(job);
 
-#if 0
 	trace_amdgpu_cs_ioctl(job);
-#endif
 	amdgpu_vm_bo_trace_cs(&fpriv->vm, &p->ticket);
 	priority = job->base.s_priority;
 	drm_sched_entity_push_job(&job->base, entity);
@@ -1297,8 +1269,7 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 	return 0;
 
 error_abort:
-	dma_fence_put(&job->base.s_fence->finished);
-	job->base.s_fence = NULL;
+	drm_sched_job_cleanup(&job->base);
 	amdgpu_mn_unlock(p->mn);
 
 error_unlock:
@@ -1312,7 +1283,7 @@ int amdgpu_cs_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 	union drm_amdgpu_cs *cs = data;
 	struct amdgpu_cs_parser parser = {};
 	bool reserved_buffers = false;
-	int r;
+	int i, r;
 
 	if (!adev->accel_working)
 		return -EBUSY;
@@ -1347,10 +1318,8 @@ int amdgpu_cs_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 
 	reserved_buffers = true;
 
-#if 0
 	for (i = 0; i < parser.job->num_ibs; i++)
 		trace_amdgpu_cs(&parser, i);
-#endif
 
 	r = amdgpu_cs_vm_handling(&parser);
 	if (r)
@@ -1460,6 +1429,9 @@ int amdgpu_cs_fence_to_handle_ioctl(struct drm_device *dev, void *data,
 	fence = amdgpu_cs_get_fence(adev, filp, &info->in.fence);
 	if (IS_ERR(fence))
 		return PTR_ERR(fence);
+
+	if (!fence)
+		fence = dma_fence_get_stub();
 
 	switch (info->in.what) {
 	case AMDGPU_FENCE_TO_HANDLE_GET_SYNCOBJ:

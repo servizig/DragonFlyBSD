@@ -45,6 +45,7 @@
 #include "dcn10_hubbub.h"
 #include "dcn10_cm_common.h"
 #include "dc_link_dp.h"
+#include "dccg.h"
 
 #define DC_LOGGER_INIT(logger)
 
@@ -789,7 +790,7 @@ static bool dcn10_hw_wa_force_recovery(struct dc *dc)
 			&dc->current_state->res_ctx.pipe_ctx[i];
 		if (pipe_ctx != NULL) {
 			hubp = pipe_ctx->plane_res.hubp;
-			if (hubp != NULL) {
+			if (hubp != NULL && hubp->funcs->hubp_get_underflow_status) {
 				if (hubp->funcs->hubp_get_underflow_status(hubp) != 0) {
 					/* one pipe underflow, we will reset all the pipes*/
 					need_recover = true;
@@ -815,7 +816,7 @@ static bool dcn10_hw_wa_force_recovery(struct dc *dc)
 		if (pipe_ctx != NULL) {
 			hubp = pipe_ctx->plane_res.hubp;
 			/*DCHUBP_CNTL:HUBP_BLANK_EN=1*/
-			if (hubp != NULL)
+			if (hubp != NULL && hubp->funcs->set_hubp_blank_en)
 				hubp->funcs->set_hubp_blank_en(hubp, true);
 		}
 	}
@@ -828,7 +829,7 @@ static bool dcn10_hw_wa_force_recovery(struct dc *dc)
 		if (pipe_ctx != NULL) {
 			hubp = pipe_ctx->plane_res.hubp;
 			/*DCHUBP_CNTL:HUBP_DISABLE=1*/
-			if (hubp != NULL)
+			if (hubp != NULL && hubp->funcs->hubp_disable_control)
 				hubp->funcs->hubp_disable_control(hubp, true);
 		}
 	}
@@ -838,7 +839,7 @@ static bool dcn10_hw_wa_force_recovery(struct dc *dc)
 		if (pipe_ctx != NULL) {
 			hubp = pipe_ctx->plane_res.hubp;
 			/*DCHUBP_CNTL:HUBP_DISABLE=0*/
-			if (hubp != NULL)
+			if (hubp != NULL && hubp->funcs->hubp_disable_control)
 				hubp->funcs->hubp_disable_control(hubp, true);
 		}
 	}
@@ -850,7 +851,7 @@ static bool dcn10_hw_wa_force_recovery(struct dc *dc)
 		if (pipe_ctx != NULL) {
 			hubp = pipe_ctx->plane_res.hubp;
 			/*DCHUBP_CNTL:HUBP_BLANK_EN=0*/
-			if (hubp != NULL)
+			if (hubp != NULL && hubp->funcs->set_hubp_blank_en)
 				hubp->funcs->set_hubp_blank_en(hubp, true);
 		}
 	}
