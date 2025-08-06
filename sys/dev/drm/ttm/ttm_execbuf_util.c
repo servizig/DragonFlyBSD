@@ -220,7 +220,7 @@ void ttm_eu_fence_buffer_objects(struct ww_acquire_ctx *ticket,
 			}
 			kprintf("\n");
 		}
-		if (entry->shared)
+		if (entry->num_shared)
 			reservation_object_add_shared_fence(bo->resv, fence);
 		else
 			reservation_object_add_excl_fence(bo->resv, fence);

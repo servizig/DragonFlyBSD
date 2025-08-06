@@ -423,7 +423,7 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 	/* Zero all the fields */
 	memset(&init_data, 0, sizeof(init_data));
 
-	mutex_init(&adev->dm.dc_lock);
+	lockinit(&adev->dm.dc_lock, "amdgdmdcl", 0, LK_CANRECURSE);
 
 	if(amdgpu_dm_irq_init(adev)) {
 		DRM_ERROR("amdgpu: failed to initialize DM IRQ support.\n");
@@ -1613,6 +1613,7 @@ static int dm_atomic_get_state(struct drm_atomic_state *state,
 	return 0;
 }
 
+static
 struct dm_atomic_state *
 dm_atomic_get_new_state(struct drm_atomic_state *state)
 {
@@ -1631,6 +1632,7 @@ dm_atomic_get_new_state(struct drm_atomic_state *state)
 	return NULL;
 }
 
+static
 struct dm_atomic_state *
 dm_atomic_get_old_state(struct drm_atomic_state *state)
 {
@@ -1748,6 +1750,7 @@ static int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
 #if defined(CONFIG_BACKLIGHT_CLASS_DEVICE) ||\
 	defined(CONFIG_BACKLIGHT_CLASS_DEVICE_MODULE)
 
+#if 0
 static void amdgpu_dm_update_backlight_caps(struct amdgpu_display_manager *dm)
 {
 #if defined(CONFIG_ACPI)
@@ -1772,6 +1775,7 @@ static void amdgpu_dm_update_backlight_caps(struct amdgpu_display_manager *dm)
 	dm->backlight_caps.max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
 #endif
 }
+#endif
 
 #if 0
 static int amdgpu_dm_backlight_update_status(struct backlight_device *bd)
@@ -1853,7 +1857,7 @@ sysctl_backlight_handler(SYSCTL_HANDLER_ARGS)
 	}
 
 	if (val >= 0 && val <= AMDGPU_MAX_BL_LEVEL) {
-		dc_link_set_backlight_level(dm->backlight_link, val, 0, 0);
+		dc_link_set_backlight_level(dm->backlight_link, val, 0);
 	}
 
 	return(err);
@@ -4570,6 +4574,7 @@ static void prepare_flip_isr(struct amdgpu_crtc *acrtc)
 						 acrtc->crtc_id);
 }
 
+static
 struct dc_stream_status *dc_state_get_stream_status(
 	struct dc_state *state,
 	struct dc_stream_state *stream)
@@ -6066,8 +6071,10 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		goto fail;
 
 	for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state, new_crtc_state, i) {
+#if 0
 		struct dm_crtc_state *dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 		struct dm_crtc_state *dm_old_crtc_state  = to_dm_crtc_state(old_crtc_state);
+#endif
 
 		if (!drm_atomic_crtc_needs_modeset(new_crtc_state) &&
 		    !new_crtc_state->color_mgmt_changed &&

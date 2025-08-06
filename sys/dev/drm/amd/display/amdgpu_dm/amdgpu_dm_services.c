@@ -44,6 +44,7 @@ unsigned long long dm_get_elapse_time_in_ns(struct dc_context *ctx,
 	return current_time_stamp - last_time_stamp;
 }
 
+void dm_perf_trace_timestamp(const char *func_name, unsigned int line);
 void dm_perf_trace_timestamp(const char *func_name, unsigned int line)
 {
 }

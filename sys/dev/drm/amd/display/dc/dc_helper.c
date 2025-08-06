@@ -29,6 +29,8 @@
 #include "dm_services.h"
 #include <stdarg.h>
 
+#pragma GCC diagnostic ignored "-Wmissing-prototypes"
+
 uint32_t generic_reg_update_ex(const struct dc_context *ctx,
 		uint32_t addr, uint32_t reg_val, int n,
 		uint8_t shift1, uint32_t mask1, uint32_t field_value1,

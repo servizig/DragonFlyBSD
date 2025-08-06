@@ -35,6 +35,7 @@ static struct amdgpu_hive_info xgmi_hives[AMDGPU_MAX_XGMI_HIVE];
 static unsigned hive_count = 0;
 
 
+void *amdgpu_xgmi_hive_try_lock(struct amdgpu_hive_info *hive);
 void *amdgpu_xgmi_hive_try_lock(struct amdgpu_hive_info *hive)
 {
 	return &hive->device_list;
@@ -59,7 +60,7 @@ struct amdgpu_hive_info *amdgpu_get_xgmi_hive(struct amdgpu_device *adev)
 	tmp = &xgmi_hives[hive_count++];
 	tmp->hive_id = adev->gmc.xgmi.hive_id;
 	INIT_LIST_HEAD(&tmp->device_list);
-	mutex_init(&tmp->hive_lock);
+	lockinit(&tmp->hive_lock, "amdgxgmihl", 0, LK_CANRECURSE);
 
 	return tmp;
 }
@@ -97,14 +98,14 @@ int amdgpu_xgmi_add_device(struct amdgpu_device *adev)
 	if (!adev->gmc.xgmi.supported)
 		return 0;
 
-	ret = psp_xgmi_get_node_id(&adev->psp, &adev->gmc.xgmi.node_id);
+	ret = psp_xgmi_get_node_id(&adev->psp, (uint64_t *)&adev->gmc.xgmi.node_id);
 	if (ret) {
 		dev_err(adev->dev,
 			"XGMI: Failed to get node id\n");
 		return ret;
 	}
 
-	ret = psp_xgmi_get_hive_id(&adev->psp, &adev->gmc.xgmi.hive_id);
+	ret = psp_xgmi_get_hive_id(&adev->psp, (uint64_t *)&adev->gmc.xgmi.hive_id);
 	if (ret) {
 		dev_err(adev->dev,
 			"XGMI: Failed to get hive id\n");

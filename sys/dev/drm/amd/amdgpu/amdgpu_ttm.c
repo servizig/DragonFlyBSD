@@ -1688,7 +1688,7 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 	int r;
 	u64 vis_vram_limit;
 
-	mutex_init(&adev->mman.gtt_window_lock);
+	lockinit(&adev->mman.gtt_window_lock, "amdgpummgttwl", 0, LK_CANRECURSE);
 
 	/* No others user of address space so set it to 0 */
 	r = ttm_bo_device_init(&adev->mman.bdev,

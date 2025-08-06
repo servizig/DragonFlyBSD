@@ -29,7 +29,7 @@ struct amdgpu_hive_info {
 	struct list_head	device_list;
 	struct psp_xgmi_topology_info	topology_info;
 	int number_devices;
-	struct mutex hive_lock;
+	struct lock hive_lock;
 };
 
 struct amdgpu_hive_info *amdgpu_get_xgmi_hive(struct amdgpu_device *adev);

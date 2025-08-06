@@ -268,11 +268,11 @@ static bool gmc_v9_0_prescreen_iv(struct amdgpu_device *adev,
 		return true;
 
 	/* Track retry faults in per-VM fault FIFO. */
-	spin_lock(&adev->vm_manager.pasid_lock);
+	lockmgr(&adev->vm_manager.pasid_lock, LK_EXCLUSIVE);
 	vm = idr_find(&adev->vm_manager.pasid_idr, entry->pasid);
 	if (!vm) {
 		/* VM not found, process it normally */
-		spin_unlock(&adev->vm_manager.pasid_lock);
+		lockmgr(&adev->vm_manager.pasid_lock, LK_RELEASE);
 		return true;
 	}
 
@@ -283,19 +283,21 @@ static bool gmc_v9_0_prescreen_iv(struct amdgpu_device *adev,
 	 * ignore further page faults
 	 */
 	if (r != 0) {
-		spin_unlock(&adev->vm_manager.pasid_lock);
+		lockmgr(&adev->vm_manager.pasid_lock, LK_RELEASE);
 		return false;
 	}
 	/* No locking required with single writer and single reader */
+#if 0 /* XXX: TODO kfifo_put */
 	r = kfifo_put(&vm->faults, key);
 	if (!r) {
 		/* FIFO is full. Ignore it until there is space */
 		amdgpu_vm_clear_fault(vm->fault_hash, key);
-		spin_unlock(&adev->vm_manager.pasid_lock);
+		lockmgr(&adev->vm_manager.pasid_lock, LK_RELEASE);
 		return false;
 	}
+#endif
 
-	spin_unlock(&adev->vm_manager.pasid_lock);
+	lockmgr(&adev->vm_manager.pasid_lock, LK_RELEASE);
 	/* It's the first fault for this address, process it normally */
 	return true;
 }

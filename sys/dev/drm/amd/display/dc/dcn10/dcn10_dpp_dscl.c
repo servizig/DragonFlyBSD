@@ -85,7 +85,6 @@ enum dscl_mode_sel {
 	DSCL_MODE_DSCL_BYPASS = 6
 };
 
-#if 0
 static void dpp1_dscl_set_overscan(
 	struct dcn10_dpp *dpp,
 	const struct scaler_data *data)
@@ -130,7 +129,6 @@ static void dpp1_dscl_set_otg_blank(
 			OTG_V_BLANK_START, v_blank_start,
 			OTG_V_BLANK_END, v_blank_end);
 }
-#endif
 
 static int dpp1_dscl_get_pixel_depth_val(enum lb_pixel_depth depth)
 {
@@ -517,6 +515,9 @@ static enum lb_memory_config dpp1_dscl_find_lb_memory_config(struct dcn10_dpp *d
 	return LB_MEMORY_CONFIG_0;
 }
 
+void dpp1_dscl_set_scaler_auto_scale(
+	struct dpp *dpp_base,
+	const struct scaler_data *scl_data);
 void dpp1_dscl_set_scaler_auto_scale(
 	struct dpp *dpp_base,
 	const struct scaler_data *scl_data)

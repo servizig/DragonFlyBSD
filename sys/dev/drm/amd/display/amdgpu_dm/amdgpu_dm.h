@@ -140,7 +140,7 @@ struct amdgpu_display_manager {
 	 * Guards access to DC functions that can issue register write
 	 * sequences.
 	 */
-	struct mutex dc_lock;
+	struct lock dc_lock;
 
 	/**
 	 * @irq_handler_list_low_tab:

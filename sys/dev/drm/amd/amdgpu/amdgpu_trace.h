@@ -38,6 +38,7 @@
 static inline bool
 trace_amdgpu_vm_bo_mapping_enabled(void) { return false; }
 #define trace_amdgpu_vm_bo_mapping(mapping)
+#define trace_amdgpu_vm_bo_map(bo_va, mapping);
 #define trace_amdgpu_vm_bo_unmap(bo_va, mapping)
 #define trace_amdgpu_vm_copy_ptes(pe, src, count)
 #define trace_amdgpu_vm_flush(addr, ring_idx, vm_id)
@@ -56,9 +57,18 @@ trace_amdgpu_ttm_bo_move(struct amdgpu_bo *bo, u8 new_memtype, u8 old_memtype)
 #define trace_amdgpu_mm_rreg(device, reg, ret)
 #define trace_amdgpu_mm_wreg(device, reg, v)
 
+#define trace_amdgpu_cs_ioctl(job)
+#define trace_amdgpu_cs(parser, i);
 #define trace_amdgpu_cs_bo_status(entries, size)
 
 #define trace_amdgpu_bo_create(bo)
-#define trace_amdgpu_bo_move(bo, new_mem_type, old_mem_type)
+#define trace_amdgpu_bo_move(bo, new_mem_type, old_mem_type) 
+
+#define trace_amdgpu_ib_pipe_sync(job, tmp)
+
+#define trace_amdgpu_pasid_allocated(pasid)
+#define trace_amdgpu_pasid_freed(pasid)
+
+#define trace_amdgpu_iv(entry)
 
 #endif	/* _AMDGPU_TRACE_H_ */

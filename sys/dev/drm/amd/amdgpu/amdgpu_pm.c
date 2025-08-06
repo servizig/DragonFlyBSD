@@ -2017,7 +2017,9 @@ void amdgpu_pm_print_power_states(struct amdgpu_device *adev)
 
 int amdgpu_pm_sysfs_init(struct amdgpu_device *adev)
 {
+#if 0
 	struct pp_hwmgr *hwmgr = adev->powerplay.pp_handle;
+#endif
 	int ret;
 
 	if (adev->pm.sysfs_initialized)
@@ -2132,8 +2134,8 @@ int amdgpu_pm_sysfs_init(struct amdgpu_device *adev)
 
 void amdgpu_pm_sysfs_fini(struct amdgpu_device *adev)
 {
-	struct pp_hwmgr *hwmgr = adev->powerplay.pp_handle;
 #if 0
+	struct pp_hwmgr *hwmgr = adev->powerplay.pp_handle;
 	if (adev->pm.dpm_enabled == 0)
 		return;
 

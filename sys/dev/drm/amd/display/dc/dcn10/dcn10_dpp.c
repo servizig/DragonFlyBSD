@@ -127,6 +127,7 @@ void dpp_read_state(struct dpp *dpp_base,
 }
 
 /* Program gamut remap in bypass mode */
+void dpp_set_gamut_remap_bypass(struct dcn10_dpp *dpp);
 void dpp_set_gamut_remap_bypass(struct dcn10_dpp *dpp)
 {
 	REG_SET(CM_GAMUT_REMAP_CONTROL, 0,

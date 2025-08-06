@@ -609,8 +609,6 @@ int drm_dev_init(struct drm_device *dev,
 		}
 	}
 
-	/* Use the parent device name as DRM device unique identifier, but fall
-	 * back to the driver name for virtual devices like vgem. */
 #if 0
 	ret = drm_dev_set_unique(dev, dev_name(parent));
 	if (ret)
@@ -1044,7 +1042,6 @@ static void drm_core_exit(void)
 #endif
 	idr_destroy(&drm_minors_idr);
 	drm_connector_ida_destroy();
-	drm_global_release();
 }
 
 static int __init drm_core_init(void)
@@ -1053,7 +1050,6 @@ static int __init drm_core_init(void)
 	int ret;
 #endif
 
-	drm_global_init();
 	drm_connector_ida_init();
 	idr_init(&drm_minors_idr);
 

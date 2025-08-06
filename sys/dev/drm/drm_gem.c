@@ -311,7 +311,9 @@ drm_gem_object_release_handle(int id, void *ptr, void *data)
 	struct drm_gem_object *obj = ptr;
 	struct drm_device *dev = obj->dev;
 
-	if (dev->driver->gem_close_object)
+	if (obj->funcs && obj->funcs->close)
+		obj->funcs->close(obj, file_priv);
+	else if (dev->driver->gem_close_object)
 		dev->driver->gem_close_object(obj, file_priv);
 
 	if (drm_core_check_feature(dev, DRIVER_PRIME))
@@ -1185,13 +1187,13 @@ drm_gem_mmap_single(struct drm_device *dev, vm_ooffset_t *offset, vm_size_t size
 		return (ENODEV);
 	}
 
-	drm_gem_object_reference(gem_obj);
+	drm_gem_object_get(gem_obj);
 	DRM_UNLOCK(dev);
 	vm_obj = cdev_pager_allocate(gem_obj, OBJT_MGTDEVICE,
 	    dev->driver->gem_vm_ops, size, nprot,
 	    DRM_GEM_MAPPING_MAPOFF(*offset), curthread->td_ucred);
 	if (vm_obj == NULL) {
-		drm_gem_object_unreference_unlocked(gem_obj);
+		drm_gem_object_put(gem_obj);
 		return (EINVAL);
 	}
 	*offset = DRM_GEM_MAPPING_MAPOFF(*offset);

@@ -33,6 +33,7 @@
 
 #include <linux/errno.h>
 
+#include <linux/slab.h>
 #include <linux/mmdebug.h>
 #include <linux/gfp.h>
 #include <linux/bug.h>
@@ -182,6 +183,16 @@ static inline void *
 page_address(const struct page *page)
 {
 	return (void *)VM_PAGE_TO_PHYS((const struct vm_page *)page);
+}
+
+static inline void *
+kvcalloc(size_t nelem, size_t elemsize, gfp_t gfp)
+{
+
+	KKASSERT(elemsize > 0);
+	if (SIZE_MAX/elemsize < nelem)
+		return NULL;
+	return kvzalloc(nelem * elemsize, gfp);
 }
 
 void * kvmalloc_array(size_t n, size_t size, gfp_t flags);

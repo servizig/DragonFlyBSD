@@ -25,6 +25,43 @@
 #include <linux/slab.h>
 #include <linux/dma-fence.h>
 
+static struct dma_fence dma_fence_stub;
+static struct lock dma_fence_stub_lock = LOCK_INITIALIZER("dmafenstubl", 0, 0);
+
+
+static const char *
+dma_fence_stub_get_name(struct dma_fence *fence)
+{
+
+	return ("stub");
+}
+
+static const struct dma_fence_ops dma_fence_stub_ops = {
+	.get_driver_name = dma_fence_stub_get_name,
+	.get_timeline_name = dma_fence_stub_get_name,
+};
+
+/*
+ * return a signaled fence
+ */
+struct dma_fence *
+dma_fence_get_stub(void)
+{
+	lockmgr(&dma_fence_stub_lock, LK_EXCLUSIVE);
+	if (dma_fence_stub.ops == NULL) {
+		dma_fence_init(&dma_fence_stub,
+		    &dma_fence_stub_ops,
+		    &dma_fence_stub_lock,
+		    0,
+		    0);
+		set_bit(DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT,
+		    &dma_fence_stub.flags);
+		dma_fence_signal_locked(&dma_fence_stub);
+	}
+	lockmgr(&dma_fence_stub_lock, LK_RELEASE);
+	return (dma_fence_get(&dma_fence_stub));
+}
+
 void
 dma_fence_init(struct dma_fence *fence, const struct dma_fence_ops *ops,
     spinlock_t *lock, u64 context, unsigned seqno)

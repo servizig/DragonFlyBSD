@@ -85,6 +85,8 @@ struct vega10_power_state *cast_phw_vega10_power_state(
 }
 
 const struct vega10_power_state *cast_const_phw_vega10_power_state(
+				 const struct pp_hw_power_state *hw_ps);
+const struct vega10_power_state *cast_const_phw_vega10_power_state(
 				 const struct pp_hw_power_state *hw_ps)
 {
 	PP_ASSERT_WITH_CODE((PhwVega10_Magic == hw_ps->magic),
@@ -3771,6 +3773,8 @@ static void vega10_notify_smc_display_change(struct pp_hwmgr *hwmgr,
 }
 
 int vega10_display_clock_voltage_request(struct pp_hwmgr *hwmgr,
+		struct pp_display_clock_request *clock_req);
+int vega10_display_clock_voltage_request(struct pp_hwmgr *hwmgr,
 		struct pp_display_clock_request *clock_req)
 {
 	int result = 0;
@@ -4376,6 +4380,7 @@ static int vega10_display_configuration_changed_task(struct pp_hwmgr *hwmgr)
 	return result;
 }
 
+int vega10_enable_disable_uvd_dpm(struct pp_hwmgr *hwmgr, bool enable);
 int vega10_enable_disable_uvd_dpm(struct pp_hwmgr *hwmgr, bool enable)
 {
 	struct vega10_hwmgr *data = hwmgr->backend;
@@ -4983,6 +4988,7 @@ static const struct pp_hwmgr_func vega10_hwmgr_funcs = {
 	.get_performance_level = vega10_get_performance_level,
 };
 
+int vega10_hwmgr_init(struct pp_hwmgr *hwmgr);
 int vega10_hwmgr_init(struct pp_hwmgr *hwmgr)
 {
 	hwmgr->hwmgr_func = &vega10_hwmgr_funcs;

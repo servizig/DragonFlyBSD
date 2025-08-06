@@ -491,6 +491,7 @@ int phm_set_active_display_count(struct pp_hwmgr *hwmgr, uint32_t count)
 	return hwmgr->hwmgr_func->set_active_display_count(hwmgr, count);
 }
 
+int phm_set_min_deep_sleep_dcefclk(struct pp_hwmgr *hwmgr, uint32_t clock);
 int phm_set_min_deep_sleep_dcefclk(struct pp_hwmgr *hwmgr, uint32_t clock)
 {
 	PHM_FUNC_CHECK(hwmgr);
@@ -501,6 +502,7 @@ int phm_set_min_deep_sleep_dcefclk(struct pp_hwmgr *hwmgr, uint32_t clock)
 	return hwmgr->hwmgr_func->set_min_deep_sleep_dcefclk(hwmgr, clock);
 }
 
+int phm_set_hard_min_dcefclk_by_freq(struct pp_hwmgr *hwmgr, uint32_t clock);
 int phm_set_hard_min_dcefclk_by_freq(struct pp_hwmgr *hwmgr, uint32_t clock)
 {
 	PHM_FUNC_CHECK(hwmgr);
@@ -511,6 +513,7 @@ int phm_set_hard_min_dcefclk_by_freq(struct pp_hwmgr *hwmgr, uint32_t clock)
 	return hwmgr->hwmgr_func->set_hard_min_dcefclk_by_freq(hwmgr, clock);
 }
 
+int phm_set_hard_min_fclk_by_freq(struct pp_hwmgr *hwmgr, uint32_t clock);
 int phm_set_hard_min_fclk_by_freq(struct pp_hwmgr *hwmgr, uint32_t clock)
 {
 	PHM_FUNC_CHECK(hwmgr);

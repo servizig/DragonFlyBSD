@@ -38,6 +38,12 @@ lockdep_assert_held(struct lock *l)
 	KKASSERT(lockinuse(l));
 }
 
+static inline void
+lockdep_assert_held_once(struct lock *l)
+{
+	KKASSERT(lockinuse(l));
+}
+
 static inline int
 lockdep_is_held(struct lock *l)
 {

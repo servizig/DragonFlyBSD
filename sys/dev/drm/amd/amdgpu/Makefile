@@ -48,7 +48,8 @@ KMOD=	amdgpu
 	${.CURDIR}/../display/dc/dce80 \
 	${.CURDIR}/../display/modules/freesync \
 	${.CURDIR}/../display/modules/color \
-	${.CURDIR}/../display/modules/info_packet
+	${.CURDIR}/../display/modules/info_packet \
+	${.CURDIR}/../display/modules/power
 
 SRCS=	amdgpu_drv.c
 
@@ -68,7 +69,8 @@ SRCS+= amdgpu_device.c amdgpu_kms.c \
 	amdgpu_gtt_mgr.c amdgpu_vram_mgr.c amdgpu_virt.c amdgpu_atomfirmware.c \
 	amdgpu_vf_error.c amdgpu_sched.c amdgpu_debugfs.c \
 	amdgpu_ids.c \
-	amdgpu_gmc.c amdgpu_xgmi.c
+	amdgpu_gmc.c amdgpu_xgmi.c \
+	amdgpu_csa.c amdgpu_rlc.c
 
 SRCS+= \
 	vi.c mxgpu_vi.c nbio_v6_1.c soc15.c emu_soc.c mxgpu_ai.c nbio_v7_0.c vega10_reg_init.c \
@@ -217,8 +219,8 @@ SRCS+= dcn_calcs.c dcn_calc_math.c dcn_calc_auto.c
 # dc/dce
 SRCS+= dce_audio.c dce_stream_encoder.c dce_link_encoder.c dce_hwseq.c \
 	dce_mem_input.c dce_clock_source.c dce_scl_filters.c dce_transform.c \
-	dce_clocks.c dce_opp.c dce_dmcu.c dce_abm.c dce_ipp.c dce_aux.c \
-	dce_i2c.c dce_i2c_hw.c dce_i2c_sw.c
+	dce_opp.c dce_dmcu.c dce_abm.c dce_ipp.c dce_aux.c \
+	dce_i2c.c dce_i2c_hw.c dce_i2c_sw.c dce_clk_mgr.c
 
 # dc/gpio
 SRCS+= gpio_base.c gpio_service.c hw_factory.c \
@@ -291,7 +293,8 @@ SRCS+= dcn10_resource.c dcn10_ipp.c dcn10_hw_sequencer.c dcn10_hw_sequencer_debu
 	dcn10_dpp.c dcn10_opp.c dcn10_optc.c \
 	dcn10_hubp.c dcn10_mpc.c \
 	dcn10_dpp_dscl.c dcn10_dpp_cm.c dcn10_cm_common.c \
-	dcn10_hubbub.c dcn10_stream_encoder.c dcn10_link_encoder.c
+	dcn10_hubbub.c dcn10_stream_encoder.c dcn10_link_encoder.c \
+	dcn10_clk_mgr.c
 
 # dc/dml
 SRCS+= display_mode_lib.c display_rq_dlg_helpers.c dml1_display_rq_dlg_calc.c \
@@ -330,6 +333,9 @@ SRCS+= color_gamma.c
 
 # modules/info_packet
 SRCS+= info_packet.c
+
+#modules/power
+SRCS+= power_helpers.c
 
 # end display core component (CONFIG_DRM_AMD_DC)
 

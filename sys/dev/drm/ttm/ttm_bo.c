@@ -88,8 +88,8 @@ static void ttm_mem_type_debug(struct ttm_bo_device *bdev, struct drm_printer *p
 	drm_printf(p, "    has_type: %d\n", man->has_type);
 	drm_printf(p, "    use_type: %d\n", man->use_type);
 	drm_printf(p, "    flags: 0x%08X\n", man->flags);
-	drm_printf(p, "    gpu_offset: 0x%08llX\n", man->gpu_offset);
-	drm_printf(p, "    size: %llu\n", man->size);
+	drm_printf(p, "    gpu_offset: 0x%08lX\n", man->gpu_offset);
+	drm_printf(p, "    size: %lu\n", man->size);
 	drm_printf(p, "    available_caching: 0x%08X\n", man->available_caching);
 	drm_printf(p, "    default_caching: 0x%08X\n", man->default_caching);
 	if (mem_type != TTM_PL_SYSTEM)
@@ -1572,7 +1572,7 @@ static int ttm_bo_global_init(void)
 	if (ret)
 		goto out;
 
-	spin_lock_init(&glob->lru_lock);
+	lockinit(&glob->lru_lock, "ttmglrul", 0, LK_CANRECURSE);
 	glob->mem_glob = &ttm_mem_glob;
 	glob->mem_glob->bo_glob = glob;
 	glob->dummy_read_page = alloc_page(__GFP_ZERO | GFP_DMA32);

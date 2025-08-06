@@ -228,12 +228,18 @@ unsigned long drm_sched_suspend_timeout(struct drm_gpu_scheduler *sched)
 {
 	unsigned long sched_timeout, now = jiffies;
 
+#ifdef __DragonFly__
+	/* XXX: drm_sched_suspend_timeout is not used, recheck after update*/
+	sched_timeout = 0;
+#else
 	sched_timeout = sched->work_tdr.timer.expires;
+#endif
 
 	/*
 	 * Modify the timeout to an arbitrarily large value. This also prevents
 	 * the timeout to be restarted when new submissions arrive
 	 */
+	/* XXX: DFly mod_delayed_work always returns false */
 	if (mod_delayed_work(system_wq, &sched->work_tdr, MAX_SCHEDULE_TIMEOUT)
 			&& time_after(sched_timeout, now))
 		return sched_timeout - now;
@@ -370,7 +376,7 @@ void drm_sched_hw_job_reset(struct drm_gpu_scheduler *sched, struct drm_sched_jo
 		for (i = DRM_SCHED_PRIORITY_MIN; i < DRM_SCHED_PRIORITY_KERNEL; i++ ) {
 			struct drm_sched_rq *rq = &sched->sched_rq[i];
 
-			spin_lock(&rq->lock);
+			lockmgr(&rq->lock, LK_EXCLUSIVE);
 			list_for_each_entry_safe(entity, tmp, &rq->entities, list) {
 				if (bad->s_fence->scheduled.context == entity->fence_context) {
 				    if (atomic_read(&bad->karma) > bad->sched->hang_limit)
@@ -379,7 +385,7 @@ void drm_sched_hw_job_reset(struct drm_gpu_scheduler *sched, struct drm_sched_jo
 					break;
 				}
 			}
-			spin_unlock(&rq->lock);
+			lockmgr(&rq->lock, LK_RELEASE);
 			if (&entity->list != &rq->entities)
 				break;
 		}

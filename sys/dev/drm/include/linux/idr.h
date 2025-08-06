@@ -120,6 +120,12 @@ idr_get_next(struct idr *idp, int *nextid)
 	return res;
 }
 
+static inline bool
+idr_is_empty(const struct idr *idr)
+{
+	return idr->idr_count == 0;
+}
+
 #define idr_for_each_entry(idp, entry, id)			\
 	for (id = 0; ((entry) = idr_get_next(idp, &(id))) != NULL; ++id)
 

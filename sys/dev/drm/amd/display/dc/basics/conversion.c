@@ -34,6 +34,10 @@
 uint16_t fixed_point_to_int_frac(
 	struct fixed31_32 arg,
 	uint8_t integer_bits,
+	uint8_t fractional_bits);
+uint16_t fixed_point_to_int_frac(
+	struct fixed31_32 arg,
+	uint8_t integer_bits,
 	uint8_t fractional_bits)
 {
 	int32_t numerator;
@@ -78,6 +82,10 @@ uint16_t fixed_point_to_int_frac(
 * @param :
 * @return None
 */
+void convert_float_matrix(
+	uint16_t *matrix,
+	struct fixed31_32 *flt,
+	uint32_t buffer_size);
 void convert_float_matrix(
 	uint16_t *matrix,
 	struct fixed31_32 *flt,

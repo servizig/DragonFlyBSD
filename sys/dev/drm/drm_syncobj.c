@@ -512,7 +512,7 @@ err_put_fd:
 void
 drm_syncobj_open(struct drm_file *file_private)
 {
-	idr_init_base(&file_private->syncobj_idr, 1);
+	idr_init(&file_private->syncobj_idr);
 	lockinit(&file_private->syncobj_table_lock, "dsotl", 0, 0);
 }
 

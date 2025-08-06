@@ -27,7 +27,7 @@
 #define PRECISION 5 /* Change this value to change the number of decimal places in the final output - 5 is a good default */
 
 #define SHIFTED_2 (2 << SHIFT_AMOUNT)
-#define MAX (1 << (SHIFT_AMOUNT - 1)) - 1 /* 32767 - Might change in the future */
+#define POWERPLAY_MAX (1 << (SHIFT_AMOUNT - 1)) - 1 /* 32767 - Might change in the future */
 
 /* -------------------------------------------------------------------------------
  * NEW TYPE - fINT

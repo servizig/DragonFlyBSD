@@ -3596,6 +3596,7 @@ static const struct pp_hwmgr_func vega20_hwmgr_funcs = {
 	.enable_mgpu_fan_boost = vega20_enable_mgpu_fan_boost,
 };
 
+int vega20_hwmgr_init(struct pp_hwmgr *hwmgr);
 int vega20_hwmgr_init(struct pp_hwmgr *hwmgr)
 {
 	hwmgr->hwmgr_func = &vega20_hwmgr_funcs;

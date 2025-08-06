@@ -1365,6 +1365,8 @@ static int vega12_notify_smc_display_change(struct pp_hwmgr *hwmgr,
 }
 
 int vega12_display_clock_voltage_request(struct pp_hwmgr *hwmgr,
+		struct pp_display_clock_request *clock_req);
+int vega12_display_clock_voltage_request(struct pp_hwmgr *hwmgr,
 		struct pp_display_clock_request *clock_req)
 {
 	int result = 0;
@@ -2143,6 +2145,7 @@ static int vega12_display_configuration_changed_task(struct pp_hwmgr *hwmgr)
 	return result;
 }
 
+int vega12_enable_disable_uvd_dpm(struct pp_hwmgr *hwmgr, bool enable);
 int vega12_enable_disable_uvd_dpm(struct pp_hwmgr *hwmgr, bool enable)
 {
 	struct vega12_hwmgr *data =
@@ -2434,6 +2437,7 @@ static const struct pp_hwmgr_func vega12_hwmgr_funcs = {
 	.get_performance_level = vega12_get_performance_level,
 };
 
+int vega12_hwmgr_init(struct pp_hwmgr *hwmgr);
 int vega12_hwmgr_init(struct pp_hwmgr *hwmgr)
 {
 	hwmgr->hwmgr_func = &vega12_hwmgr_funcs;

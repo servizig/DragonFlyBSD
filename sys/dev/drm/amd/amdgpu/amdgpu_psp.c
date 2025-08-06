@@ -302,7 +302,7 @@ static int psp_xgmi_init_shared_buf(struct psp_context *psp)
 	ret = amdgpu_bo_create_kernel(psp->adev, PSP_XGMI_SHARED_MEM_SIZE,
 				      PAGE_SIZE, AMDGPU_GEM_DOMAIN_VRAM,
 				      &psp->xgmi_context.xgmi_shared_bo,
-				      &psp->xgmi_context.xgmi_shared_mc_addr,
+				      (u64 *)&psp->xgmi_context.xgmi_shared_mc_addr,
 				      &psp->xgmi_context.xgmi_shared_buf);
 
 	return ret;
@@ -426,7 +426,7 @@ static int psp_xgmi_terminate(struct psp_context *psp)
 
 	/* free xgmi shared memory */
 	amdgpu_bo_free_kernel(&psp->xgmi_context.xgmi_shared_bo,
-			&psp->xgmi_context.xgmi_shared_mc_addr,
+			(u64*)&psp->xgmi_context.xgmi_shared_mc_addr,
 			&psp->xgmi_context.xgmi_shared_buf);
 
 	return 0;

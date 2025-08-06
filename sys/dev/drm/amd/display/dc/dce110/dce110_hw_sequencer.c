@@ -2627,6 +2627,7 @@ static void dce110_wait_for_mpcc_disconnect(
 	/* do nothing*/
 }
 
+void dce110_set_cursor_position(struct pipe_ctx *pipe_ctx);
 void dce110_set_cursor_position(struct pipe_ctx *pipe_ctx)
 {
 	struct dc_cursor_position pos_cpy = pipe_ctx->stream->cursor_position;

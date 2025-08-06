@@ -183,9 +183,9 @@ static ssize_t ttm_mem_global_show(struct kobject *kobj,
 		container_of(kobj, struct ttm_mem_global, kobj);
 	uint64_t val = 0;
 
-	spin_lock(&glob->lock);
+	lockmgr(&glob->lock, LK_EXCLUSIVE);
 	val = glob->lower_mem_limit;
-	spin_unlock(&glob->lock);
+	lockmgr(&glob->lock, LK_RELEASE);
 	/* convert from number of pages to KB */
 	val <<= (PAGE_SHIFT - 10);
 	return snprintf(buffer, PAGE_SIZE, "%llu\n",
@@ -203,7 +203,7 @@ static ssize_t ttm_mem_global_store(struct kobject *kobj,
 	struct ttm_mem_global *glob =
 		container_of(kobj, struct ttm_mem_global, kobj);
 
-	chars = sscanf(buffer, "%lu", &val);
+	chars = ksscanf(buffer, "%lu", &val);
 	if (chars == 0)
 		return size;
 
@@ -211,9 +211,9 @@ static ssize_t ttm_mem_global_store(struct kobject *kobj,
 	/* convert from KB to number of pages */
 	val64 >>= (PAGE_SHIFT - 10);
 
-	spin_lock(&glob->lock);
+	lockmgr(&glob->lock, LK_EXCLUSIVE);
 	glob->lower_mem_limit = val64;
-	spin_unlock(&glob->lock);
+	lockmgr(&glob->lock, LK_RELEASE);
 
 	return size;
 }

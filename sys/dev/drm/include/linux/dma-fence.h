@@ -85,6 +85,7 @@ void dma_fence_init(struct dma_fence *fence, const struct dma_fence_ops *ops,
 		    spinlock_t *lock, u64 context, unsigned seqno);
 
 void dma_fence_release(struct kref *kref);
+struct dma_fence* dma_fence_get_stub(void);
 
 static inline struct dma_fence *
 dma_fence_get(struct dma_fence *fence)

@@ -27,6 +27,16 @@
 #ifndef _LINUX_TIMEKEEPING_H_
 #define _LINUX_TIMEKEEPING_H_
 
+/* TODO: check this */
+static inline u64 ktime_get_ns(void)
+{
+	struct timespec ts;
+
+	nanouptime(&ts);
+
+	return (ts.tv_sec * NSEC_PER_SEC) + ts.tv_nsec;
+}
+
 static inline u64 ktime_get_raw_ns(void)
 {
 	struct timespec ts;

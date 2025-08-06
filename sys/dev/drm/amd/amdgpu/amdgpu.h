@@ -930,6 +930,11 @@ struct amdgpu_device {
 	unsigned long last_mm_index;
 	bool                            in_gpu_reset;
 	struct lock  lock_reset;
+	struct amdgpu_doorbell_index doorbell_index;
+
+	int asic_reset_res;
+	struct work_struct		xgmi_reset_work;
+
 #ifdef __DragonFly__
 	struct {
 		ACPI_HANDLE		handle;
