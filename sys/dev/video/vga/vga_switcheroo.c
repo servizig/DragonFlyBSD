@@ -496,7 +496,7 @@ vga_switcheroo_unregister_client(struct pci_dev *pdev)
 		if (client_is_vga(client))
 			vgasr_priv->registered_clients--;
 		list_del(&client->list);
-		kfree(client, M_VGA_SWITCHEROO_CLIENT);
+		kfree(client);
 	}
 	if (vgasr_priv->active && vgasr_priv->registered_clients < 2) {
 		pr_info("disabled\n");
@@ -1022,8 +1022,8 @@ vga_switcheroo_handler(struct module *m __unused, int what, void *arg __unused)
 	case MOD_UNLOAD:
 	case MOD_SHUTDOWN:
 		destroy_dev(vga_switcheroo_dev);
-		kfree(vga_switcheroo_buf, M_VGA_SWITCHEROO_BUF);
-		kfree(vgasr_priv, M_VGA_SWITCHEROO_VGASR_PRIV);
+		kfree(vga_switcheroo_buf);
+		kfree(vgasr_priv);
 		kprintf("vga_switcheroo device unloaded\n");
 		break;
 

@@ -124,7 +124,7 @@ drm_atomic_helper_crtc_duplicate_state(struct drm_crtc *crtc)
 	if (WARN_ON(!crtc->state))
 		return NULL;
 
-	state = kmalloc(sizeof(*state), GFP_KERNEL);
+	state = kmalloc(sizeof(*state), M_DRM, GFP_KERNEL);
 	if (state)
 		__drm_atomic_helper_crtc_duplicate_state(crtc, state);
 
@@ -261,7 +261,7 @@ drm_atomic_helper_plane_duplicate_state(struct drm_plane *plane)
 	if (WARN_ON(!plane->state))
 		return NULL;
 
-	state = kmalloc(sizeof(*state), GFP_KERNEL);
+	state = kmalloc(sizeof(*state), M_DRM, GFP_KERNEL);
 	if (state)
 		__drm_atomic_helper_plane_duplicate_state(plane, state);
 
@@ -389,7 +389,7 @@ drm_atomic_helper_connector_duplicate_state(struct drm_connector *connector)
 	if (WARN_ON(!connector->state))
 		return NULL;
 
-	state = kmalloc(sizeof(*state), GFP_KERNEL);
+	state = kmalloc(sizeof(*state), M_DRM, GFP_KERNEL);
 	if (state)
 		__drm_atomic_helper_connector_duplicate_state(connector, state);
 

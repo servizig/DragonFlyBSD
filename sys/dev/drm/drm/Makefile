@@ -4,6 +4,7 @@ KMOD	= drm
 SRCS	= \
 	drm_atomic.c \
 	drm_atomic_helper.c \
+	drm_atomic_state_helper.c \
 	drm_atomic_uapi.c \
 	drm_auth.c \
 	drm_blend.c \
@@ -15,12 +16,14 @@ SRCS	= \
 	drm_context.c \
 	drm_crtc.c \
 	drm_crtc_helper.c \
+	drm_damage_helper.c \
 	drm_dma.c \
 	drm_dp_aux_dev.c \
 	drm_dp_dual_mode_helper.c \
 	drm_dp_helper.c \
 	drm_dp_mst_topology.c \
 	drm_dragonfly.c \
+	drm_dsc.c \
 	drm_drv.c \
 	drm_dumb_buffers.c \
 	drm_edid.c \

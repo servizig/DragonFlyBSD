@@ -438,7 +438,7 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 	else
 		size = ALIGN(size, PAGE_SIZE);
 
-#if 1
+#if 0
 	/* ZZZ force alignment to fit the allocation size */
 	if (size > 2048 * 1024) {
 //		unsigned long opa = page_align;

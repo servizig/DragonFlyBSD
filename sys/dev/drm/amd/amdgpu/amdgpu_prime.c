@@ -234,6 +234,7 @@ err_fences_put:
 	kfree(fences);
 	return -ENOMEM;
 }
+#endif
 
 /**
  * amdgpu_gem_map_attach - &dma_buf_ops.attach implementation
@@ -247,6 +248,7 @@ err_fences_put:
  * Returns:
  * 0 on success or a negative error code on failure.
  */
+#if 0
 static int amdgpu_gem_map_attach(struct dma_buf *dma_buf,
 				 struct dma_buf_attachment *attach)
 {
@@ -351,7 +353,6 @@ struct reservation_object *amdgpu_gem_prime_res_obj(struct drm_gem_object *obj)
  * Returns:
  * 0 on success or a negative error code on failure.
  */
-#if 0
 static int amdgpu_gem_begin_cpu_access(struct dma_buf *dma_buf,
 				       enum dma_data_direction direction)
 {
@@ -381,8 +382,10 @@ static int amdgpu_gem_begin_cpu_access(struct dma_buf *dma_buf,
 }
 
 const struct dma_buf_ops amdgpu_dmabuf_ops = {
+#if 0
 	.attach = amdgpu_gem_map_attach,
 	.detach = amdgpu_gem_map_detach,
+#endif
 	.map_dma_buf = drm_gem_map_dma_buf,
 	.unmap_dma_buf = drm_gem_unmap_dma_buf,
 	.release = drm_gem_dmabuf_release,
@@ -391,7 +394,6 @@ const struct dma_buf_ops amdgpu_dmabuf_ops = {
 	.vmap = drm_gem_dmabuf_vmap,
 	.vunmap = drm_gem_dmabuf_vunmap,
 };
-#endif
 
 /**
  * amdgpu_gem_prime_export - &drm_driver.gem_prime_export implementation
