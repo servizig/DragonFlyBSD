@@ -11,6 +11,8 @@ sha1 = a045ea36603aaea19b1b0994e22a87600dd93bd0
 
 The file README.DELETED contains a list of deleted files and directories.
 
+Use "git diff vendor/GCC120 contrib/gcc-12" to see local modifications.
+
 Configured with
 ===============
   --with-pkgversion=DragonFly
@@ -21,3 +23,18 @@ Configured with
   --disable-libquadmath --disable-libitm --enable-libstdcxx-dual-abi=yes
   --enable-lto --enable-plugin --enable-gnu-indirect-function
   --disable-nls --disable-multilib --disable-bootstrap
+
+The following files have been patched
+=====================================
+  gcc/c-family/c-format.cc		extra TZ "%+" format for strftime()
+  gcc/config/dragonfly.h		default dynamic linker path
+  gcc/gcc.cc				default paths for base tools
+  libgcc/gthr-posix.h			avoid weakref (ld.gold issue)
+  libgcc/unwind-dw2-fde-dip.c		avoid redefining ElfW
+  libstdc++-v3/config/locale/dragonfly/codecvt_members.cc
+					fix codecvt::do_length
+  libstdc++-v3/config/os/bsd/dragonfly/os_defines.h
+					fix _GLIBCXX_USE_C99_LONG_LONG_DYNAMIC
+  libstdc++-v3/include/c_global/cstdio	remove throw() decorations
+  libstdc++-v3/include/c_global/cstdlib	remove throw() decorations
+  libstdc++-v3/include/c_global/cwchar	remove throw() decorations
