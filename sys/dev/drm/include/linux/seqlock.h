@@ -51,14 +51,14 @@
 
 typedef struct {
 	unsigned sequence;
-	struct spinlock lock;
+	struct lock lock;
 } seqlock_t;
 
 static inline void
 seqlock_init(seqlock_t *sl)
 {
 	sl->sequence = 0;
-	spin_init(&sl->lock, "lsql");
+	lockinit(&sl->lock, "lsql", 0, 0);
 }
 
 /*
@@ -69,7 +69,7 @@ seqlock_init(seqlock_t *sl)
 static inline void
 write_seqlock(seqlock_t *sl)
 {
-	spin_lock(&sl->lock);
+	lockmgr(&sl->lock, LK_EXCLUSIVE | LK_SPIN);
 	atomic_add_int(&sl->sequence, 1);
 	cpu_sfence();
 }
@@ -78,7 +78,7 @@ static inline void
 write_sequnlock(seqlock_t *sl)
 {
 	atomic_add_int(&sl->sequence, 1);
-	spin_unlock(&sl->lock);
+	lockmgr(&sl->lock, LK_RELEASE);
 	cpu_sfence();
 }
 
@@ -175,7 +175,7 @@ raw_read_seqcount(const seqcount_t *s)
 static inline void
 write_seqlock_irqsave(seqlock_t *sl, unsigned long flags)
 {
-	spin_lock(&sl->lock);
+	lockmgr(&sl->lock, LK_EXCLUSIVE | LK_SPIN);
 	local_irq_save(flags);
 	atomic_add_int(&sl->sequence, 1);
 }
@@ -185,7 +185,7 @@ write_sequnlock_irqrestore(seqlock_t *sl, unsigned long flags)
 {
 	atomic_add_int(&sl->sequence, 1);
 	local_irq_restore(flags);
-	spin_unlock(&sl->lock);	
+	lockmgr(&sl->lock, LK_RELEASE);
 }
 
 #endif	/* _LINUX_SEQLOCK_H_ */

@@ -68,7 +68,7 @@ kthread_run(int (*lfn)(void *), void *data, const char *namefmt, ...)
 
 	task->kt_fn = lfn;
 	task->kt_fndata = data;
-	spin_init(&task->kt_spin, "tspin1");
+	lockinit(&task->kt_spin, "tspin1", 0, 0);
 
 	/* Start the thread here */
 	lwkt_schedule(td);

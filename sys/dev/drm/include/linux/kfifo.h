@@ -64,7 +64,7 @@ _kfifo_alloc(struct kfifo_meta *meta, void *bufp, size_t nbytes, gfp_t gfp)
 {
 	void *buf;
 
-	buf = kmalloc(nbytes, M_DRM, gfp);
+	buf = __kmalloc(nbytes, M_DRM, gfp);
 	if (buf == NULL)
 		return -ENOMEM;
 
@@ -87,7 +87,7 @@ _kfifo_free(struct kfifo_meta *meta, void *bufp)
 {
 	void *buf;
 
-	mutex_destroy(&meta->kfm_lock);
+	lockuninit(&meta->kfm_lock);
 
 	memcpy(&buf, bufp, sizeof(void *));
 	kfree(buf);

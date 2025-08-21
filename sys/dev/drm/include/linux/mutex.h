@@ -33,6 +33,13 @@
 #include <linux/atomic.h>
 #include <asm/processor.h>
 
+struct mutex {
+  struct lock lock;
+};
+
+#define mutex_init(mutex) lockinit(mutex.lock, #mutex, 0, 0)
+#define mutex_destroy(mutex) lockuninit(mutex.lock)
+
 #define mutex_is_locked(lock)	(lockinuse(lock))
 
 #define mutex_lock(lock)	lockmgr(lock, LK_EXCLUSIVE)
@@ -52,12 +59,6 @@ mutex_lock_interruptible(struct lock *lock)
 #define DEFINE_MUTEX(mutex)	\
 	struct lock mutex;	\
 	LOCK_SYSINIT(mutex, &mutex, "lmutex", LK_CANRECURSE)
-
-static inline void
-mutex_destroy(struct lock *mutex)
-{
-	lockuninit(mutex);
-}
 
 #define mutex_lock_nested(lock, unused)	mutex_lock(lock)
 

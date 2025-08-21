@@ -42,12 +42,17 @@
 
 #include <linux/rwlock.h>
 
-#include <sys/spinlock2.h>
 #include <sys/lock.h>
 
-#define spin_is_locked(x)	spin_held(x)
-
 #define assert_spin_locked(x)	KKASSERT(lockinuse(x))
+
+void lkpi_spin_lock(struct lock*);
+void lkpi_spin_unlock(struct lock*);
+
+#undef spin_lock
+#define spin_lock(lock) lkpi_spin_lock(lock)
+#undef spin_unlock
+#define spin_unlock(lock) lkpi_spin_unlock(lock)
 
 /*
  * The spin_lock_irq() family of functions stop hardware interrupts

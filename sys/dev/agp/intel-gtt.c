@@ -861,7 +861,7 @@ agp_i810_attach(device_t dev)
 	}
 
 	sc->initial_aperture = AGP_GET_APERTURE(dev);
-	sc->gatt = kmalloc(sizeof(struct agp_gatt), M_DRM, M_WAITOK);
+	sc->gatt = __kmalloc(sizeof(struct agp_gatt), M_DRM, M_WAITOK);
 	sc->gatt->ag_entries = AGP_GET_APERTURE(dev) >> AGP_PAGE_SHIFT;
 
 	if ((error = sc->match->driver->get_stolen_size(dev)) != 0 ||
@@ -1171,7 +1171,7 @@ agp_i810_alloc_memory(device_t dev, int type, vm_size_t size)
 		}
 	}
 
-	mem = kmalloc(sizeof *mem, M_DRM, M_INTWAIT);
+	mem = __kmalloc(sizeof *mem, M_DRM, M_INTWAIT);
 	mem->am_id = sc->agp.as_nextid++;
 	mem->am_size = size;
 	mem->am_type = type;

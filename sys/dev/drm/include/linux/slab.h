@@ -32,8 +32,11 @@
 
 MALLOC_DECLARE(M_DRM);
 
-#define kzalloc(size, flags)	kmalloc(size, M_DRM, flags | M_ZERO)
-#define kvzalloc(size, flags)	kmalloc(size, M_DRM, (flags) | M_ZERO)
+#undef kmalloc
+#define kmalloc(size, flags) __kmalloc(size, M_DRM, flags)
+
+#define kzalloc(size, flags)	__kmalloc(size, M_DRM, flags | M_ZERO)
+#define kvzalloc(size, flags)	__kmalloc(size, M_DRM, (flags) | M_ZERO)
 
 #undef kfree
 #define kfree(ptr)	do {			\
@@ -46,7 +49,7 @@ MALLOC_DECLARE(M_DRM);
 static inline void *
 kmalloc_array(size_t n, size_t size, gfp_t flags)
 {
-	return kmalloc(n * size, M_DRM, flags);
+	return __kmalloc(n * size, M_DRM, flags);
 }
 
 #include <linux/kasan.h>
@@ -84,7 +87,7 @@ kmem_cache_destroy(struct kmem_cache *kc)
 static inline void *
 kmem_cache_alloc(struct kmem_cache *kc, gfp_t flags)
 {
-	return kmalloc(kc->size, M_DRM, flags);
+	return __kmalloc(kc->size, M_DRM, flags);
 }
 
 static inline void *

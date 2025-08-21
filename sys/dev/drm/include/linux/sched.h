@@ -96,7 +96,7 @@ struct task_struct {
 
 	atomic_t          usage_counter;
 	pid_t             pid;
-	struct spinlock   kt_spin;
+	struct lock   kt_spin;
 };
 
 #define __set_current_state(state_value)	current->state = (state_value);
@@ -133,7 +133,7 @@ schedule_timeout(signed long timeout)
 		? 0
 		: timeout;
 
-	spin_lock(&current->kt_spin);
+	lockmgr(&current->kt_spin, LK_EXCLUSIVE | LK_SPIN);
 
 	switch (current->state) {
 	case TASK_INTERRUPTIBLE:
@@ -145,7 +145,7 @@ schedule_timeout(signed long timeout)
 
 	case TASK_RUNNING:
 		/* bail early, timeout strictly >= 0 */
-		spin_unlock(&current->kt_spin);
+		lockmgr(&current->kt_spin, LK_RELEASE);
 		return timeout;
 
 	default:
@@ -156,7 +156,7 @@ schedule_timeout(signed long timeout)
 		panic("unreachable state %ld\n", current->state);
 	}
 	time_before = ticks;
-	error = ssleep(current, &current->kt_spin, flags, "lstim", timo);
+	error = lksleep(current, &current->kt_spin, flags, "lstim", timo);
 	time_after = ticks;
 
 	/* assume timeout actually expired */
@@ -182,7 +182,7 @@ schedule_timeout(signed long timeout)
 		}
 	}
 
-	spin_unlock(&current->kt_spin);
+	lockmgr(&current->kt_spin, LK_RELEASE);
 
 	current->state = TASK_RUNNING;
 	return ret;
@@ -235,10 +235,10 @@ wake_up_process(struct task_struct *tsk)
 	 * a barrier
 	 */
 	smp_wmb();
-	spin_lock(&tsk->kt_spin);
+	lockmgr(&tsk->kt_spin, LK_EXCLUSIVE | LK_SPIN);
 	ostate = tsk->state;
 	tsk->state = TASK_RUNNING;
-	spin_unlock(&tsk->kt_spin);
+	lockmgr(&tsk->kt_spin, LK_RELEASE);
 	if (ostate != TASK_RUNNING)
 		wakeup(tsk);
 

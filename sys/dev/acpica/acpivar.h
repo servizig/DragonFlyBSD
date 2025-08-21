@@ -38,8 +38,10 @@
 #include <sys/sysctl.h>
 #include <sys/lock.h>
 #include <sys/bus.h>
+#if 0
 #include <sys/spinlock.h>
 #include <sys/spinlock2.h>
+#endif
 #include <sys/serialize.h>
 #include <contrib/dev/acpica/source/include/acmacros.h>
 #include <contrib/dev/acpica/source/include/acconfig.h>

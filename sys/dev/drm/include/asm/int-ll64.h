@@ -39,7 +39,7 @@ typedef int32_t s32;
 typedef uint32_t u32;
 
 typedef signed long long s64;
-typedef unsigned long long u64;
+typedef unsigned long u64;
 
 #define U64_C(x) x ## ULL
 
