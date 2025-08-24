@@ -95,7 +95,7 @@ do_edid_fw_load(struct drm_connector *connector, const char *fwname,
 		goto fw_out;
 	}
 
-	block = kmalloc(fwsize, M_DRM, GFP_KERNEL);
+	block = kmalloc(fwsize, GFP_KERNEL);
 	if (block == NULL) {
 		goto fw_out;
 	}

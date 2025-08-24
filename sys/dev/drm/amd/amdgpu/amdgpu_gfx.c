@@ -241,7 +241,7 @@ int amdgpu_gfx_kiq_init_ring(struct amdgpu_device *adev,
 	struct amdgpu_kiq *kiq = &adev->gfx.kiq;
 	int r = 0;
 
-	lockinit(&kiq->ring_lock, "agkiqrl", 0, LK_CANRECURSE);
+	spin_lock_init(&kiq->ring_lock);
 
 	r = amdgpu_device_wb_get(adev, &adev->virt.reg_val_offs);
 	if (r)
@@ -323,14 +323,14 @@ int amdgpu_gfx_compute_mqd_sw_init(struct amdgpu_device *adev,
 		 */
 		r = amdgpu_bo_create_kernel(adev, mqd_size, PAGE_SIZE,
 					    AMDGPU_GEM_DOMAIN_VRAM, &ring->mqd_obj,
-					    (u64 *)&ring->mqd_gpu_addr, &ring->mqd_ptr);
+					    &ring->mqd_gpu_addr, &ring->mqd_ptr);
 		if (r) {
 			dev_warn(adev->dev, "failed to create ring mqd ob (%d)", r);
 			return r;
 		}
 
 		/* prepare MQD backup */
-		adev->gfx.mec.mqd_backup[AMDGPU_MAX_COMPUTE_RINGS] = kmalloc(mqd_size, M_DRM, GFP_KERNEL);
+		adev->gfx.mec.mqd_backup[AMDGPU_MAX_COMPUTE_RINGS] = kmalloc(mqd_size, GFP_KERNEL);
 		if (!adev->gfx.mec.mqd_backup[AMDGPU_MAX_COMPUTE_RINGS])
 				dev_warn(adev->dev, "no memory to create MQD backup for ring %s\n", ring->name);
 	}
@@ -341,14 +341,14 @@ int amdgpu_gfx_compute_mqd_sw_init(struct amdgpu_device *adev,
 		if (!ring->mqd_obj) {
 			r = amdgpu_bo_create_kernel(adev, mqd_size, PAGE_SIZE,
 						    AMDGPU_GEM_DOMAIN_GTT, &ring->mqd_obj,
-						    (u64 *)&ring->mqd_gpu_addr, &ring->mqd_ptr);
+						    &ring->mqd_gpu_addr, &ring->mqd_ptr);
 			if (r) {
 				dev_warn(adev->dev, "failed to create ring mqd ob (%d)", r);
 				return r;
 			}
 
 			/* prepare MQD backup */
-			adev->gfx.mec.mqd_backup[i] = kmalloc(mqd_size, M_DRM, GFP_KERNEL);
+			adev->gfx.mec.mqd_backup[i] = kmalloc(mqd_size, GFP_KERNEL);
 			if (!adev->gfx.mec.mqd_backup[i])
 				dev_warn(adev->dev, "no memory to create MQD backup for ring %s\n", ring->name);
 		}
@@ -366,14 +366,14 @@ void amdgpu_gfx_compute_mqd_sw_fini(struct amdgpu_device *adev)
 		ring = &adev->gfx.compute_ring[i];
 		kfree(adev->gfx.mec.mqd_backup[i]);
 		amdgpu_bo_free_kernel(&ring->mqd_obj,
-				      (u64 *)&ring->mqd_gpu_addr,
+				      &ring->mqd_gpu_addr,
 				      &ring->mqd_ptr);
 	}
 
 	ring = &adev->gfx.kiq.ring;
 	kfree(adev->gfx.mec.mqd_backup[AMDGPU_MAX_COMPUTE_RINGS]);
 	amdgpu_bo_free_kernel(&ring->mqd_obj,
-			      (u64 *)&ring->mqd_gpu_addr,
+			      &ring->mqd_gpu_addr,
 			      &ring->mqd_ptr);
 }
 

@@ -59,7 +59,7 @@ ww_acquire_fini(struct ww_acquire_ctx *ctx __unused)
 void
 ww_mutex_init(struct ww_mutex *ww, struct ww_class *ww_class)
 {
-	lockinit(&ww->base, ww_class->name, 0, LK_CANRECURSE);
+	lockinit(&ww->base.lock, ww_class->name, 0, LK_CANRECURSE);
 	ww->ctx = NULL;
 	ww->stamp = 0xFFFFFFFFFFFFFFFFLU;
 	ww->blocked = 0;
@@ -68,7 +68,7 @@ ww_mutex_init(struct ww_mutex *ww, struct ww_class *ww_class)
 void
 ww_mutex_destroy(struct ww_mutex *ww)
 {
-	lockuninit(&ww->base);
+	lockuninit(&ww->base.lock);
 }
 
 /*
@@ -92,7 +92,7 @@ __wwlock(struct ww_mutex *ww, struct ww_acquire_ctx *ctx,
 	 * Already held by calling thread (DRM really needs this to work
 	 * properly by returning -EALREADY)
 	 */
-	if (lockstatus(&ww->base, curthread) == LK_EXCLUSIVE) {
+	if (lockstatus(&ww->base.lock, curthread) == LK_EXCLUSIVE) {
 		//kprintf("ww %p already locked\n", ww);
 		//print_backtrace(-1);
 		//tsleep(&flags, 0, "XXX", hz);
@@ -103,7 +103,7 @@ __wwlock(struct ww_mutex *ww, struct ww_acquire_ctx *ctx,
 	 * Normal mutex if ctx is NULL
 	 */
 	if (ctx == NULL) {
-		error = lockmgr(&ww->base, flags);
+		error = lockmgr(&ww->base.lock, flags);
 		if (error)
 			error = -EINTR;
 		return error;
@@ -123,7 +123,7 @@ __wwlock(struct ww_mutex *ww, struct ww_acquire_ctx *ctx,
 			flags |= LK_NOWAIT;
 			tsleep_interlock(ww, (intr ? PCATCH : 0));
 		}
-		error = lockmgr(&ww->base, flags);
+		error = lockmgr(&ww->base.lock, flags);
 		if (error == 0) {
 			ww->ctx = ctx;
 			ww->stamp = ctx->stamp;
@@ -174,7 +174,7 @@ __wwlock(struct ww_mutex *ww, struct ww_acquire_ctx *ctx,
 int
 ww_mutex_lock_recursive(struct ww_mutex *ww)
 {
-    lockmgr(&ww->base, LK_EXCLUSIVE | LK_CANRECURSE);
+    lockmgr(&ww->base.lock, LK_EXCLUSIVE | LK_CANRECURSE);
 
     return 0;
 }
@@ -216,7 +216,7 @@ ww_mutex_unlock(struct ww_mutex *ww)
 		ww->ctx = NULL;
 		ww->stamp = 0xFFFFFFFFFFFFFFFFLU;
 	}
-	lockmgr(&ww->base, LK_RELEASE);
+	lockmgr(&ww->base.lock, LK_RELEASE);
 	if (atomic_swap_int(&ww->blocked, 0))
 		wakeup(ww);
 }

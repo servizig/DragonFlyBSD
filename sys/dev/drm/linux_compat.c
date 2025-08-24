@@ -47,7 +47,7 @@ kmemdup(const void *src, size_t len, gfp_t gfp)
 {
 	void *dst;
 
-	dst = kmalloc(len, M_DRM, gfp);
+	dst = __kmalloc(len, M_DRM, gfp);
 	if (dst)
 		memcpy(dst, src, len);
 	return (dst);

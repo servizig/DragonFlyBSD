@@ -268,11 +268,11 @@ static bool gmc_v9_0_prescreen_iv(struct amdgpu_device *adev,
 		return true;
 
 	/* Track retry faults in per-VM fault FIFO. */
-	lockmgr(&adev->vm_manager.pasid_lock, LK_EXCLUSIVE);
+	drm_spin_lock(&adev->vm_manager.pasid_lock);
 	vm = idr_find(&adev->vm_manager.pasid_idr, entry->pasid);
 	if (!vm) {
 		/* VM not found, process it normally */
-		lockmgr(&adev->vm_manager.pasid_lock, LK_RELEASE);
+		drm_spin_unlock(&adev->vm_manager.pasid_lock);
 		return true;
 	}
 
@@ -283,7 +283,7 @@ static bool gmc_v9_0_prescreen_iv(struct amdgpu_device *adev,
 	 * ignore further page faults
 	 */
 	if (r != 0) {
-		lockmgr(&adev->vm_manager.pasid_lock, LK_RELEASE);
+		drm_spin_unlock(&adev->vm_manager.pasid_lock);
 		return false;
 	}
 	/* No locking required with single writer and single reader */
@@ -292,12 +292,12 @@ static bool gmc_v9_0_prescreen_iv(struct amdgpu_device *adev,
 	if (!r) {
 		/* FIFO is full. Ignore it until there is space */
 		amdgpu_vm_clear_fault(vm->fault_hash, key);
-		lockmgr(&adev->vm_manager.pasid_lock, LK_RELEASE);
+		spin_unlock(&adev->vm_manager.pasid_lock);
 		return false;
 	}
 #endif
 
-	lockmgr(&adev->vm_manager.pasid_lock, LK_RELEASE);
+	drm_spin_unlock(&adev->vm_manager.pasid_lock);
 	/* It's the first fault for this address, process it normally */
 	return true;
 }
@@ -307,6 +307,7 @@ static int gmc_v9_0_process_interrupt(struct amdgpu_device *adev,
 				struct amdgpu_iv_entry *entry)
 {
 	struct amdgpu_vmhub *hub = &adev->vmhub[entry->vmid_src];
+	bool retry_fault = !!(entry->src_data[1] & 0x80);
 	uint32_t status = 0;
 	u64 addr;
 
@@ -322,17 +323,20 @@ static int gmc_v9_0_process_interrupt(struct amdgpu_device *adev,
 	}
 
 	if (printk_ratelimit()) {
-		struct amdgpu_task_info task_info = { 0 };
+		struct amdgpu_task_info task_info;
 
+		memset(&task_info, 0, sizeof(struct amdgpu_task_info));
 		amdgpu_vm_get_task_info(adev, entry->pasid, &task_info);
 
 		dev_err(adev->dev,
-			"[%s] VMC page fault (src_id:%u ring:%u vmid:%u pasid:%u, for process %s pid %d thread %s pid %d)\n",
+			"[%s] %s page fault (src_id:%u ring:%u vmid:%u "
+			"pasid:%u, for process %s pid %d thread %s pid %d)\n",
 			entry->vmid_src ? "mmhub" : "gfxhub",
+			retry_fault ? "retry" : "no-retry",
 			entry->src_id, entry->ring_id, entry->vmid,
 			entry->pasid, task_info.process_name, task_info.tgid,
 			task_info.task_name, task_info.pid);
-		dev_err(adev->dev, "  in page starting at address 0x%016llx from %d\n",
+		dev_err(adev->dev, "  in page starting at address 0x%016lx from %d\n",
 			addr, entry->client_id);
 		if (!amdgpu_sriov_vf(adev))
 			dev_err(adev->dev,
@@ -413,7 +417,7 @@ static void gmc_v9_0_flush_gpu_tlb(struct amdgpu_device *adev,
 			continue;
 		}
 
-		spin_lock(&adev->gmc.invalidate_lock);
+		drm_spin_lock(&adev->gmc.invalidate_lock);
 		WREG32_NO_KIQ(hub->vm_inv_eng0_req + eng, tmp);
 		for (j = 0; j < adev->usec_timeout; j++) {
 			tmp = RREG32_NO_KIQ(hub->vm_inv_eng0_ack + eng);
@@ -421,7 +425,7 @@ static void gmc_v9_0_flush_gpu_tlb(struct amdgpu_device *adev,
 				break;
 			udelay(1);
 		}
-		spin_unlock(&adev->gmc.invalidate_lock);
+		drm_spin_unlock(&adev->gmc.invalidate_lock);
 		if (j < adev->usec_timeout)
 			continue;
 
@@ -713,6 +717,7 @@ static bool gmc_v9_0_keep_stolen_memory(struct amdgpu_device *adev)
 	case CHIP_VEGA10:
 		return true;
 	case CHIP_RAVEN:
+		return (adev->pdev->device == 0x15d8);
 	case CHIP_VEGA12:
 	case CHIP_VEGA20:
 	default:
@@ -941,7 +946,7 @@ static int gmc_v9_0_sw_init(void *handle)
 	gfxhub_v1_0_init(adev);
 	mmhub_v1_0_init(adev);
 
-	spin_init(&adev->gmc.invalidate_lock, "aggmcil");
+	spin_lock_init(&adev->gmc.invalidate_lock);
 
 	adev->gmc.vram_type = amdgpu_atomfirmware_get_vram_type(adev);
 	switch (adev->asic_type) {
@@ -963,7 +968,11 @@ static int gmc_v9_0_sw_init(void *handle)
 		 * vm size is 256TB (48bit), maximum size of Vega10,
 		 * block size 512 (9bit)
 		 */
-		amdgpu_vm_adjust_size(adev, 256 * 1024, 9, 3, 48);
+		/* sriov restrict max_pfn below AMDGPU_GMC_HOLE */
+		if (amdgpu_sriov_vf(adev))
+			amdgpu_vm_adjust_size(adev, 256 * 1024, 9, 3, 47);
+		else
+			amdgpu_vm_adjust_size(adev, 256 * 1024, 9, 3, 48);
 		break;
 	default:
 		break;

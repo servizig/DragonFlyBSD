@@ -183,7 +183,7 @@ struct ttm_mem_type_manager {
 	uint32_t default_caching;
 	const struct ttm_mem_type_manager_func *func;
 	void *priv;
-	struct lock io_reserve_mutex;
+	struct mutex io_reserve_mutex;
 	bool use_io_reserve_lru;
 	bool io_reserve_fastpath;
 	spinlock_t move_lock;
@@ -381,6 +381,15 @@ struct ttm_bo_driver {
 	 */
 	int (*access_memory)(struct ttm_buffer_object *bo, unsigned long offset,
 			     void *buf, int len, int write);
+
+	/**
+	 * struct ttm_bo_driver member del_from_lru_notify
+	 *
+	 * @bo: the buffer object deleted from lru
+	 *
+	 * notify driver that a BO was deleted from LRU.
+	 */
+	void (*del_from_lru_notify)(struct ttm_buffer_object *bo);
 };
 
 /**
@@ -761,9 +770,9 @@ static inline int ttm_bo_reserve_slowpath(struct ttm_buffer_object *bo,
 static inline void ttm_bo_unreserve(struct ttm_buffer_object *bo)
 {
 	if (!(bo->mem.placement & TTM_PL_FLAG_NO_EVICT)) {
-		lockmgr(&bo->bdev->glob->lru_lock, LK_EXCLUSIVE);
+		drm_spin_lock(&bo->bdev->glob->lru_lock);
 		ttm_bo_add_to_lru(bo);
-		lockmgr(&bo->bdev->glob->lru_lock, LK_RELEASE);
+		drm_spin_unlock(&bo->bdev->glob->lru_lock);
 	}
 	reservation_object_unlock(bo->resv);
 }
@@ -868,7 +877,7 @@ int ttm_bo_pipeline_move(struct ttm_buffer_object *bo,
  *
  * @bo: A pointer to a struct ttm_buffer_object.
  *
- * Pipelined gutting a BO of it's backing store.
+ * Pipelined gutting a BO of its backing store.
  */
 int ttm_bo_pipeline_gutting(struct ttm_buffer_object *bo);
 

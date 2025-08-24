@@ -85,7 +85,7 @@ reservation_object_reserve_shared(struct reservation_object *obj, unsigned int n
 		max = 4;
 	}
 
-	new = kmalloc(offsetof(typeof(*new), shared[max]), M_DRM, GFP_KERNEL);
+	new = __kmalloc(offsetof(typeof(*new), shared[max]), M_DRM, GFP_KERNEL);
 	if (!new)
 		return -ENOMEM;
 
@@ -318,7 +318,7 @@ int reservation_object_copy_fences(struct reservation_object *dst,
 	if (src_list) {
 		size = offsetof(typeof(*src_list),
 				shared[src_list->shared_count]);
-		dst_list = kmalloc(size, M_DRM, GFP_KERNEL);
+		dst_list = __kmalloc(size, M_DRM, GFP_KERNEL);
 		if (!dst_list)
 			return -ENOMEM;
 

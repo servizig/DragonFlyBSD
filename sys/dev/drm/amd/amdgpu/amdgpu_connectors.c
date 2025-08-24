@@ -25,8 +25,8 @@
  */
 #include <drm/drmP.h>
 #include <drm/drm_edid.h>
-#include <drm/drm_crtc_helper.h>
 #include <drm/drm_fb_helper.h>
+#include <drm/drm_probe_helper.h>
 #include <drm/amdgpu_drm.h>
 #include "amdgpu.h"
 #include "atom.h"
@@ -267,7 +267,7 @@ amdgpu_connector_get_hardcoded_edid(struct amdgpu_device *adev)
 	struct edid *edid;
 
 	if (adev->mode_info.bios_hardcoded_edid) {
-		edid = kmalloc(adev->mode_info.bios_hardcoded_edid_size, M_DRM, GFP_KERNEL);
+		edid = kmalloc(adev->mode_info.bios_hardcoded_edid_size, GFP_KERNEL);
 		if (edid) {
 			memcpy((unsigned char *)edid,
 			       (unsigned char *)adev->mode_info.bios_hardcoded_edid,

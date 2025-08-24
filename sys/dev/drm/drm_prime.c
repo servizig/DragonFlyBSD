@@ -97,7 +97,7 @@ static int drm_prime_add_buf_handle(struct drm_prime_file_private *prime_fpriv,
 	struct drm_prime_member *member;
 	struct rb_node **p, *rb;
 
-	member = kmalloc(sizeof(*member), M_DRM, GFP_KERNEL);
+	member = kmalloc(sizeof(*member), GFP_KERNEL);
 	if (!member)
 		return -ENOMEM;
 
@@ -933,7 +933,7 @@ struct sg_table *drm_prime_pages_to_sg(struct page **pages, unsigned int nr_page
 	struct sg_table *sg = NULL;
 	int ret;
 
-	sg = kmalloc(sizeof(struct sg_table), M_DRM, GFP_KERNEL);
+	sg = kmalloc(sizeof(struct sg_table), GFP_KERNEL);
 	if (!sg) {
 		ret = -ENOMEM;
 		goto out;
@@ -1018,7 +1018,7 @@ EXPORT_SYMBOL(drm_prime_gem_destroy);
 
 void drm_prime_init_file_private(struct drm_prime_file_private *prime_fpriv)
 {
-	lockinit(&prime_fpriv->lock, "drmpfpl", 0, LK_CANRECURSE);
+	mutex_init(&prime_fpriv->lock);
 	prime_fpriv->dmabufs = LINUX_RB_ROOT;
 	prime_fpriv->handles = LINUX_RB_ROOT;
 }

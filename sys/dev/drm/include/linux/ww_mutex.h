@@ -58,7 +58,7 @@ struct ww_acquire_ctx {
 };
 
 struct ww_mutex {
-	struct lock		base;
+	struct mutex		base;
 	struct ww_acquire_ctx	*ctx;
 	u_long			stamp;	/* heuristic */
 	int			blocked;
@@ -92,7 +92,7 @@ extern void ww_mutex_destroy(struct ww_mutex *ww);
 static inline bool
 ww_mutex_is_locked(struct ww_mutex *ww)
 {
-	return (lockstatus(&ww->base, NULL) != 0);
+	return (lockstatus(&ww->base.lock, NULL) != 0);
 }
 
 /*
@@ -103,9 +103,9 @@ ww_mutex_is_locked(struct ww_mutex *ww)
 static inline int
 ww_mutex_trylock(struct ww_mutex *ww)
 {
-	if (lockstatus(&ww->base, NULL) == LK_EXCLUSIVE)
+	if (lockstatus(&ww->base.lock, NULL) == LK_EXCLUSIVE)
 		return 0;
-	return (lockmgr(&ww->base, LK_EXCLUSIVE|LK_NOWAIT) == 0);
+	return (lockmgr(&ww->base.lock, LK_EXCLUSIVE|LK_NOWAIT) == 0);
 }
 
 #endif	/* _LINUX_WW_MUTEX_H_ */

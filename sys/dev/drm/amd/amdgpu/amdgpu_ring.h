@@ -118,8 +118,8 @@ struct amdgpu_ring_funcs {
 	unsigned		extra_dw;
 
 	/* ring read/write ptr handling */
-	uint64_t (*get_rptr)(struct amdgpu_ring *ring);
-	uint64_t (*get_wptr)(struct amdgpu_ring *ring);
+	u64 (*get_rptr)(struct amdgpu_ring *ring);
+	u64 (*get_wptr)(struct amdgpu_ring *ring);
 	void (*set_wptr)(struct amdgpu_ring *ring);
 	/* validating and patching of IBs */
 	int (*parse_cs)(struct amdgpu_cs_parser *p, uint32_t ib_idx);
@@ -131,7 +131,7 @@ struct amdgpu_ring_funcs {
 	void (*emit_ib)(struct amdgpu_ring *ring,
 			struct amdgpu_job *job,
 			struct amdgpu_ib *ib,
-			bool ctx_switch);
+			uint32_t flags);
 	void (*emit_fence)(struct amdgpu_ring *ring, uint64_t addr,
 			   uint64_t seq, unsigned flags);
 	void (*emit_pipeline_sync)(struct amdgpu_ring *ring);
@@ -213,7 +213,7 @@ struct amdgpu_ring {
 	bool			has_compute_vm_bug;
 
 	atomic_t		num_jobs[DRM_SCHED_PRIORITY_MAX];
-	struct lock		priority_mutex;
+	struct mutex		priority_mutex;
 	/* protected by priority_mutex */
 	int			priority;
 
@@ -229,7 +229,7 @@ struct amdgpu_ring {
 #define amdgpu_ring_get_rptr(r) (r)->funcs->get_rptr((r))
 #define amdgpu_ring_get_wptr(r) (r)->funcs->get_wptr((r))
 #define amdgpu_ring_set_wptr(r) (r)->funcs->set_wptr((r))
-#define amdgpu_ring_emit_ib(r, job, ib, c) ((r)->funcs->emit_ib((r), (job), (ib), (c)))
+#define amdgpu_ring_emit_ib(r, job, ib, flags) ((r)->funcs->emit_ib((r), (job), (ib), (flags)))
 #define amdgpu_ring_emit_pipeline_sync(r) (r)->funcs->emit_pipeline_sync((r))
 #define amdgpu_ring_emit_vm_flush(r, vmid, addr) (r)->funcs->emit_vm_flush((r), (vmid), (addr))
 #define amdgpu_ring_emit_fence(r, addr, seq, flags) (r)->funcs->emit_fence((r), (addr), (seq), (flags))

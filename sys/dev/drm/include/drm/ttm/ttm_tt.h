@@ -28,6 +28,10 @@
 #define _TTM_TT_H_
 
 #include <linux/types.h>
+#ifdef __DragonFly__
+/* for IS_ENABLED */
+#include <linux/kconfig.h>
+#endif
 
 struct ttm_tt;
 struct ttm_mem_reg;

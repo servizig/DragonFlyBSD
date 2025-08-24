@@ -49,6 +49,11 @@
 #include <linux/seq_file.h> /* for seq_printf */
 #include <linux/dma-mapping.h>
 
+#ifdef __DragonFly__
+/* TODO: figure out this include */
+#include <linux/notifier.h>
+#endif
+
 #include <linux/atomic.h>
 
 #include <drm/ttm/ttm_bo_driver.h>
@@ -75,7 +80,7 @@
  * @npages: Number of pages in pool.
  */
 struct ttm_page_pool {
-	struct lock		lock;
+	spinlock_t		lock;
 	bool			fill_lock;
 	struct pglist		list;
 	gfp_t			gfp_flags;
@@ -307,7 +312,7 @@ static int ttm_page_pool_free(struct ttm_page_pool *pool, unsigned nr_free,
 		pages_to_free = static_buf;
 	else
 		pages_to_free = kmalloc(npages_to_free * sizeof(struct page *),
-					M_DRM, GFP_KERNEL);
+					GFP_KERNEL);
 	if (!pages_to_free) {
 		pr_err("Failed to allocate memory for pool free operation\n");
 		return 0;
@@ -512,7 +517,7 @@ static int ttm_alloc_new_pages(struct pglist *pages, gfp_t gfp_flags,
 	unsigned max_cpages = min(count << order, (unsigned)NUM_PAGES_TO_ALLOC);
 
 	/* allocate array for page caching change */
-	caching_array = kmalloc(max_cpages*sizeof(struct page *), M_DRM, M_WAITOK);
+	caching_array = kmalloc(max_cpages*sizeof(struct page *), M_WAITOK);
 
 	if (!caching_array) {
 		pr_debug("Unable to allocate table for new pages\n");
@@ -809,7 +814,7 @@ static int ttm_get_pages(struct page **pages, unsigned npages, int flags,
 static void ttm_page_pool_init_locked(struct ttm_page_pool *pool, gfp_t flags,
 		char *name, unsigned int order)
 {
-	lockinit(&pool->lock, "ttmpool", 0, LK_CANRECURSE);
+	spin_lock_init(&pool->lock);
 	pool->fill_lock = false;
 	TAILQ_INIT(&pool->list);
 	pool->npages = pool->nfrees = 0;

@@ -70,8 +70,7 @@ struct bw_fixed bw_frc_to_fixed(int64_t numerator, int64_t denominator)
 
 	arg1_value = abs_i64(numerator);
 	arg2_value = abs_i64(denominator);
-	/* XXX: int64_t* -> u64* conversion! */
-	res_value = div64_u64_rem(arg1_value, arg2_value, (u64 *)&remainder);
+	res_value = div64_u64_rem(arg1_value, arg2_value, &remainder);
 
 	ASSERT(res_value <= BW_FIXED_MAX_I32);
 

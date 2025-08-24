@@ -46,6 +46,13 @@
 #include <drm/ttm/ttm_page_alloc.h>
 #include <drm/ttm/ttm_set_memory.h> /* ZZZ */
 
+
+#ifdef __DragonFly__
+#include <vm/vm_extern.h>
+#include <vm/vm_pager.h>
+#endif
+
+
 /**
  * Allocates a ttm structure for the given BO.
  */

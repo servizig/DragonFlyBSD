@@ -110,7 +110,7 @@ void __drm_printfn_coredump(struct drm_printer *p, struct va_format *vaf)
 	 * Finally, hit the slow path and make a temporary string to copy over
 	 * using _drm_puts_coredump
 	 */
-	buf = kmalloc(len + 1, M_DRM, GFP_KERNEL | __GFP_NOWARN | __GFP_NORETRY);
+	buf = kmalloc(len + 1, GFP_KERNEL | __GFP_NOWARN | __GFP_NORETRY);
 	if (!buf)
 		return;
 

@@ -767,7 +767,7 @@ static int smu8_smu_init(struct pp_hwmgr *hwmgr)
 				PAGE_SIZE,
 				AMDGPU_GEM_DOMAIN_VRAM,
 				&smu8_smu->toc_buffer.handle,
-				(u64 *)&smu8_smu->toc_buffer.mc_addr,
+				&smu8_smu->toc_buffer.mc_addr,
 				&smu8_smu->toc_buffer.kaddr);
 	if (ret)
 		goto err2;
@@ -777,7 +777,7 @@ static int smu8_smu_init(struct pp_hwmgr *hwmgr)
 				PAGE_SIZE,
 				AMDGPU_GEM_DOMAIN_VRAM,
 				&smu8_smu->smu_buffer.handle,
-				(u64 *)&smu8_smu->smu_buffer.mc_addr,
+				&smu8_smu->smu_buffer.mc_addr,
 				&smu8_smu->smu_buffer.kaddr);
 	if (ret)
 		goto err1;
@@ -825,11 +825,11 @@ static int smu8_smu_init(struct pp_hwmgr *hwmgr)
 
 err0:
 	amdgpu_bo_free_kernel(&smu8_smu->smu_buffer.handle,
-				(u64 *)&smu8_smu->smu_buffer.mc_addr,
+				&smu8_smu->smu_buffer.mc_addr,
 				&smu8_smu->smu_buffer.kaddr);
 err1:
 	amdgpu_bo_free_kernel(&smu8_smu->toc_buffer.handle,
-				(u64 *)&smu8_smu->toc_buffer.mc_addr,
+				&smu8_smu->toc_buffer.mc_addr,
 				&smu8_smu->toc_buffer.kaddr);
 err2:
 	kfree(smu8_smu);
@@ -846,10 +846,10 @@ static int smu8_smu_fini(struct pp_hwmgr *hwmgr)
 	smu8_smu = hwmgr->smu_backend;
 	if (smu8_smu) {
 		amdgpu_bo_free_kernel(&smu8_smu->toc_buffer.handle,
-					(u64 *)&smu8_smu->toc_buffer.mc_addr,
+					&smu8_smu->toc_buffer.mc_addr,
 					&smu8_smu->toc_buffer.kaddr);
 		amdgpu_bo_free_kernel(&smu8_smu->smu_buffer.handle,
-					(u64 *)&smu8_smu->smu_buffer.mc_addr,
+					&smu8_smu->smu_buffer.mc_addr,
 					&smu8_smu->smu_buffer.kaddr);
 		kfree(smu8_smu);
 	}

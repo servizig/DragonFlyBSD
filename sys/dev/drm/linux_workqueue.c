@@ -199,7 +199,7 @@ _create_workqueue_common(const char *name, int flags)
 	struct workqueue_struct *wq;
 	int priority, error;
 
-	wq = kmalloc(sizeof(*wq), M_DRM, M_WAITOK | M_ZERO);
+	wq = __kmalloc(sizeof(*wq), M_DRM, M_WAITOK | M_ZERO);
 
 	if (flags & WQ_HIGHPRI)
 		priority = TDPRI_INT_SUPPORT;
@@ -211,7 +211,7 @@ _create_workqueue_common(const char *name, int flags)
 	} else {
 		wq->num_workers = ncpus;
 	}
-	wq->workers = kmalloc(sizeof(struct workqueue_worker) * wq->num_workers,
+	wq->workers = __kmalloc(sizeof(struct workqueue_worker) * wq->num_workers,
 			M_DRM, M_WAITOK | M_ZERO);
 
 	for (int i = 0;i < wq->num_workers; i++) {

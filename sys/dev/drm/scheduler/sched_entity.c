@@ -73,7 +73,7 @@ int drm_sched_entity_init(struct drm_sched_entity *entity,
 
 	entity->last_scheduled = NULL;
 
-	lockinit(&entity->rq_lock, "gserql", 0, LK_CANRECURSE);
+	spin_lock_init(&entity->rq_lock);
 	spsc_queue_init(&entity->job_queue);
 
 	atomic_set(&entity->fence_seq, 0);
@@ -196,10 +196,10 @@ long drm_sched_entity_flush(struct drm_sched_entity *entity, long timeout)
 #endif
 	if (/*(!last_user || last_user == current->group_leader) && */
 	    (curproc && (curproc->p_flags & P_WEXIT)) && fatal_signal_pending(current)) {
-		lockmgr(&entity->rq_lock, LK_EXCLUSIVE);
+		drm_spin_lock(&entity->rq_lock);
 		entity->stopped = true;
 		drm_sched_rq_remove_entity(entity->rq, entity);
-		lockmgr(&entity->rq_lock, LK_RELEASE);
+		drm_spin_unlock(&entity->rq_lock);
 	}
 
 	return ret;
@@ -372,7 +372,7 @@ void drm_sched_entity_set_priority(struct drm_sched_entity *entity,
 {
 	unsigned int i;
 
-	lockmgr(&entity->rq_lock, LK_EXCLUSIVE);
+	drm_spin_lock(&entity->rq_lock);
 
 	for (i = 0; i < entity->num_rq_list; ++i)
 		drm_sched_entity_set_rq_priority(&entity->rq_list[i], priority);
@@ -383,7 +383,7 @@ void drm_sched_entity_set_priority(struct drm_sched_entity *entity,
 		drm_sched_rq_add_entity(entity->rq, entity);
 	}
 
-	lockmgr(&entity->rq_lock, LK_RELEASE);
+	drm_spin_unlock(&entity->rq_lock);
 }
 EXPORT_SYMBOL(drm_sched_entity_set_priority);
 
@@ -498,10 +498,10 @@ void drm_sched_entity_select_rq(struct drm_sched_entity *entity)
 	if (rq == entity->rq)
 		return;
 
-	lockmgr(&entity->rq_lock, LK_EXCLUSIVE);
+	drm_spin_lock(&entity->rq_lock);
 	drm_sched_rq_remove_entity(entity->rq, entity);
 	entity->rq = rq;
-	lockmgr(&entity->rq_lock, LK_RELEASE);
+	drm_spin_unlock(&entity->rq_lock);
 }
 
 /**
@@ -531,15 +531,15 @@ void drm_sched_entity_push_job(struct drm_sched_job *sched_job,
 	/* first job wakes up scheduler */
 	if (first) {
 		/* Add the entity to the run queue */
-		lockmgr(&entity->rq_lock, LK_EXCLUSIVE);
+		drm_spin_lock(&entity->rq_lock);
 		if (entity->stopped) {
-			lockmgr(&entity->rq_lock, LK_RELEASE);
+			drm_spin_unlock(&entity->rq_lock);
 
 			DRM_ERROR("Trying to push to a killed entity\n");
 			return;
 		}
 		drm_sched_rq_add_entity(entity->rq, entity);
-		lockmgr(&entity->rq_lock, LK_RELEASE);
+		drm_spin_unlock(&entity->rq_lock);
 		drm_sched_wakeup(entity->rq->sched);
 	}
 }

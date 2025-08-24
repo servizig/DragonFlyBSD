@@ -111,7 +111,7 @@ ssize_t drm_dp_dual_mode_write(struct i2c_adapter *adapter,
 	void *data;
 	int ret;
 
-	data = kmalloc(msg.len, M_DRM, GFP_KERNEL);
+	data = kmalloc(msg.len, GFP_KERNEL);
 	if (!data)
 		return -ENOMEM;
 

@@ -31,7 +31,6 @@
 #ifndef _TTM_BO_API_H_
 #define _TTM_BO_API_H_
 
-#include <drm/drmP.h>
 #include <drm/drm_hashtab.h>
 #include <drm/drm_vma_manager.h>
 #include <linux/kref.h>
@@ -234,7 +233,7 @@ struct ttm_buffer_object {
 
 	struct reservation_object *resv;
 	struct reservation_object ttm_resv;
-	struct lock wu_mutex;
+	struct mutex wu_mutex;
 };
 
 /**
@@ -295,23 +294,6 @@ struct ttm_operation_ctx {
 static inline void ttm_bo_get(struct ttm_buffer_object *bo)
 {
 	kref_get(&bo->kref);
-}
-
-/**
- * ttm_bo_reference - reference a struct ttm_buffer_object
- *
- * @bo: The buffer object.
- *
- * Returns a refcounted pointer to a buffer object.
- *
- * This function is deprecated. Use @ttm_bo_get instead.
- */
-
-static inline struct ttm_buffer_object *
-ttm_bo_reference(struct ttm_buffer_object *bo)
-{
-	ttm_bo_get(bo);
-	return bo;
 }
 
 /**
@@ -387,17 +369,6 @@ int ttm_bo_validate(struct ttm_buffer_object *bo,
  * Unreference a buffer object.
  */
 void ttm_bo_put(struct ttm_buffer_object *bo);
-
-/**
- * ttm_bo_unref
- *
- * @bo: The buffer object.
- *
- * Unreference and clear a pointer to a buffer object.
- *
- * This function is deprecated. Use @ttm_bo_put instead.
- */
-void ttm_bo_unref(struct ttm_buffer_object **bo);
 
 /**
  * ttm_bo_add_to_lru

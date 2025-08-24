@@ -69,6 +69,6 @@ trace_amdgpu_ttm_bo_move(struct amdgpu_bo *bo, u8 new_memtype, u8 old_memtype)
 #define trace_amdgpu_pasid_allocated(pasid)
 #define trace_amdgpu_pasid_freed(pasid)
 
-#define trace_amdgpu_iv(entry)
+#define trace_amdgpu_iv(ih, entry)
 
 #endif	/* _AMDGPU_TRACE_H_ */

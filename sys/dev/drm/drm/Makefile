@@ -92,7 +92,7 @@ SRCS	= \
 	linux_sched.c \
 	linux_shmem.c \
 	linux_sort.c \
-	linux_spinlock.c \
+	linux_swap.c \
 	linux_tasklet.c \
 	linux_vmalloc.c \
 	linux_wait.c \

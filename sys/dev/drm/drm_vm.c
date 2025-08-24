@@ -180,7 +180,7 @@ vm_phys_fictitious_reg_range(vm_paddr_t start, vm_paddr_t end,
 
         page_count = (end - start) / PAGE_SIZE;
 
-        fp = kmalloc(page_count * sizeof(struct vm_page), M_DRM,
+        fp = kmalloc(page_count * sizeof(struct vm_page),
                     M_WAITOK | M_ZERO);
 
         for (i = 0; i < page_count; i++) {

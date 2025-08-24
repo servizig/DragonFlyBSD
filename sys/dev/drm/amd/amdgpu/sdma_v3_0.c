@@ -421,7 +421,7 @@ static void sdma_v3_0_ring_insert_nop(struct amdgpu_ring *ring, uint32_t count)
 static void sdma_v3_0_ring_emit_ib(struct amdgpu_ring *ring,
 				   struct amdgpu_job *job,
 				   struct amdgpu_ib *ib,
-				   bool ctx_switch)
+				   uint32_t flags)
 {
 	unsigned vmid = AMDGPU_JOB_GET_VMID(job);
 
@@ -476,7 +476,7 @@ static void sdma_v3_0_ring_emit_hdp_flush(struct amdgpu_ring *ring)
  * the fence seq number and DMA trap packet to generate
  * an interrupt if needed (VI).
  */
-static void sdma_v3_0_ring_emit_fence(struct amdgpu_ring *ring, uint64_t addr, uint64_t seq,
+static void sdma_v3_0_ring_emit_fence(struct amdgpu_ring *ring, u64 addr, u64 seq,
 				      unsigned flags)
 {
 	bool write64bit = flags & AMDGPU_FENCE_FLAG_64BIT;
@@ -1145,8 +1145,7 @@ static int sdma_v3_0_sw_init(void *handle)
 		ring->ring_obj = NULL;
 		if (!amdgpu_sriov_vf(adev)) {
 			ring->use_doorbell = true;
-			ring->doorbell_index = (i == 0) ?
-				adev->doorbell_index.sdma_engine0 : adev->doorbell_index.sdma_engine1;
+			ring->doorbell_index = adev->doorbell_index.sdma_engine[i];
 		} else {
 			ring->use_pollmem = true;
 		}

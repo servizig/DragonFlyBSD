@@ -48,7 +48,7 @@
  * Drivers must initialize the vertical blanking handling core with a call to
  * drm_vblank_init(). Minimally, a driver needs to implement
  * &drm_crtc_funcs.enable_vblank and &drm_crtc_funcs.disable_vblank plus call
- * drm_crtc_handle_vblank() in it's vblank interrupt handler for working vblank
+ * drm_crtc_handle_vblank() in its vblank interrupt handler for working vblank
  * support.
  *
  * Vertical blanking interrupts can be enabled by the DRM core or by drivers
@@ -105,13 +105,20 @@ static void store_vblank(struct drm_device *dev, unsigned int pipe,
 	write_sequnlock(&vblank->seqlock);
 }
 
+static u32 drm_max_vblank_count(struct drm_device *dev, unsigned int pipe)
+{
+	struct drm_vblank_crtc *vblank = &dev->vblank[pipe];
+
+	return vblank->max_vblank_count ?: dev->max_vblank_count;
+}
+
 /*
  * "No hw counter" fallback implementation of .get_vblank_counter() hook,
  * if there is no useable hardware frame counter available.
  */
 static u32 drm_vblank_no_hw_counter(struct drm_device *dev, unsigned int pipe)
 {
-	WARN_ON_ONCE(dev->max_vblank_count != 0);
+	WARN_ON_ONCE(drm_max_vblank_count(dev, pipe) != 0);
 	return 0;
 }
 
@@ -149,7 +156,7 @@ static void drm_reset_vblank_timestamp(struct drm_device *dev, unsigned int pipe
 	ktime_t t_vblank;
 	int count = DRM_TIMESTAMP_MAXRETRIES;
 
-	lockmgr(&dev->vblank_time_lock, LK_EXCLUSIVE);
+	drm_spin_lock(&dev->vblank_time_lock);
 
 	/*
 	 * sample the current counter to avoid random jumps
@@ -174,7 +181,7 @@ static void drm_reset_vblank_timestamp(struct drm_device *dev, unsigned int pipe
 	 */
 	store_vblank(dev, pipe, 1, t_vblank, cur_vblank);
 
-	lockmgr(&dev->vblank_time_lock, LK_RELEASE);
+	drm_spin_unlock(&dev->vblank_time_lock);
 }
 
 /*
@@ -198,6 +205,7 @@ static void drm_update_vblank_count(struct drm_device *dev, unsigned int pipe,
 	ktime_t t_vblank;
 	int count = DRM_TIMESTAMP_MAXRETRIES;
 	int framedur_ns = vblank->framedur_ns;
+	u32 max_vblank_count = drm_max_vblank_count(dev, pipe);
 
 	/*
 	 * Interrupts were disabled prior to this call, so deal with counter
@@ -216,9 +224,9 @@ static void drm_update_vblank_count(struct drm_device *dev, unsigned int pipe,
 		rc = drm_get_last_vbltimestamp(dev, pipe, &t_vblank, in_vblank_irq);
 	} while (cur_vblank != __get_vblank_counter(dev, pipe) && --count > 0);
 
-	if (dev->max_vblank_count != 0) {
+	if (max_vblank_count) {
 		/* trust the hw counter when it's around */
-		diff = (cur_vblank - vblank->last) & dev->max_vblank_count;
+		diff = (cur_vblank - vblank->last) & max_vblank_count;
 	} else if (rc && framedur_ns) {
 		u64 diff_ns = ktime_to_ns(ktime_sub(t_vblank, vblank->time));
 
@@ -254,7 +262,7 @@ static void drm_update_vblank_count(struct drm_device *dev, unsigned int pipe,
 	}
 
 	DRM_DEBUG_VBL("updating vblank count on crtc %u:"
-		      " current=%llu, diff=%u, hw=%u hw_last=%u\n",
+		      " current=%lu, diff=%u, hw=%u hw_last=%u\n",
 		      pipe, vblank->count, diff, cur_vblank, vblank->last);
 
 	if (diff == 0) {
@@ -429,8 +437,8 @@ int drm_vblank_init(struct drm_device *dev, unsigned int num_crtcs)
 	int ret = -ENOMEM;
 	unsigned int i;
 
-	lockinit(&dev->vbl_lock, "drmvbl", 0, 0);
-	lockinit(&dev->vblank_time_lock, "drmvtl", 0, 0);
+	spin_lock_init(&dev->vbl_lock);
+	spin_lock_init(&dev->vblank_time_lock);
 
 	dev->num_crtcs = num_crtcs;
 
@@ -682,7 +690,7 @@ bool drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
 	ts_etime = ktime_to_timespec64(etime);
 	ts_vblank_time = ktime_to_timespec64(*vblank_time);
 
-	DRM_DEBUG_VBL("crtc %u : v p(%d,%d)@ %lld.%06ld -> %lld.%06ld [e %d us, %d rep]\n",
+	DRM_DEBUG_VBL("crtc %u : v p(%d,%d)@ %ld.%06ld -> %ld.%06ld [e %d us, %d rep]\n",
 		      pipe, hpos, vpos,
 		      (u64)ts_etime.tv_sec, ts_etime.tv_nsec / 1000,
 		      (u64)ts_vblank_time.tv_sec, ts_vblank_time.tv_nsec / 1000,
@@ -943,7 +951,7 @@ static int drm_vblank_enable(struct drm_device *dev, unsigned int pipe)
 
 	assert_spin_locked(&dev->vbl_lock);
 
-	lockmgr(&dev->vblank_time_lock, LK_EXCLUSIVE);
+	drm_spin_lock(&dev->vblank_time_lock);
 
 	if (!vblank->enabled) {
 		/*
@@ -968,7 +976,7 @@ static int drm_vblank_enable(struct drm_device *dev, unsigned int pipe)
 		}
 	}
 
-	lockmgr(&dev->vblank_time_lock, LK_RELEASE);
+	drm_spin_unlock(&dev->vblank_time_lock);
 
 	return ret;
 }
@@ -1128,7 +1136,7 @@ void drm_crtc_vblank_off(struct drm_crtc *crtc)
 
 	spin_lock_irqsave(&dev->event_lock, irqflags);
 
-	lockmgr(&dev->vbl_lock, LK_EXCLUSIVE);
+	drm_spin_lock(&dev->vbl_lock);
 	DRM_DEBUG_VBL("crtc %d, vblank enabled %d, inmodeset %d\n",
 		      pipe, vblank->enabled, vblank->inmodeset);
 
@@ -1147,7 +1155,7 @@ void drm_crtc_vblank_off(struct drm_crtc *crtc)
 		atomic_inc(&vblank->refcount);
 		vblank->inmodeset = 1;
 	}
-	lockmgr(&dev->vbl_lock, LK_RELEASE);
+	drm_spin_unlock(&dev->vbl_lock);
 
 	/* Send any queued vblank events, lest the natives grow disquiet */
 	seq = drm_vblank_count_and_time(dev, pipe, &now);
@@ -1156,7 +1164,7 @@ void drm_crtc_vblank_off(struct drm_crtc *crtc)
 		if (e->pipe != pipe)
 			continue;
 		DRM_DEBUG("Sending premature vblank event on disable: "
-			  "wanted %llu, current %llu\n",
+			  "wanted %lu, current %lu\n",
 			  e->sequence, seq);
 		list_del(&e->base.link);
 		drm_vblank_put(dev, pipe);
@@ -1203,6 +1211,37 @@ void drm_crtc_vblank_reset(struct drm_crtc *crtc)
 	WARN_ON(!list_empty(&dev->vblank_event_list));
 }
 EXPORT_SYMBOL(drm_crtc_vblank_reset);
+
+/**
+ * drm_crtc_set_max_vblank_count - configure the hw max vblank counter value
+ * @crtc: CRTC in question
+ * @max_vblank_count: max hardware vblank counter value
+ *
+ * Update the maximum hardware vblank counter value for @crtc
+ * at runtime. Useful for hardware where the operation of the
+ * hardware vblank counter depends on the currently active
+ * display configuration.
+ *
+ * For example, if the hardware vblank counter does not work
+ * when a specific connector is active the maximum can be set
+ * to zero. And when that specific connector isn't active the
+ * maximum can again be set to the appropriate non-zero value.
+ *
+ * If used, must be called before drm_vblank_on().
+ */
+void drm_crtc_set_max_vblank_count(struct drm_crtc *crtc,
+				   u32 max_vblank_count)
+{
+	struct drm_device *dev = crtc->dev;
+	unsigned int pipe = drm_crtc_index(crtc);
+	struct drm_vblank_crtc *vblank = &dev->vblank[pipe];
+
+	WARN_ON(dev->max_vblank_count);
+	WARN_ON(!READ_ONCE(vblank->inmodeset));
+
+	vblank->max_vblank_count = max_vblank_count;
+}
+EXPORT_SYMBOL(drm_crtc_set_max_vblank_count);
 
 /**
  * drm_crtc_vblank_on - enable vblank events on a CRTC
@@ -1289,7 +1328,7 @@ void drm_vblank_restore(struct drm_device *dev, unsigned int pipe)
 		diff = DIV_ROUND_CLOSEST_ULL(diff_ns, framedur_ns);
 
 
-	DRM_DEBUG_VBL("missed %d vblanks in %lld ns, frame duration=%d ns, hw_diff=%d\n",
+	DRM_DEBUG_VBL("missed %d vblanks in %ld ns, frame duration=%d ns, hw_diff=%d\n",
 		      diff, diff_ns, framedur_ns, cur_vblank - vblank->last);
 	store_vblank(dev, pipe, diff, t_vblank, cur_vblank);
 }
@@ -1449,7 +1488,7 @@ static int drm_queue_vblank_event(struct drm_device *dev, unsigned int pipe,
 
 	seq = drm_vblank_count_and_time(dev, pipe, &now);
 
-	DRM_DEBUG("event on vblank count %llu, current %llu, crtc %u\n",
+	DRM_DEBUG("event on vblank count %lu, current %lu, crtc %u\n",
 		  req_seq, seq, pipe);
 
 	trace_drm_vblank_event_queued(file_priv, pipe, req_seq);
@@ -1621,7 +1660,7 @@ int drm_wait_vblank_ioctl(struct drm_device *dev, void *data,
 	}
 
 	if (req_seq != seq) {
-		DRM_DEBUG("waiting on vblank count %llu, crtc %u\n",
+		DRM_DEBUG("waiting on vblank count %lu, crtc %u\n",
 			  req_seq, pipe);
 		DRM_WAIT_ON(ret, vblank->queue, 3 * HZ,
 			    vblank_passed(drm_vblank_count(dev, pipe),
@@ -1659,7 +1698,7 @@ static void drm_handle_vblank_events(struct drm_device *dev, unsigned int pipe)
 		if (!vblank_passed(seq, e->sequence))
 			continue;
 
-		DRM_DEBUG("vblank event on %llu, current %llu\n",
+		DRM_DEBUG("vblank event on %lu, current %lu\n",
 			  e->sequence, seq);
 
 		list_del(&e->base.link);
@@ -1698,18 +1737,18 @@ bool drm_handle_vblank(struct drm_device *dev, unsigned int pipe)
 	 * vblank enable/disable, as this would cause inconsistent
 	 * or corrupted timestamps and vblank counts.
 	 */
-	lockmgr(&dev->vblank_time_lock, LK_EXCLUSIVE);
+	drm_spin_lock(&dev->vblank_time_lock);
 
 	/* Vblank irq handling disabled. Nothing to do. */
 	if (!vblank->enabled) {
-		lockmgr(&dev->vblank_time_lock, LK_RELEASE);
+		drm_spin_unlock(&dev->vblank_time_lock);
 		spin_unlock_irqrestore(&dev->event_lock, irqflags);
 		return false;
 	}
 
 	drm_update_vblank_count(dev, pipe, true);
 
-	lockmgr(&dev->vblank_time_lock, LK_RELEASE);
+	drm_spin_unlock(&dev->vblank_time_lock);
 
 	wake_up(&vblank->queue);
 

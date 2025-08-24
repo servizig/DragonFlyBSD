@@ -129,7 +129,7 @@ static void show_leaks(struct drm_mm *mm)
 	unsigned long entries[STACKDEPTH];
 	char *buf;
 
-	buf = kmalloc(BUFSZ, M_DRM, GFP_KERNEL);
+	buf = kmalloc(BUFSZ, GFP_KERNEL);
 	if (!buf)
 		return;
 
@@ -826,7 +826,7 @@ EXPORT_SYMBOL(drm_mm_scan_add_block);
  * When the scan list is empty, the selected memory nodes can be freed. An
  * immediately following drm_mm_insert_node_in_range_generic() or one of the
  * simpler versions of that function with !DRM_MM_SEARCH_BEST will then return
- * the just freed block (because its at the top of the free_stack list).
+ * the just freed block (because it's at the top of the free_stack list).
  *
  * Returns:
  * True if this block should be evicted, false otherwise. Will always
@@ -969,7 +969,7 @@ static u64 drm_mm_dump_hole(struct drm_printer *p, const struct drm_mm_node *ent
 	size = entry->hole_size;
 	if (size) {
 		start = drm_mm_hole_node_start(entry);
-		drm_printf(p, "%#018llx-%#018llx: %llu: free\n",
+		drm_printf(p, "%#018lx-%#018lx: %lu: free\n",
 			   start, start + size, size);
 	}
 
@@ -988,14 +988,14 @@ void drm_mm_print(const struct drm_mm *mm, struct drm_printer *p)
 	total_free += drm_mm_dump_hole(p, &mm->head_node);
 
 	drm_mm_for_each_node(entry, mm) {
-		drm_printf(p, "%#018llx-%#018llx: %llu: used\n", entry->start,
+		drm_printf(p, "%#018lx-%#018lx: %lu: used\n", entry->start,
 			   entry->start + entry->size, entry->size);
 		total_used += entry->size;
 		total_free += drm_mm_dump_hole(p, entry);
 	}
 	total = total_free + total_used;
 
-	drm_printf(p, "total: %llu, used %llu free %llu\n", total,
+	drm_printf(p, "total: %lu, used %lu free %lu\n", total,
 		   total_used, total_free);
 }
 EXPORT_SYMBOL(drm_mm_print);

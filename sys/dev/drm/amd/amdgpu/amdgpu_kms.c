@@ -214,7 +214,7 @@ int amdgpu_driver_load_kms(struct drm_device *dev, unsigned long flags)
 	if (!r) {
 		acpi_status = amdgpu_acpi_init(adev);
 		if (acpi_status)
-		dev_dbg(&dev->pdev->dev,
+			dev_dbg(&dev->pdev->dev,
 				"Error during ACPI methods call\n");
 	}
 
@@ -1004,7 +1004,7 @@ int amdgpu_driver_open_kms(struct drm_device *dev, struct drm_file *file_priv)
 			goto error_vm;
 	}
 
-	lockinit(&fpriv->bo_list_lock, "agfbll", 0, LK_CANRECURSE);
+	mutex_init(&fpriv->bo_list_lock);
 	idr_init(&fpriv->bo_list_handles);
 
 	amdgpu_ctx_mgr_init(&fpriv->ctx_mgr);

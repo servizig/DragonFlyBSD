@@ -27,7 +27,7 @@
 
 struct amdgpu_gtt_mgr {
 	struct drm_mm mm;
-	struct spinlock lock;
+	spinlock_t lock;
 	atomic64_t available;
 };
 
@@ -58,7 +58,7 @@ static int amdgpu_gtt_mgr_init(struct ttm_mem_type_manager *man,
 	start = AMDGPU_GTT_MAX_TRANSFER_SIZE * AMDGPU_GTT_NUM_TRANSFER_WINDOWS;
 	size = (adev->gmc.gart_size >> PAGE_SHIFT) - start;
 	drm_mm_init(&mgr->mm, start, size);
-	spin_init(&mgr->lock, "aggmml");
+	spin_lock_init(&mgr->lock);
 	atomic64_set(&mgr->available, p_size);
 	man->priv = mgr;
 	return 0;
@@ -75,9 +75,9 @@ static int amdgpu_gtt_mgr_init(struct ttm_mem_type_manager *man,
 static int amdgpu_gtt_mgr_fini(struct ttm_mem_type_manager *man)
 {
 	struct amdgpu_gtt_mgr *mgr = man->priv;
-	spin_lock(&mgr->lock);
+	drm_spin_lock(&mgr->lock);
 	drm_mm_takedown(&mgr->mm);
-	spin_unlock(&mgr->lock);
+	drm_spin_unlock(&mgr->lock);
 	kfree(mgr);
 	man->priv = NULL;
 	return 0;
@@ -136,11 +136,11 @@ static int amdgpu_gtt_mgr_alloc(struct ttm_mem_type_manager *man,
 	if (place && place->flags & TTM_PL_FLAG_TOPDOWN)
 		mode = DRM_MM_INSERT_HIGH;
 
-	spin_lock(&mgr->lock);
+	drm_spin_lock(&mgr->lock);
 	r = drm_mm_insert_node_in_range(&mgr->mm, &node->node, mem->num_pages,
 					mem->page_alignment, 0, fpfn, lpfn,
 					mode);
-	spin_unlock(&mgr->lock);
+	drm_spin_unlock(&mgr->lock);
 
 	if (!r)
 		mem->start = node->node.start;
@@ -167,14 +167,14 @@ static int amdgpu_gtt_mgr_new(struct ttm_mem_type_manager *man,
 	struct amdgpu_gtt_node *node;
 	int r;
 
-	spin_lock(&mgr->lock);
+	drm_spin_lock(&mgr->lock);
 	if ((&tbo->mem == mem || tbo->mem.mem_type != TTM_PL_TT) &&
 	    atomic64_read(&mgr->available) < mem->num_pages) {
-		spin_unlock(&mgr->lock);
+		drm_spin_unlock(&mgr->lock);
 		return 0;
 	}
 	atomic64_sub(mem->num_pages, &mgr->available);
-	spin_unlock(&mgr->lock);
+	drm_spin_unlock(&mgr->lock);
 
 	node = kzalloc(sizeof(*node), GFP_KERNEL);
 	if (!node) {
@@ -225,10 +225,10 @@ static void amdgpu_gtt_mgr_del(struct ttm_mem_type_manager *man,
 	if (!node)
 		return;
 
-	spin_lock(&mgr->lock);
+	drm_spin_lock(&mgr->lock);
 	if (node->node.start != AMDGPU_BO_INVALID_OFFSET)
 		drm_mm_remove_node(&node->node);
-	spin_unlock(&mgr->lock);
+	drm_spin_unlock(&mgr->lock);
 	atomic64_add(mem->num_pages, &mgr->available);
 
 	kfree(node);
@@ -257,14 +257,14 @@ int amdgpu_gtt_mgr_recover(struct ttm_mem_type_manager *man)
 	struct drm_mm_node *mm_node;
 	int r = 0;
 
-	spin_lock(&mgr->lock);
+	drm_spin_lock(&mgr->lock);
 	drm_mm_for_each_node(mm_node, &mgr->mm) {
 		node = container_of(mm_node, struct amdgpu_gtt_node, node);
 		r = amdgpu_ttm_recover_gart(node->tbo);
 		if (r)
 			break;
 	}
-	spin_unlock(&mgr->lock);
+	drm_spin_unlock(&mgr->lock);
 
 	return r;
 }
@@ -282,11 +282,11 @@ static void amdgpu_gtt_mgr_debug(struct ttm_mem_type_manager *man,
 {
 	struct amdgpu_gtt_mgr *mgr = man->priv;
 
-	spin_lock(&mgr->lock);
+	drm_spin_lock(&mgr->lock);
 	drm_mm_print(&mgr->mm, printer);
-	spin_unlock(&mgr->lock);
+	drm_spin_unlock(&mgr->lock);
 
-	drm_printf(printer, "man size:%lu pages, gtt available:%lld pages, usage:%luMB\n",
+	drm_printf(printer, "man size:%lu pages, gtt available:%ld pages, usage:%luMB\n",
 		   man->size, (u64)atomic64_read(&mgr->available),
 		   amdgpu_gtt_mgr_usage(man) >> 20);
 }

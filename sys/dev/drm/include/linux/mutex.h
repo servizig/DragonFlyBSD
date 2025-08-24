@@ -29,7 +29,6 @@
 
 #include <asm/current.h>
 #include <linux/list.h>
-#include <linux/lockdep.h>
 #include <linux/atomic.h>
 #include <asm/processor.h>
 
@@ -37,30 +36,30 @@ struct mutex {
   struct lock lock;
 };
 
-#define mutex_init(mutex) lockinit(mutex.lock, #mutex, 0, 0)
+#define mutex_init(mutex) lockinit(mutex.lock, #mutex, 0, LK_CANRECURSE)
 #define mutex_destroy(mutex) lockuninit(mutex.lock)
 
-#define mutex_is_locked(lock)	(lockinuse(lock))
+#define mutex_is_locked(mutex)	(lockinuse(mutex.lock))
 
-#define mutex_lock(lock)	lockmgr(lock, LK_EXCLUSIVE)
-#define mutex_unlock(lock)	lockmgr(lock, LK_RELEASE)
+#define mutex_lock(mutex)	lockmgr(mutex.lock, LK_EXCLUSIVE)
+#define mutex_unlock(mutex)	lockmgr(mutex.lock, LK_RELEASE)
 
-#define mutex_trylock(lock)	lockmgr_try(lock, LK_EXCLUSIVE)
+#define mutex_trylock(mutex)	lockmgr_try(mutex.lock, LK_EXCLUSIVE)
 
 static inline int
-mutex_lock_interruptible(struct lock *lock)
+mutex_lock_interruptible(struct mutex *mutex)
 {
-	if (lockmgr(lock, LK_EXCLUSIVE|LK_SLEEPFAIL|LK_PCATCH))
+	if (lockmgr(&mutex->lock, LK_EXCLUSIVE|LK_SLEEPFAIL|LK_PCATCH))
 		return -EINTR;
 
 	return 0;
 }
 
-#define DEFINE_MUTEX(mutex)	\
-	struct lock mutex;	\
-	LOCK_SYSINIT(mutex, &mutex, "lmutex", LK_CANRECURSE)
+#define DEFINE_MUTEX(mtx)	\
+	struct mutex mtx;	\
+	LOCK_SYSINIT(mtx, &mtx.lock, "lmutex", LK_CANRECURSE)
 
-#define mutex_lock_nested(lock, unused)	mutex_lock(lock)
+#define mutex_lock_nested(mutex, unused)	mutex_lock(mutex.lock)
 
 enum mutex_trylock_recursive_enum {
 	MUTEX_TRYLOCK_FAILED    = 0,
@@ -74,7 +73,7 @@ mutex_trylock_recursive(struct lock *lock)
 	if (lockowned(lock))
 		return MUTEX_TRYLOCK_RECURSIVE;
 
-	if (mutex_trylock(lock))
+	if (lockmgr_try(lock, LK_EXCLUSIVE))
 		return MUTEX_TRYLOCK_SUCCESS;
 
 	return MUTEX_TRYLOCK_FAILED;

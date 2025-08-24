@@ -70,7 +70,7 @@ drm_dma_handle_t *drm_pci_alloc(struct drm_device * dev, size_t size, size_t ali
 		return NULL;
 	}
 
-	dmah = kmalloc(sizeof(drm_dma_handle_t), M_DRM, M_ZERO | M_NOWAIT);
+	dmah = kmalloc(sizeof(drm_dma_handle_t), M_ZERO | M_NOWAIT);
 	if (dmah == NULL)
 		return NULL;
 
@@ -115,7 +115,7 @@ drm_dma_handle_t *drm_pci_alloc(struct drm_device * dev, size_t size, size_t ali
 	if (align > size)
 		return NULL;
 
-	dmah = kmalloc(sizeof(drm_dma_handle_t), M_DRM, GFP_KERNEL);
+	dmah = kmalloc(sizeof(drm_dma_handle_t), GFP_KERNEL);
 	if (!dmah)
 		return NULL;
 

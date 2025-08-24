@@ -174,7 +174,7 @@ struct vgasr_priv {
 
 	const struct vga_switcheroo_handler *handler;
 	enum vga_switcheroo_handler_flags_t handler_flags;
-	struct lock mux_hw_lk;
+	struct mutex mux_hw_lk;
 	int old_ddc_owner;
 };
 
@@ -304,7 +304,7 @@ register_client(struct pci_dev *pdev,
 {
 	struct vga_switcheroo_client *client;
 
-	client = kmalloc(sizeof(*client), M_VGA_SWITCHEROO_CLIENT, M_WAITOK | M_ZERO);
+	client = __kmalloc(sizeof(*client), M_VGA_SWITCHEROO_CLIENT, M_WAITOK | M_ZERO);
 	if (!client)
 		return -ENOMEM;
 
@@ -1010,12 +1010,12 @@ vga_switcheroo_handler(struct module *m __unused, int what, void *arg __unused)
 		if (error != 0)
 			break;
 
-		vga_switcheroo_buf = kmalloc(sizeof(*vga_switcheroo_buf), M_VGA_SWITCHEROO_BUF, M_WAITOK | M_ZERO);
+		vga_switcheroo_buf = __kmalloc(sizeof(*vga_switcheroo_buf), M_VGA_SWITCHEROO_BUF, M_WAITOK | M_ZERO);
 
 		//init vgasr_priv
-		vgasr_priv = kmalloc(sizeof(*vgasr_priv), M_VGA_SWITCHEROO_VGASR_PRIV, M_WAITOK | M_ZERO);
+		vgasr_priv = __kmalloc(sizeof(*vgasr_priv), M_VGA_SWITCHEROO_VGASR_PRIV, M_WAITOK | M_ZERO);
 		vgasr_priv->clients = (struct list_head) { &(vgasr_priv->clients), &(vgasr_priv->clients) };
-		lockinit(&vgasr_priv->mux_hw_lk, "mux_hw_lk", 0, LK_CANRECURSE);
+		mutex_init(&vgasr_priv->mux_hw_lk);
 		kprintf("vga_switcheroo device loaded\n");
 		break;
 

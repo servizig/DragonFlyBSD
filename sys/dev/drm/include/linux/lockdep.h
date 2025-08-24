@@ -29,26 +29,32 @@
 
 #include <linux/linkage.h>
 #include <linux/list.h>
+#include <linux/mutex.h>
 
-#include <sys/lock.h>
+#if 0
+static inline void
+lockdep_assert_held(struct mutex *m)
+{
+	KKASSERT(lockinuse(&m->lock));
+}
+#endif
+
+#define lockdep_assert_held(l) KKASSERT(lockinuse((struct lock*)l))
 
 static inline void
-lockdep_assert_held(struct lock *l)
+lockdep_assert_held_once(struct mutex *m)
 {
-	KKASSERT(lockinuse(l));
+	KKASSERT(lockinuse(&m->lock));
 }
 
-static inline void
-lockdep_assert_held_once(struct lock *l)
-{
-	KKASSERT(lockinuse(l));
-}
-
+#if 0
 static inline int
-lockdep_is_held(struct lock *l)
+lockdep_is_held(struct mutex *m)
 {
-	return(lockstatus(l, curthread) == LK_EXCLUSIVE);
+	return(lockstatus(&m->lock, curthread) == LK_EXCLUSIVE);
 }
+#endif
+#define lockdep_is_held(l) (lockstatus((struct lock*)(l), curthread) == LK_EXCLUSIVE)
 
 #define might_lock(lock) do { } while (0)
 

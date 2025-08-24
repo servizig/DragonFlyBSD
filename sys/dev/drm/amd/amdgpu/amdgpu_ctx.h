@@ -51,13 +51,13 @@ struct amdgpu_ctx {
 	bool				preamble_presented;
 	enum drm_sched_priority		init_priority;
 	enum drm_sched_priority		override_priority;
-	struct lock			lock;
+	struct mutex			lock;
 	atomic_t			guilty;
 };
 
 struct amdgpu_ctx_mgr {
 	struct amdgpu_device	*adev;
-	struct lock		lock;
+	struct mutex		lock;
 	/* protected by lock */
 	struct idr		ctx_handles;
 };

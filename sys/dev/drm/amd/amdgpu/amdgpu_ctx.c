@@ -113,8 +113,8 @@ static int amdgpu_ctx_init(struct amdgpu_device *adev,
 			amdgpu_ctx_num_entities[i - 1];
 
 	kref_init(&ctx->refcount);
-	lockinit(&ctx->ring_lock, "agcrl", 0, LK_CANRECURSE);
-	lockinit(&ctx->lock, "agctxl", 0, LK_CANRECURSE);
+	spin_lock_init(&ctx->ring_lock);
+	mutex_init(&ctx->lock);
 
 	ctx->reset_counter = atomic_read(&adev->gpu_reset_counter);
 	ctx->reset_counter_query = ctx->reset_counter;
@@ -169,12 +169,12 @@ static int amdgpu_ctx_init(struct amdgpu_device *adev,
 			break;
 		}
 
-               for (j = 0; j < num_rings; ++j) {
-                       if (!rings[j]->adev)
-                               continue;
+		for (j = 0; j < num_rings; ++j) {
+			if (!rings[j]->adev)
+				continue;
 
-                       rqs[num_rqs++] = &rings[j]->sched.sched_rq[priority];
-               }
+			rqs[num_rqs++] = &rings[j]->sched.sched_rq[priority];
+		}
 
 		for (j = 0; j < amdgpu_ctx_num_entities[i]; ++j)
 			r = drm_sched_entity_init(&ctx->entities[i][j].entity,
@@ -250,7 +250,7 @@ static int amdgpu_ctx_alloc(struct amdgpu_device *adev,
 	struct amdgpu_ctx *ctx;
 	int r;
 
-	ctx = kmalloc(sizeof(*ctx), M_DRM, GFP_KERNEL);
+	ctx = kmalloc(sizeof(*ctx), GFP_KERNEL);
 	if (!ctx)
 		return -ENOMEM;
 
@@ -490,24 +490,24 @@ struct dma_fence *amdgpu_ctx_get_fence(struct amdgpu_ctx *ctx,
 	struct amdgpu_ctx_entity *centity = to_amdgpu_ctx_entity(entity);
 	struct dma_fence *fence;
 
-	lockmgr(&ctx->ring_lock, LK_EXCLUSIVE);
+	drm_spin_lock(&ctx->ring_lock);
 
 	if (seq == ~0ull)
 		seq = centity->sequence - 1;
 
 	if (seq >= centity->sequence) {
-		lockmgr(&ctx->ring_lock, LK_RELEASE);
+		drm_spin_unlock(&ctx->ring_lock);
 		return ERR_PTR(-EINVAL);
 	}
 
 
 	if (seq + amdgpu_sched_jobs < centity->sequence) {
-		lockmgr(&ctx->ring_lock, LK_RELEASE);
+		drm_spin_unlock(&ctx->ring_lock);
 		return NULL;
 	}
 
 	fence = dma_fence_get(centity->fences[seq & (amdgpu_sched_jobs - 1)]);
-	lockmgr(&ctx->ring_lock, LK_RELEASE);
+	drm_spin_unlock(&ctx->ring_lock);
 
 	return fence;
 }
@@ -554,7 +554,7 @@ int amdgpu_ctx_wait_prev_fence(struct amdgpu_ctx *ctx,
 
 void amdgpu_ctx_mgr_init(struct amdgpu_ctx_mgr *mgr)
 {
-	lockinit(&mgr->lock, "agml", 0, LK_CANRECURSE);
+	mutex_init(&mgr->lock);
 	idr_init(&mgr->ctx_handles);
 }
 

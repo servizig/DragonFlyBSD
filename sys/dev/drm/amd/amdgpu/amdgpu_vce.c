@@ -180,7 +180,7 @@ int amdgpu_vce_sw_init(struct amdgpu_device *adev, unsigned long size)
 
 	r = amdgpu_bo_create_kernel(adev, size, PAGE_SIZE,
 				    AMDGPU_GEM_DOMAIN_VRAM, &adev->vce.vcpu_bo,
-				    (u64 *)&adev->vce.gpu_addr, &adev->vce.cpu_addr);
+				    &adev->vce.gpu_addr, &adev->vce.cpu_addr);
 	if (r) {
 		dev_err(adev->dev, "(%d) failed to allocate VCE bo\n", r);
 		return r;
@@ -192,7 +192,7 @@ int amdgpu_vce_sw_init(struct amdgpu_device *adev, unsigned long size)
 	}
 
 	INIT_DELAYED_WORK(&adev->vce.idle_work, amdgpu_vce_idle_work_handler);
-	lockinit(&adev->vce.idle_mutex, "agavim", 0, LK_CANRECURSE);
+	mutex_init(&adev->vce.idle_mutex);
 
 	return 0;
 }
@@ -213,7 +213,7 @@ int amdgpu_vce_sw_fini(struct amdgpu_device *adev)
 
 	drm_sched_entity_destroy(&adev->vce.entity);
 
-	amdgpu_bo_free_kernel(&adev->vce.vcpu_bo, (u64 *)&adev->vce.gpu_addr,
+	amdgpu_bo_free_kernel(&adev->vce.vcpu_bo, &adev->vce.gpu_addr,
 		(void **)&adev->vce.cpu_addr);
 
 	for (i = 0; i < adev->vce.num_rings; i++)
@@ -1035,7 +1035,7 @@ out:
 void amdgpu_vce_ring_emit_ib(struct amdgpu_ring *ring,
 				struct amdgpu_job *job,
 				struct amdgpu_ib *ib,
-				bool ctx_switch)
+				uint32_t flags)
 {
 	amdgpu_ring_write(ring, VCE_CMD_IB);
 	amdgpu_ring_write(ring, lower_32_bits(ib->gpu_addr));
@@ -1050,7 +1050,7 @@ void amdgpu_vce_ring_emit_ib(struct amdgpu_ring *ring,
  * @fence: the fence
  *
  */
-void amdgpu_vce_ring_emit_fence(struct amdgpu_ring *ring, uint64_t addr, uint64_t seq,
+void amdgpu_vce_ring_emit_fence(struct amdgpu_ring *ring, u64 addr, u64 seq,
 				unsigned flags)
 {
 	WARN_ON(flags & AMDGPU_FENCE_FLAG_64BIT);
@@ -1072,7 +1072,7 @@ void amdgpu_vce_ring_emit_fence(struct amdgpu_ring *ring, uint64_t addr, uint64_
 int amdgpu_vce_ring_test_ring(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
-	uint32_t rptr = amdgpu_ring_get_rptr(ring);
+	uint32_t rptr;
 	unsigned i;
 	int r, timeout = adev->usec_timeout;
 
@@ -1083,6 +1083,8 @@ int amdgpu_vce_ring_test_ring(struct amdgpu_ring *ring)
 	r = amdgpu_ring_alloc(ring, 16);
 	if (r)
 		return r;
+
+	rptr = amdgpu_ring_get_rptr(ring);
 
 	amdgpu_ring_write(ring, VCE_CMD_END);
 	amdgpu_ring_commit(ring);

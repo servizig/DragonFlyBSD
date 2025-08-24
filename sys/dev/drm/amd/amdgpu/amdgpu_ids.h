@@ -63,7 +63,7 @@ struct amdgpu_vmid {
 };
 
 struct amdgpu_vmid_mgr {
-	struct lock		lock;
+	struct mutex		lock;
 	unsigned		num_ids;
 	struct list_head	ids_lru;
 	struct amdgpu_vmid	ids[AMDGPU_NUM_VMID];

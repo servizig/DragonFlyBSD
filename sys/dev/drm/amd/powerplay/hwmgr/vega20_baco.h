@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-15 Advanced Micro Devices, Inc.
+ * Copyright 2018 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -19,14 +19,14 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
- * Authors: AMD
- *
  */
+#ifndef __VEGA20_BACO_H__
+#define __VEGA20_BACO_H__
+#include "hwmgr.h"
+#include "common_baco.h"
 
-#ifndef __DAL_I2C_AUX_DCE100_H__
-#define __DAL_I2C_AUX_DCE100_H__
+extern int vega20_baco_get_capability(struct pp_hwmgr *hwmgr, bool *cap);
+extern int vega20_baco_get_state(struct pp_hwmgr *hwmgr, enum BACO_STATE *state);
+extern int vega20_baco_set_state(struct pp_hwmgr *hwmgr, enum BACO_STATE state);
 
-struct i2caux *dal_i2caux_dce100_create(
-	struct dc_context *ctx);
-
-#endif /* __DAL_I2C_AUX_DCE100_H__ */
+#endif

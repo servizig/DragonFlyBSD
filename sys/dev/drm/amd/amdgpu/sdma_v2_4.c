@@ -247,7 +247,7 @@ static void sdma_v2_4_ring_insert_nop(struct amdgpu_ring *ring, uint32_t count)
 static void sdma_v2_4_ring_emit_ib(struct amdgpu_ring *ring,
 				   struct amdgpu_job *job,
 				   struct amdgpu_ib *ib,
-				   bool ctx_switch)
+				   uint32_t flags)
 {
 	unsigned vmid = AMDGPU_JOB_GET_VMID(job);
 
@@ -302,7 +302,7 @@ static void sdma_v2_4_ring_emit_hdp_flush(struct amdgpu_ring *ring)
  * the fence seq number and DMA trap packet to generate
  * an interrupt if needed (VI).
  */
-static void sdma_v2_4_ring_emit_fence(struct amdgpu_ring *ring, uint64_t addr, uint64_t seq,
+static void sdma_v2_4_ring_emit_fence(struct amdgpu_ring *ring, u64 addr, u64 seq,
 				      unsigned flags)
 {
 	bool write64bit = flags & AMDGPU_FENCE_FLAG_64BIT;

@@ -234,6 +234,10 @@ enum lockdep_ok {
 	LOCKDEP_NOW_UNRELIABLE
 };
 
+
+#define	__is_constexpr(x) \
+	__builtin_constant_p(x)
+
 #define TAINT_MACHINE_CHECK	4
 #define TAINT_WARN		5
 

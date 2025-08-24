@@ -708,7 +708,7 @@ ssize_t mipi_dsi_dcs_write(struct mipi_dsi_device *dsi, u8 cmd,
 	if (len > 0) {
 		size = 1 + len;
 
-		tx = kmalloc(size, M_DRM, GFP_KERNEL);
+		tx = kmalloc(size, GFP_KERNEL);
 		if (!tx)
 			return -ENOMEM;
 

@@ -74,7 +74,7 @@ char *kvasprintf(int flags, const char *format, va_list ap)
 	size = kvsnprintf(NULL, 0, format, aq);
 	va_end(aq);
 
-	str = kmalloc(size+1, M_DRM, flags);
+	str = kmalloc(size+1, flags);
 	if (str == NULL)
 		return NULL;
 
@@ -267,7 +267,7 @@ int drm_device_detach(device_t kdev)
 
 	lockuninit(&dev->vbl_lock);
 	lockuninit(&dev->event_lock);
-	lockuninit(&dev->struct_mutex);
+	lockuninit(&dev->struct_mutex.lock);
 #endif
 
 	return 0;

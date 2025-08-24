@@ -64,7 +64,7 @@ int amdgpu_sa_bo_manager_init(struct amdgpu_device *adev,
 		INIT_LIST_HEAD(&sa_manager->flist[i]);
 
 	r = amdgpu_bo_create_kernel(adev, size, align, domain, &sa_manager->bo,
-				(u64 *)&sa_manager->gpu_addr, &sa_manager->cpu_ptr);
+				&sa_manager->gpu_addr, &sa_manager->cpu_ptr);
 	if (r) {
 		dev_err(adev->dev, "(%d) failed to allocate bo for manager\n", r);
 		return r;
@@ -95,7 +95,7 @@ void amdgpu_sa_bo_manager_fini(struct amdgpu_device *adev,
 		amdgpu_sa_bo_remove_locked(sa_bo);
 	}
 
-	amdgpu_bo_free_kernel(&sa_manager->bo, (u64 *)&sa_manager->gpu_addr, &sa_manager->cpu_ptr);
+	amdgpu_bo_free_kernel(&sa_manager->bo, &sa_manager->gpu_addr, &sa_manager->cpu_ptr);
 	sa_manager->size = 0;
 }
 
@@ -288,7 +288,7 @@ int amdgpu_sa_bo_new(struct amdgpu_sa_manager *sa_manager,
 	if (WARN_ON_ONCE(size > sa_manager->size))
 		return -EINVAL;
 
-	*sa_bo = kmalloc(sizeof(struct amdgpu_sa_bo), M_DRM, GFP_KERNEL);
+	*sa_bo = kmalloc(sizeof(struct amdgpu_sa_bo), GFP_KERNEL);
 	if (!(*sa_bo))
 		return -ENOMEM;
 	(*sa_bo)->manager = sa_manager;
@@ -296,7 +296,7 @@ int amdgpu_sa_bo_new(struct amdgpu_sa_manager *sa_manager,
 	INIT_LIST_HEAD(&(*sa_bo)->olist);
 	INIT_LIST_HEAD(&(*sa_bo)->flist);
 
-	lockmgr(&sa_manager->wq.lock, LK_EXCLUSIVE);
+	drm_spin_lock(&sa_manager->wq.lock);
 	do {
 		for (i = 0; i < AMDGPU_SA_NUM_FENCE_LISTS; ++i)
 			tries[i] = 0;
@@ -306,7 +306,7 @@ int amdgpu_sa_bo_new(struct amdgpu_sa_manager *sa_manager,
 
 			if (amdgpu_sa_bo_try_alloc(sa_manager, *sa_bo,
 						   size, align)) {
-				lockmgr(&sa_manager->wq.lock, LK_RELEASE);
+				drm_spin_unlock(&sa_manager->wq.lock);
 				return 0;
 			}
 
@@ -318,7 +318,7 @@ int amdgpu_sa_bo_new(struct amdgpu_sa_manager *sa_manager,
 				fences[count++] = dma_fence_get(fences[i]);
 
 		if (count) {
-			lockmgr(&sa_manager->wq.lock, LK_RELEASE);
+			drm_spin_unlock(&sa_manager->wq.lock);
 			t = dma_fence_wait_any_timeout(fences, count, false,
 						       MAX_SCHEDULE_TIMEOUT,
 						       NULL);
@@ -326,7 +326,7 @@ int amdgpu_sa_bo_new(struct amdgpu_sa_manager *sa_manager,
 				dma_fence_put(fences[i]);
 
 			r = (t > 0) ? 0 : t;
-			lockmgr(&sa_manager->wq.lock, LK_EXCLUSIVE);
+			drm_spin_lock(&sa_manager->wq.lock);
 		} else {
 			/* if we have nothing to wait for block */
 			r = wait_event_interruptible_locked(
@@ -337,7 +337,7 @@ int amdgpu_sa_bo_new(struct amdgpu_sa_manager *sa_manager,
 
 	} while (!r);
 
-	lockmgr(&sa_manager->wq.lock, LK_RELEASE);
+	drm_spin_unlock(&sa_manager->wq.lock);
 	kfree(*sa_bo);
 	*sa_bo = NULL;
 	return r;
@@ -353,7 +353,7 @@ void amdgpu_sa_bo_free(struct amdgpu_device *adev, struct amdgpu_sa_bo **sa_bo,
 	}
 
 	sa_manager = (*sa_bo)->manager;
-	lockmgr(&sa_manager->wq.lock, LK_EXCLUSIVE);
+	drm_spin_lock(&sa_manager->wq.lock);
 	if (fence && !dma_fence_is_signaled(fence)) {
 		uint32_t idx;
 
@@ -364,7 +364,7 @@ void amdgpu_sa_bo_free(struct amdgpu_device *adev, struct amdgpu_sa_bo **sa_bo,
 		amdgpu_sa_bo_remove_locked(*sa_bo);
 	}
 	wake_up_all_locked(&sa_manager->wq);
-	lockmgr(&sa_manager->wq.lock, LK_RELEASE);
+	drm_spin_unlock(&sa_manager->wq.lock);
 	*sa_bo = NULL;
 }
 
@@ -375,7 +375,7 @@ void amdgpu_sa_bo_dump_debug_info(struct amdgpu_sa_manager *sa_manager,
 {
 	struct amdgpu_sa_bo *i;
 
-	lockmgr(&sa_manager->wq.lock, LK_EXCLUSIVE);
+	spin_lock(&sa_manager->wq.lock);
 	list_for_each_entry(i, &sa_manager->olist, olist) {
 		uint64_t soffset = i->soffset + sa_manager->gpu_addr;
 		uint64_t eoffset = i->eoffset + sa_manager->gpu_addr;
@@ -388,11 +388,11 @@ void amdgpu_sa_bo_dump_debug_info(struct amdgpu_sa_manager *sa_manager,
 			   soffset, eoffset, eoffset - soffset);
 
 		if (i->fence)
-			seq_printf(m, " protected by 0x%08x on context %llu",
+			seq_printf(m, " protected by 0x%016llx on context %llu",
 				   i->fence->seqno, i->fence->context);
 
 		seq_printf(m, "\n");
 	}
-	lockmgr(&sa_manager->wq.lock, LK_RELEASE);
+	spin_unlock(&sa_manager->wq.lock);
 }
 #endif

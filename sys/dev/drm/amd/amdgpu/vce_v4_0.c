@@ -439,7 +439,7 @@ static int vce_v4_0_sw_init(void *handle)
 		const struct common_firmware_header *hdr;
 		unsigned size = amdgpu_bo_size(adev->vce.vcpu_bo);
 
-		adev->vce.saved_bo = kmalloc(size, M_DRM, GFP_KERNEL);
+		adev->vce.saved_bo = kvmalloc(size, GFP_KERNEL);
 		if (!adev->vce.saved_bo)
 			return -ENOMEM;
 
@@ -947,7 +947,7 @@ static int vce_v4_0_set_powergating_state(void *handle,
 #endif
 
 static void vce_v4_0_ring_emit_ib(struct amdgpu_ring *ring, struct amdgpu_job *job,
-					struct amdgpu_ib *ib, bool ctx_switch)
+					struct amdgpu_ib *ib, uint32_t flags)
 {
 	unsigned vmid = AMDGPU_JOB_GET_VMID(job);
 
@@ -958,8 +958,8 @@ static void vce_v4_0_ring_emit_ib(struct amdgpu_ring *ring, struct amdgpu_job *j
 	amdgpu_ring_write(ring, ib->length_dw);
 }
 
-static void vce_v4_0_ring_emit_fence(struct amdgpu_ring *ring, uint64_t addr,
-			uint64_t seq, unsigned flags)
+static void vce_v4_0_ring_emit_fence(struct amdgpu_ring *ring, u64 addr,
+			u64 seq, unsigned flags)
 {
 	WARN_ON(flags & AMDGPU_FENCE_FLAG_64BIT);
 

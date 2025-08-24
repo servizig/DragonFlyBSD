@@ -49,7 +49,7 @@ static inline unsigned long long complete_integer_division_u64(
 
 	ASSERT(divisor);
 
-	result = div64_u64_rem(dividend, divisor, remainder);
+	result = div64_u64_rem(dividend, divisor, (u64*)remainder);
 
 	return result;
 }

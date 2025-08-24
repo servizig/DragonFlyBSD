@@ -56,6 +56,16 @@
 #include "drm_internal.h"
 #include <drm/drm_syncobj.h>
 
+struct syncobj_wait_entry {
+	struct list_head node;
+	struct task_struct *task;
+	struct dma_fence *fence;
+	struct dma_fence_cb fence_cb;
+};
+
+static void syncobj_wait_syncobj_func(struct drm_syncobj *syncobj,
+				      struct syncobj_wait_entry *wait);
+
 /**
  * drm_syncobj_find - lookup and reference a sync object.
  * @file_private: drm file private pointer
@@ -69,76 +79,47 @@ struct drm_syncobj *drm_syncobj_find(struct drm_file *file_private,
 {
 	struct drm_syncobj *syncobj;
 
-	lockmgr(&file_private->syncobj_table_lock, LK_EXCLUSIVE);
+	drm_spin_lock(&file_private->syncobj_table_lock);
 
 	/* Check if we currently have a reference on the object */
 	syncobj = idr_find(&file_private->syncobj_idr, handle);
 	if (syncobj)
 		drm_syncobj_get(syncobj);
 
-	lockmgr(&file_private->syncobj_table_lock, LK_RELEASE);
+	drm_spin_unlock(&file_private->syncobj_table_lock);
 
 	return syncobj;
 }
 EXPORT_SYMBOL(drm_syncobj_find);
 
-static void drm_syncobj_add_callback_locked(struct drm_syncobj *syncobj,
-					    struct drm_syncobj_cb *cb,
-					    drm_syncobj_func_t func)
+static void drm_syncobj_fence_add_wait(struct drm_syncobj *syncobj,
+				       struct syncobj_wait_entry *wait)
 {
-	cb->func = func;
-	list_add_tail(&cb->node, &syncobj->cb_list);
-}
+	if (wait->fence)
+		return;
 
-static int drm_syncobj_fence_get_or_add_callback(struct drm_syncobj *syncobj,
-						 struct dma_fence **fence,
-						 struct drm_syncobj_cb *cb,
-						 drm_syncobj_func_t func)
-{
-	int ret;
-
-	*fence = drm_syncobj_fence_get(syncobj);
-	if (*fence)
-		return 1;
-
-	lockmgr(&syncobj->lock, LK_EXCLUSIVE);
+	drm_spin_lock(&syncobj->lock);
 	/* We've already tried once to get a fence and failed.  Now that we
 	 * have the lock, try one more time just to be sure we don't add a
 	 * callback when a fence has already been set.
 	 */
-	if (syncobj->fence) {
-		*fence = dma_fence_get(rcu_dereference_protected(syncobj->fence,
-								 lockdep_is_held(&syncobj->lock)));
-		ret = 1;
-	} else {
-		*fence = NULL;
-		drm_syncobj_add_callback_locked(syncobj, cb, func);
-		ret = 0;
-	}
-	lockmgr(&syncobj->lock, LK_RELEASE);
-
-	return ret;
+	if (syncobj->fence)
+		wait->fence = dma_fence_get(
+			rcu_dereference_protected(syncobj->fence, 1));
+	else
+		list_add_tail(&wait->node, &syncobj->cb_list);
+	drm_spin_unlock(&syncobj->lock);
 }
 
-#if 0 /* unused */
-static
-void drm_syncobj_add_callback(struct drm_syncobj *syncobj,
-			      struct drm_syncobj_cb *cb,
-			      drm_syncobj_func_t func)
+static void drm_syncobj_remove_wait(struct drm_syncobj *syncobj,
+				    struct syncobj_wait_entry *wait)
 {
-	lockmgr(&syncobj->lock, LK_EXCLUSIVE);
-	drm_syncobj_add_callback_locked(syncobj, cb, func);
-	lockmgr(&syncobj->lock, LK_RELEASE);
-}
-#endif
+	if (!wait->node.next)
+		return;
 
-static
-void drm_syncobj_remove_callback(struct drm_syncobj *syncobj,
-				 struct drm_syncobj_cb *cb)
-{
-	lockmgr(&syncobj->lock, LK_EXCLUSIVE);
-	list_del_init(&cb->node);
-	lockmgr(&syncobj->lock, LK_RELEASE);
+	drm_spin_lock(&syncobj->lock);
+	list_del_init(&wait->node);
+	drm_spin_unlock(&syncobj->lock);
 }
 
 /**
@@ -152,12 +133,12 @@ void drm_syncobj_replace_fence(struct drm_syncobj *syncobj,
 			       struct dma_fence *fence)
 {
 	struct dma_fence *old_fence;
-	struct drm_syncobj_cb *cur, *tmp;
+	struct syncobj_wait_entry *cur, *tmp;
 
 	if (fence)
 		dma_fence_get(fence);
 
-	lockmgr(&syncobj->lock, LK_EXCLUSIVE);
+	drm_spin_lock(&syncobj->lock);
 
 	old_fence = rcu_dereference_protected(syncobj->fence,
 					      lockdep_is_held(&syncobj->lock));
@@ -166,11 +147,11 @@ void drm_syncobj_replace_fence(struct drm_syncobj *syncobj,
 	if (fence != old_fence) {
 		list_for_each_entry_safe(cur, tmp, &syncobj->cb_list, node) {
 			list_del_init(&cur->node);
-			cur->func(syncobj, cur);
+			syncobj_wait_syncobj_func(syncobj, cur);
 		}
 	}
 
-	lockmgr(&syncobj->lock, LK_RELEASE);
+	drm_spin_unlock(&syncobj->lock);
 
 	dma_fence_put(old_fence);
 }
@@ -263,7 +244,7 @@ int drm_syncobj_create(struct drm_syncobj **out_syncobj, uint32_t flags,
 
 	kref_init(&syncobj->refcount);
 	INIT_LIST_HEAD(&syncobj->cb_list);
-	lockinit(&syncobj->lock, "dsol", 0, 0);
+	spin_lock_init(&syncobj->lock);
 
 	if (flags & DRM_SYNCOBJ_CREATE_SIGNALED)
 		drm_syncobj_assign_null_handle(syncobj);
@@ -296,9 +277,9 @@ int drm_syncobj_get_handle(struct drm_file *file_private,
 	drm_syncobj_get(syncobj);
 
 	idr_preload(GFP_KERNEL);
-	lockmgr(&file_private->syncobj_table_lock, LK_EXCLUSIVE);
+	drm_spin_lock(&file_private->syncobj_table_lock);
 	ret = idr_alloc(&file_private->syncobj_idr, syncobj, 1, 0, GFP_NOWAIT);
-	lockmgr(&file_private->syncobj_table_lock, LK_RELEASE);
+	drm_spin_unlock(&file_private->syncobj_table_lock);
 
 	idr_preload_end();
 
@@ -332,9 +313,9 @@ static int drm_syncobj_destroy(struct drm_file *file_private,
 {
 	struct drm_syncobj *syncobj;
 
-	lockmgr(&file_private->syncobj_table_lock, LK_EXCLUSIVE);
+	drm_spin_lock(&file_private->syncobj_table_lock);
 	syncobj = idr_remove(&file_private->syncobj_idr, handle);
-	lockmgr(&file_private->syncobj_table_lock, LK_RELEASE);
+	drm_spin_unlock(&file_private->syncobj_table_lock);
 
 	if (!syncobj)
 		return -EINVAL;
@@ -513,7 +494,7 @@ void
 drm_syncobj_open(struct drm_file *file_private)
 {
 	idr_init(&file_private->syncobj_idr);
-	lockinit(&file_private->syncobj_table_lock, "dsotl", 0, 0);
+	spin_lock_init(&file_private->syncobj_table_lock);
 }
 
 static int
@@ -622,13 +603,6 @@ drm_syncobj_fd_to_handle_ioctl(struct drm_device *dev, void *data,
 					&args->handle);
 }
 
-struct syncobj_wait_entry {
-	struct task_struct *task;
-	struct dma_fence *fence;
-	struct dma_fence_cb fence_cb;
-	struct drm_syncobj_cb syncobj_cb;
-};
-
 static void syncobj_wait_fence_func(struct dma_fence *fence,
 				    struct dma_fence_cb *cb)
 {
@@ -639,11 +613,8 @@ static void syncobj_wait_fence_func(struct dma_fence *fence,
 }
 
 static void syncobj_wait_syncobj_func(struct drm_syncobj *syncobj,
-				      struct drm_syncobj_cb *cb)
+				      struct syncobj_wait_entry *wait)
 {
-	struct syncobj_wait_entry *wait =
-		container_of(cb, struct syncobj_wait_entry, syncobj_cb);
-
 	/* This happens inside the syncobj lock */
 	wait->fence = dma_fence_get(rcu_dereference_protected(syncobj->fence,
 							      lockdep_is_held(&syncobj->lock)));
@@ -702,12 +673,8 @@ static signed long drm_syncobj_array_wait_timeout(struct drm_syncobj **syncobjs,
 	 */
 
 	if (flags & DRM_SYNCOBJ_WAIT_FLAGS_WAIT_FOR_SUBMIT) {
-		for (i = 0; i < count; ++i) {
-			drm_syncobj_fence_get_or_add_callback(syncobjs[i],
-							      &entries[i].fence,
-							      &entries[i].syncobj_cb,
-							      syncobj_wait_syncobj_func);
-		}
+		for (i = 0; i < count; ++i)
+			drm_syncobj_fence_add_wait(syncobjs[i], &entries[i]);
 	}
 
 	do {
@@ -756,9 +723,7 @@ done_waiting:
 
 cleanup_entries:
 	for (i = 0; i < count; ++i) {
-		if (entries[i].syncobj_cb.func)
-			drm_syncobj_remove_callback(syncobjs[i],
-						    &entries[i].syncobj_cb);
+		drm_syncobj_remove_wait(syncobjs[i], &entries[i]);
 		if (entries[i].fence_cb.func)
 			dma_fence_remove_callback(entries[i].fence,
 						  &entries[i].fence_cb);

@@ -27,7 +27,7 @@
 
 struct amdgpu_vram_mgr {
 	struct drm_mm mm;
-	struct spinlock lock;
+	spinlock_t lock;
 	atomic64_t usage;
 	atomic64_t vis_usage;
 };
@@ -50,7 +50,7 @@ static int amdgpu_vram_mgr_init(struct ttm_mem_type_manager *man,
 		return -ENOMEM;
 
 	drm_mm_init(&mgr->mm, 0, p_size);
-	spin_init(&mgr->lock, "agvrml");
+	spin_lock_init(&mgr->lock);
 	man->priv = mgr;
 	return 0;
 }
@@ -67,9 +67,9 @@ static int amdgpu_vram_mgr_fini(struct ttm_mem_type_manager *man)
 {
 	struct amdgpu_vram_mgr *mgr = man->priv;
 
-	spin_lock(&mgr->lock);
+	drm_spin_lock(&mgr->lock);
 	drm_mm_takedown(&mgr->mm);
-	spin_unlock(&mgr->lock);
+	drm_spin_unlock(&mgr->lock);
 	kfree(mgr);
 	man->priv = NULL;
 	return 0;
@@ -197,7 +197,7 @@ static int amdgpu_vram_mgr_new(struct ttm_mem_type_manager *man,
 	mem->start = 0;
 	pages_left = mem->num_pages;
 
-	spin_lock(&mgr->lock);
+	drm_spin_lock(&mgr->lock);
 	for (i = 0; pages_left >= pages_per_node; ++i) {
 		unsigned long pages = rounddown_pow_of_two(pages_left);
 
@@ -233,7 +233,7 @@ static int amdgpu_vram_mgr_new(struct ttm_mem_type_manager *man,
 		amdgpu_vram_mgr_virt_start(mem, &nodes[i]);
 		pages_left -= pages;
 	}
-	spin_unlock(&mgr->lock);
+	drm_spin_unlock(&mgr->lock);
 
 	atomic64_add(usage, &mgr->usage);
 	atomic64_add(vis_usage, &mgr->vis_usage);
@@ -245,7 +245,7 @@ static int amdgpu_vram_mgr_new(struct ttm_mem_type_manager *man,
 error:
 	while (i--)
 		drm_mm_remove_node(&nodes[i]);
-	spin_unlock(&mgr->lock);
+	drm_spin_unlock(&mgr->lock);
 
 	kvfree(nodes);
 	return r == -ENOSPC ? 0 : r;
@@ -273,7 +273,7 @@ static void amdgpu_vram_mgr_del(struct ttm_mem_type_manager *man,
 	if (!mem->mm_node)
 		return;
 
-	spin_lock(&mgr->lock);
+	drm_spin_lock(&mgr->lock);
 	while (pages) {
 		pages -= nodes->size;
 		drm_mm_remove_node(nodes);
@@ -281,7 +281,7 @@ static void amdgpu_vram_mgr_del(struct ttm_mem_type_manager *man,
 		vis_usage += amdgpu_vram_mgr_vis_size(adev, nodes);
 		++nodes;
 	}
-	spin_unlock(&mgr->lock);
+	drm_spin_unlock(&mgr->lock);
 
 	atomic64_sub(usage, &mgr->usage);
 	atomic64_sub(vis_usage, &mgr->vis_usage);
@@ -331,9 +331,9 @@ static void amdgpu_vram_mgr_debug(struct ttm_mem_type_manager *man,
 {
 	struct amdgpu_vram_mgr *mgr = man->priv;
 
-	spin_lock(&mgr->lock);
+	drm_spin_lock(&mgr->lock);
 	drm_mm_print(&mgr->mm, printer);
-	spin_unlock(&mgr->lock);
+	drm_spin_unlock(&mgr->lock);
 
 	drm_printf(printer, "man size:%lu pages, ram usage:%luMB, vis usage:%luMB\n",
 		   man->size, amdgpu_vram_mgr_usage(man) >> 20,

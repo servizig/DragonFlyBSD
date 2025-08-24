@@ -137,7 +137,7 @@ void amdgpu_pasid_free_delayed(struct reservation_object *resv,
 		fence = &array->base;
 	}
 
-	cb = kmalloc(sizeof(*cb), M_DRM, GFP_KERNEL);
+	cb = kmalloc(sizeof(*cb), GFP_KERNEL);
 	if (!cb) {
 		/* Last resort when we are OOM */
 		dma_fence_wait(fence, false);
@@ -567,7 +567,7 @@ void amdgpu_vmid_mgr_init(struct amdgpu_device *adev)
 		struct amdgpu_vmid_mgr *id_mgr =
 			&adev->vm_manager.id_mgr[i];
 
-		lockinit(&id_mgr->lock, "agdimgrl", 0, LK_CANRECURSE);
+		mutex_init(&id_mgr->lock);
 		INIT_LIST_HEAD(&id_mgr->ids_lru);
 		atomic_set(&id_mgr->reserved_vmid_num, 0);
 

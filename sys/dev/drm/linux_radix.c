@@ -182,7 +182,7 @@ radix_tree_insert(struct radix_tree_root *root, unsigned long index, void *item)
 
 	/* allocate root node, if any */
 	if (node == NULL) {
-		node = kmalloc(sizeof(*node), M_DRM, root->gfp_mask | M_ZERO);
+		node = __kmalloc(sizeof(*node), M_DRM, root->gfp_mask | M_ZERO);
 		if (node == NULL)
 			return (-ENOMEM);
 		root->rnode = node;
@@ -201,7 +201,7 @@ radix_tree_insert(struct radix_tree_root *root, unsigned long index, void *item)
 		 * allocate a new radix level:
 		 */
 		if (node->count != 0) {
-			node = kmalloc(sizeof(*node), M_DRM, root->gfp_mask | M_ZERO);
+			node = __kmalloc(sizeof(*node), M_DRM, root->gfp_mask | M_ZERO);
 			if (node == NULL)
 				return (-ENOMEM);
 			node->slots[0] = root->rnode;
@@ -224,7 +224,7 @@ radix_tree_insert(struct radix_tree_root *root, unsigned long index, void *item)
 
 	/* allocate the missing radix levels, if any */
 	for (idx = 0; idx != height; idx++) {
-		temp[idx] = kmalloc(sizeof(*node), M_DRM,
+		temp[idx] = __kmalloc(sizeof(*node), M_DRM,
 		    root->gfp_mask | M_ZERO);
 		if (temp[idx] == NULL) {
 			while(idx--)

@@ -352,7 +352,7 @@ static uint64_t sdma_v4_0_ring_get_rptr(struct amdgpu_ring *ring)
 	/* XXX check if swapping is necessary on BE */
 	rptr = ((u64 *)&ring->adev->wb.wb[ring->rptr_offs]);
 
-	DRM_DEBUG("rptr before shift == 0x%016llx\n", *rptr);
+	DRM_DEBUG("rptr before shift == 0x%016lx\n", *rptr);
 	return ((*rptr) >> 2);
 }
 
@@ -371,12 +371,12 @@ static uint64_t sdma_v4_0_ring_get_wptr(struct amdgpu_ring *ring)
 	if (ring->use_doorbell) {
 		/* XXX check if swapping is necessary on BE */
 		wptr = READ_ONCE(*((u64 *)&adev->wb.wb[ring->wptr_offs]));
-		DRM_DEBUG("wptr/doorbell before shift == 0x%016llx\n", wptr);
+		DRM_DEBUG("wptr/doorbell before shift == 0x%016lx\n", wptr);
 	} else {
 		wptr = RREG32_SDMA(ring->me, mmSDMA0_GFX_RB_WPTR_HI);
 		wptr = wptr << 32;
 		wptr |= RREG32_SDMA(ring->me, mmSDMA0_GFX_RB_WPTR);
-		DRM_DEBUG("wptr before shift [%i] wptr == 0x%016llx\n",
+		DRM_DEBUG("wptr before shift [%i] wptr == 0x%016lx\n",
 				ring->me, wptr);
 	}
 
@@ -407,7 +407,7 @@ static void sdma_v4_0_ring_set_wptr(struct amdgpu_ring *ring)
 				upper_32_bits(ring->wptr << 2));
 		/* XXX check if swapping is necessary on BE */
 		WRITE_ONCE(*wb, (ring->wptr << 2));
-		DRM_DEBUG("calling WDOORBELL64(0x%08x, 0x%016llx)\n",
+		DRM_DEBUG("calling WDOORBELL64(0x%08x, 0x%016lx)\n",
 				ring->doorbell_index, ring->wptr << 2);
 		WDOORBELL64(ring->doorbell_index, ring->wptr << 2);
 	} else {
@@ -500,7 +500,7 @@ static void sdma_v4_0_ring_insert_nop(struct amdgpu_ring *ring, uint32_t count)
 static void sdma_v4_0_ring_emit_ib(struct amdgpu_ring *ring,
 				   struct amdgpu_job *job,
 				   struct amdgpu_ib *ib,
-				   bool ctx_switch)
+				   uint32_t flags)
 {
 	unsigned vmid = AMDGPU_JOB_GET_VMID(job);
 
@@ -577,7 +577,7 @@ static void sdma_v4_0_ring_emit_hdp_flush(struct amdgpu_ring *ring)
  * the fence seq number and DMA trap packet to generate
  * an interrupt if needed (VEGA10).
  */
-static void sdma_v4_0_ring_emit_fence(struct amdgpu_ring *ring, uint64_t addr, uint64_t seq,
+static void sdma_v4_0_ring_emit_fence(struct amdgpu_ring *ring, u64 addr, u64 seq,
 				      unsigned flags)
 {
 	bool write64bit = flags & AMDGPU_FENCE_FLAG_64BIT;
@@ -834,8 +834,6 @@ static void sdma_v4_0_gfx_resume(struct amdgpu_device *adev, unsigned int i)
 					OFFSET, ring->doorbell_index);
 	WREG32_SDMA(i, mmSDMA0_GFX_DOORBELL, doorbell);
 	WREG32_SDMA(i, mmSDMA0_GFX_DOORBELL_OFFSET, doorbell_offset);
-	adev->nbio_funcs->sdma_doorbell_range(adev, i, ring->use_doorbell,
-					      ring->doorbell_index);
 
 	sdma_v4_0_ring_set_wptr(ring);
 
@@ -1522,9 +1520,7 @@ static int sdma_v4_0_sw_init(void *handle)
 				ring->use_doorbell?"true":"false");
 
 		/* doorbell size is 2 dwords, get DWORD offset */
-		ring->doorbell_index = (i == 0) ?
-			(adev->doorbell_index.sdma_engine0 << 1)
-			: (adev->doorbell_index.sdma_engine1 << 1);
+		ring->doorbell_index = adev->doorbell_index.sdma_engine[i] << 1;
 
 		ksprintf(ring->name, "sdma%d", i);
 		r = amdgpu_ring_init(adev, ring, 1024,
@@ -1543,9 +1539,7 @@ static int sdma_v4_0_sw_init(void *handle)
 			/* paging queue use same doorbell index/routing as gfx queue
 			 * with 0x400 (4096 dwords) offset on second doorbell page
 			 */
-			ring->doorbell_index = (i == 0) ?
-				(adev->doorbell_index.sdma_engine0 << 1)
-				: (adev->doorbell_index.sdma_engine1 << 1);
+			ring->doorbell_index = adev->doorbell_index.sdma_engine[i] << 1;
 			ring->doorbell_index += 0x400;
 
 			sprintf(ring->name, "page%d", i);

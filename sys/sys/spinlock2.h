@@ -55,7 +55,9 @@ int spin_trylock_contested(struct spinlock *spin);
 void _spin_lock_contested(struct spinlock *spin, const char *ident, int count);
 void _spin_lock_shared_contested(struct spinlock *spin, const char *ident);
 
+#ifndef spin_lock
 #define spin_lock(spin)			_spin_lock(spin, __func__)
+#endif
 #define spin_lock_quick(spin)		_spin_lock_quick(spin, __func__)
 #define spin_lock_shared(spin)		_spin_lock_shared(spin, __func__)
 #define spin_lock_shared_quick(spin)	_spin_lock_shared_quick(spin, __func__)

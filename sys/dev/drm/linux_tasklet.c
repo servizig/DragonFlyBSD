@@ -143,7 +143,7 @@ tasklet_init(struct tasklet_struct *t,
 			goto found_and_done;			\
 	}							\
 								\
-	te = kmalloc(sizeof(struct tasklet_entry), M_DRM, M_CACHEALIGN | M_INTWAIT);	\
+	te = __kmalloc(sizeof(struct tasklet_entry), M_DRM, M_CACHEALIGN | M_INTWAIT);	\
 	te->ts = t;						\
 	STAILQ_INSERT_TAIL(&(list), te, tasklet_entries);	\
 								\

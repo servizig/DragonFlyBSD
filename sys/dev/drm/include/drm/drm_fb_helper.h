@@ -37,6 +37,11 @@ struct drm_fb_helper;
 #include <drm/drm_device.h>
 #include <linux/kgdb.h>
 
+#ifdef __DragonFly__
+/* for IS_ENABLED */
+#include <linux/kconfig.h>
+#endif
+
 enum mode_set_atomic {
 	LEAVE_ATOMIC_MODE_SET,
 	ENTER_ATOMIC_MODE_SET,
@@ -207,7 +212,7 @@ struct drm_fb_helper {
 	 * protect all helper internal state with this lock as well as reduce
 	 * core KMS locking as much as possible.
 	 */
-	struct lock lock;
+	struct mutex lock;
 
 	/**
 	 * @kernel_fb_list:

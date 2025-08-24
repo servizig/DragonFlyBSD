@@ -170,13 +170,16 @@ static void uvd_v6_0_enc_ring_set_wptr(struct amdgpu_ring *ring)
 static int uvd_v6_0_enc_ring_test_ring(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
-	uint32_t rptr = amdgpu_ring_get_rptr(ring);
+	uint32_t rptr;
 	unsigned i;
 	int r;
 
 	r = amdgpu_ring_alloc(ring, 16);
 	if (r)
 		return r;
+
+	rptr = amdgpu_ring_get_rptr(ring);
+
 	amdgpu_ring_write(ring, HEVC_ENC_CMD_END);
 	amdgpu_ring_commit(ring);
 
@@ -879,7 +882,7 @@ static void uvd_v6_0_stop(struct amdgpu_device *adev)
  *
  * Write a fence and a trap command to the ring.
  */
-static void uvd_v6_0_ring_emit_fence(struct amdgpu_ring *ring, uint64_t addr, uint64_t seq,
+static void uvd_v6_0_ring_emit_fence(struct amdgpu_ring *ring, u64 addr, u64 seq,
 				     unsigned flags)
 {
 	WARN_ON(flags & AMDGPU_FENCE_FLAG_64BIT);
@@ -909,8 +912,8 @@ static void uvd_v6_0_ring_emit_fence(struct amdgpu_ring *ring, uint64_t addr, ui
  *
  * Write enc a fence and a trap command to the ring.
  */
-static void uvd_v6_0_enc_ring_emit_fence(struct amdgpu_ring *ring, uint64_t addr,
-			uint64_t seq, unsigned flags)
+static void uvd_v6_0_enc_ring_emit_fence(struct amdgpu_ring *ring, u64 addr,
+			u64 seq, unsigned flags)
 {
 	WARN_ON(flags & AMDGPU_FENCE_FLAG_64BIT);
 
@@ -977,7 +980,7 @@ static int uvd_v6_0_ring_test_ring(struct amdgpu_ring *ring)
 static void uvd_v6_0_ring_emit_ib(struct amdgpu_ring *ring,
 				  struct amdgpu_job *job,
 				  struct amdgpu_ib *ib,
-				  bool ctx_switch)
+				  uint32_t flags)
 {
 	unsigned vmid = AMDGPU_JOB_GET_VMID(job);
 
@@ -1003,7 +1006,7 @@ static void uvd_v6_0_ring_emit_ib(struct amdgpu_ring *ring,
 static void uvd_v6_0_enc_ring_emit_ib(struct amdgpu_ring *ring,
 					struct amdgpu_job *job,
 					struct amdgpu_ib *ib,
-					bool ctx_switch)
+					uint32_t flags)
 {
 	unsigned vmid = AMDGPU_JOB_GET_VMID(job);
 

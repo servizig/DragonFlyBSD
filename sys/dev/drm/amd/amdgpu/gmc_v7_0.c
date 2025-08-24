@@ -1081,7 +1081,6 @@ static int gmc_v7_0_sw_init(void *handle)
 	}
 
 	adev->gmc.vm_fault_info = kmalloc(sizeof(struct kfd_vm_fault_info),
-					M_DRM,
 					GFP_KERNEL);
 	if (!adev->gmc.vm_fault_info)
 		return -ENOMEM;

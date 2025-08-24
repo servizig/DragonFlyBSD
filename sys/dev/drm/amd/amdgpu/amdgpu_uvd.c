@@ -257,7 +257,7 @@ int amdgpu_uvd_sw_init(struct amdgpu_device *adev)
 			continue;
 		r = amdgpu_bo_create_kernel(adev, bo_size, PAGE_SIZE,
 					    AMDGPU_GEM_DOMAIN_VRAM, &adev->uvd.inst[j].vcpu_bo,
-					    (u64 *)&adev->uvd.inst[j].gpu_addr, &adev->uvd.inst[j].cpu_addr);
+					    &adev->uvd.inst[j].gpu_addr, &adev->uvd.inst[j].cpu_addr);
 		if (r) {
 			dev_err(adev->dev, "(%d) failed to allocate UVD bo\n", r);
 			return r;
@@ -305,7 +305,7 @@ int amdgpu_uvd_sw_fini(struct amdgpu_device *adev)
 		kvfree(adev->uvd.inst[j].saved_bo);
 
 		amdgpu_bo_free_kernel(&adev->uvd.inst[j].vcpu_bo,
-				      (u64 *)&adev->uvd.inst[j].gpu_addr,
+				      &adev->uvd.inst[j].gpu_addr,
 				      (void **)&adev->uvd.inst[j].cpu_addr);
 
 		amdgpu_ring_fini(&adev->uvd.inst[j].ring);
@@ -368,7 +368,7 @@ int amdgpu_uvd_suspend(struct amdgpu_device *adev)
 		size = amdgpu_bo_size(adev->uvd.inst[j].vcpu_bo);
 		ptr = adev->uvd.inst[j].cpu_addr;
 
-		adev->uvd.inst[j].saved_bo = kmalloc(size, M_DRM, GFP_KERNEL);
+		adev->uvd.inst[j].saved_bo = kvmalloc(size, GFP_KERNEL);
 		if (!adev->uvd.inst[j].saved_bo)
 			return -ENOMEM;
 

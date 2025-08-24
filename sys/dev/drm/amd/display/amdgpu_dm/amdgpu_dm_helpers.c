@@ -31,7 +31,7 @@
 #include <linux/i2c.h>
 
 #include <drm/drmP.h>
-#include <drm/drm_crtc_helper.h>
+#include <drm/drm_probe_helper.h>
 #include <drm/amdgpu_drm.h>
 #include <drm/drm_edid.h>
 
@@ -194,7 +194,7 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 	int bpp = 0;
 	int pbn = 0;
 
-	aconnector = stream->sink->priv;
+	aconnector = (struct amdgpu_dm_connector *)stream->dm_stream_context;
 
 	if (!aconnector || !aconnector->mst_port)
 		return false;
@@ -207,7 +207,7 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 	mst_port = aconnector->port;
 
 	if (enable) {
-		clock = stream->timing.pix_clk_khz;
+		clock = stream->timing.pix_clk_100hz / 10;
 
 		switch (stream->timing.display_color_depth) {
 
@@ -265,6 +265,13 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 	return true;
 }
 
+/*
+ * poll pending down reply before clear payload allocation table
+ */
+void dm_helpers_dp_mst_poll_pending_down_reply(
+	struct dc_context *ctx,
+	const struct dc_link *link)
+{}
 
 /*
  * Clear payload allocation table before enable MST DP link.
@@ -286,7 +293,7 @@ bool dm_helpers_dp_mst_poll_for_allocation_change_trigger(
 	struct drm_dp_mst_topology_mgr *mst_mgr;
 	int ret;
 
-	aconnector = stream->sink->priv;
+	aconnector = (struct amdgpu_dm_connector *)stream->dm_stream_context;
 
 	if (!aconnector || !aconnector->mst_port)
 		return false;
@@ -314,7 +321,7 @@ bool dm_helpers_dp_mst_send_payload_allocation(
 	struct drm_dp_mst_port *mst_port;
 	int ret;
 
-	aconnector = stream->sink->priv;
+	aconnector = (struct amdgpu_dm_connector *)stream->dm_stream_context;
 
 	if (!aconnector || !aconnector->mst_port)
 		return false;
@@ -384,7 +391,7 @@ void dm_dtn_log_append_v(struct dc_context *ctx,
 	total = log_ctx->pos + n + 1;
 
 	if (total > log_ctx->size) {
-		char *buf = (char *)kcalloc(total, sizeof(char), GFP_KERNEL);
+		char *buf = (char *)kvcalloc(total, sizeof(char), GFP_KERNEL);
 
 		if (buf) {
 			memcpy(buf, log_ctx->buf, log_ctx->pos);

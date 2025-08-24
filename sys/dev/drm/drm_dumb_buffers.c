@@ -123,7 +123,7 @@ int drm_mode_mmap_dumb_ioctl(struct drm_device *dev,
 	if (dev->driver->dumb_map_offset)
 		return dev->driver->dumb_map_offset(file_priv, dev,
 						    args->handle,
-						    (uint64_t *)&args->offset);
+						    &args->offset);
 	else
 		return drm_gem_dumb_map_offset(file_priv, dev, args->handle,
 					       &args->offset);

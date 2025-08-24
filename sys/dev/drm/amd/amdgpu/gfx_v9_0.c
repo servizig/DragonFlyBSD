@@ -220,6 +220,7 @@ static const struct soc15_reg_golden golden_settings_gc_9_1_rv2[] =
 
 static const struct soc15_reg_golden golden_settings_gc_9_x_common[] =
 {
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmCP_SD_CNTL, 0xffffffff, 0x000001ff),
 	SOC15_REG_GOLDEN_VALUE(GC, 0, mmGRBM_CAM_INDEX, 0xffffffff, 0x00000000),
 	SOC15_REG_GOLDEN_VALUE(GC, 0, mmGRBM_CAM_DATA, 0xffffffff, 0x2544c382)
 };
@@ -693,7 +694,7 @@ static int gfx_v9_0_init_microcode(struct amdgpu_device *adev)
 			le32_to_cpu(rlc_hdr->reg_list_size_bytes);
 	adev->gfx.rlc.register_list_format =
 			kmalloc(adev->gfx.rlc.reg_list_format_size_bytes +
-				adev->gfx.rlc.reg_list_size_bytes, M_DRM, GFP_KERNEL);
+				adev->gfx.rlc.reg_list_size_bytes, GFP_KERNEL);
 	if (!adev->gfx.rlc.register_list_format) {
 		err = -ENOMEM;
 		goto out;
@@ -1396,7 +1397,7 @@ static int gfx_v9_0_ngg_create_buf(struct amdgpu_device *adev,
 	r = amdgpu_bo_create_kernel(adev, ngg_buf->size,
 				    PAGE_SIZE, AMDGPU_GEM_DOMAIN_VRAM,
 				    &ngg_buf->bo,
-				    (u64 *)&ngg_buf->gpu_addr,
+				    &ngg_buf->gpu_addr,
 				    NULL);
 	if (r) {
 		dev_err(adev->dev, "(%d) failed to create NGG buffer\n", r);
@@ -1413,7 +1414,7 @@ static int gfx_v9_0_ngg_fini(struct amdgpu_device *adev)
 
 	for (i = 0; i < NGG_BUF_MAX; i++)
 		amdgpu_bo_free_kernel(&adev->gfx.ngg.buf[i].bo,
-				      (u64 *)&adev->gfx.ngg.buf[i].gpu_addr,
+				      &adev->gfx.ngg.buf[i].gpu_addr,
 				      NULL);
 
 	memset(&adev->gfx.ngg.buf[0], 0,
@@ -1746,11 +1747,11 @@ static int gfx_v9_0_sw_fini(void *handle)
 	gfx_v9_0_mec_fini(adev);
 	gfx_v9_0_ngg_fini(adev);
 	amdgpu_bo_free_kernel(&adev->gfx.rlc.clear_state_obj,
-				(u64 *)&adev->gfx.rlc.clear_state_gpu_addr,
+				&adev->gfx.rlc.clear_state_gpu_addr,
 				(void **)&adev->gfx.rlc.cs_ptr);
 	if (adev->asic_type == CHIP_RAVEN) {
 		amdgpu_bo_free_kernel(&adev->gfx.rlc.cp_table_obj,
-				(u64 *)&adev->gfx.rlc.cp_table_gpu_addr,
+				&adev->gfx.rlc.cp_table_gpu_addr,
 				(void **)&adev->gfx.rlc.cp_table_ptr);
 	}
 	gfx_v9_0_free_microcode(adev);
@@ -1898,25 +1899,6 @@ static void gfx_v9_0_constants_init(struct amdgpu_device *adev)
 	mutex_unlock(&adev->srbm_mutex);
 
 	gfx_v9_0_init_compute_vmid(adev);
-
-	mutex_lock(&adev->grbm_idx_mutex);
-	/*
-	 * making sure that the following register writes will be broadcasted
-	 * to all the shaders
-	 */
-	gfx_v9_0_select_se_sh(adev, 0xffffffff, 0xffffffff, 0xffffffff);
-
-	WREG32_SOC15(GC, 0, mmPA_SC_FIFO_SIZE,
-		   (adev->gfx.config.sc_prim_fifo_size_frontend <<
-			PA_SC_FIFO_SIZE__SC_FRONTEND_PRIM_FIFO_SIZE__SHIFT) |
-		   (adev->gfx.config.sc_prim_fifo_size_backend <<
-			PA_SC_FIFO_SIZE__SC_BACKEND_PRIM_FIFO_SIZE__SHIFT) |
-		   (adev->gfx.config.sc_hiz_tile_fifo_size <<
-			PA_SC_FIFO_SIZE__SC_HIZ_TILE_FIFO_SIZE__SHIFT) |
-		   (adev->gfx.config.sc_earlyz_tile_fifo_size <<
-			PA_SC_FIFO_SIZE__SC_EARLYZ_TILE_FIFO_SIZE__SHIFT));
-	mutex_unlock(&adev->grbm_idx_mutex);
-
 }
 
 static void gfx_v9_0_wait_for_rlc_serdes(struct amdgpu_device *adev)
@@ -2031,7 +2013,7 @@ static int gfx_v9_1_init_rlc_save_restore_list(struct amdgpu_device *adev)
 	u32 tmp = 0;
 
 	u32 *register_list_format =
-		kmalloc(adev->gfx.rlc.reg_list_format_size_bytes, M_DRM, GFP_KERNEL);
+		kmalloc(adev->gfx.rlc.reg_list_format_size_bytes, GFP_KERNEL);
 	if (!register_list_format)
 		return -ENOMEM;
 	memcpy(register_list_format, adev->gfx.rlc.register_list_format,
@@ -2404,8 +2386,6 @@ static int gfx_v9_0_rlc_resume(struct amdgpu_device *adev)
 
 	/* disable CG */
 	WREG32_SOC15(GC, 0, mmRLC_CGCG_CGLS_CTRL, 0);
-
-	adev->gfx.rlc.funcs->reset(adev);
 
 	gfx_v9_0_init_pg(adev);
 
@@ -3906,12 +3886,12 @@ static void gfx_v9_0_get_clockgating_state(void *handle, u32 *flags)
 		*flags |= AMD_CG_SUPPORT_GFX_3D_CGLS;
 }
 
-static uint64_t gfx_v9_0_ring_get_rptr_gfx(struct amdgpu_ring *ring)
+static u64 gfx_v9_0_ring_get_rptr_gfx(struct amdgpu_ring *ring)
 {
 	return ring->adev->wb.wb[ring->rptr_offs]; /* gfx9 is 32bit rptr*/
 }
 
-static uint64_t gfx_v9_0_ring_get_wptr_gfx(struct amdgpu_ring *ring)
+static u64 gfx_v9_0_ring_get_wptr_gfx(struct amdgpu_ring *ring)
 {
 	struct amdgpu_device *adev = ring->adev;
 	u64 wptr;
@@ -3973,7 +3953,7 @@ static void gfx_v9_0_ring_emit_hdp_flush(struct amdgpu_ring *ring)
 static void gfx_v9_0_ring_emit_ib_gfx(struct amdgpu_ring *ring,
 					struct amdgpu_job *job,
 					struct amdgpu_ib *ib,
-					bool ctx_switch)
+					uint32_t flags)
 {
 	unsigned vmid = AMDGPU_JOB_GET_VMID(job);
 	u32 header, control = 0;
@@ -4006,10 +3986,26 @@ static void gfx_v9_0_ring_emit_ib_gfx(struct amdgpu_ring *ring,
 static void gfx_v9_0_ring_emit_ib_compute(struct amdgpu_ring *ring,
 					  struct amdgpu_job *job,
 					  struct amdgpu_ib *ib,
-					  bool ctx_switch)
+					  uint32_t flags)
 {
 	unsigned vmid = AMDGPU_JOB_GET_VMID(job);
 	u32 control = INDIRECT_BUFFER_VALID | ib->length_dw | (vmid << 24);
+
+	/* Currently, there is a high possibility to get wave ID mismatch
+	 * between ME and GDS, leading to a hw deadlock, because ME generates
+	 * different wave IDs than the GDS expects. This situation happens
+	 * randomly when at least 5 compute pipes use GDS ordered append.
+	 * The wave IDs generated by ME are also wrong after suspend/resume.
+	 * Those are probably bugs somewhere else in the kernel driver.
+	 *
+	 * Writing GDS_COMPUTE_MAX_WAVE_ID resets wave ID counters in ME and
+	 * GDS to 0 for this ring (me/pipe).
+	 */
+	if (ib->flags & AMDGPU_IB_FLAG_RESET_GDS_MAX_WAVE_ID) {
+		amdgpu_ring_write(ring, PACKET3(PACKET3_SET_CONFIG_REG, 1));
+		amdgpu_ring_write(ring, mmGDS_COMPUTE_MAX_WAVE_ID);
+		amdgpu_ring_write(ring, ring->adev->gds.gds_compute_max_wave_id);
+	}
 
 	amdgpu_ring_write(ring, PACKET3(PACKET3_INDIRECT_BUFFER, 2));
 	BUG_ON(ib->gpu_addr & 0x3); /* Dword align */
@@ -4022,8 +4018,8 @@ static void gfx_v9_0_ring_emit_ib_compute(struct amdgpu_ring *ring,
 	amdgpu_ring_write(ring, control);
 }
 
-static void gfx_v9_0_ring_emit_fence(struct amdgpu_ring *ring, uint64_t addr,
-				     uint64_t seq, unsigned flags)
+static void gfx_v9_0_ring_emit_fence(struct amdgpu_ring *ring, u64 addr,
+				     u64 seq, unsigned flags)
 {
 	bool write64bit = flags & AMDGPU_FENCE_FLAG_64BIT;
 	bool int_sel = flags & AMDGPU_FENCE_FLAG_INT;
@@ -4080,14 +4076,14 @@ static void gfx_v9_0_ring_emit_vm_flush(struct amdgpu_ring *ring,
 	}
 }
 
-static uint64_t gfx_v9_0_ring_get_rptr_compute(struct amdgpu_ring *ring)
+static u64 gfx_v9_0_ring_get_rptr_compute(struct amdgpu_ring *ring)
 {
 	return ring->adev->wb.wb[ring->rptr_offs]; /* gfx9 hardware is 32bit rptr */
 }
 
-static uint64_t gfx_v9_0_ring_get_wptr_compute(struct amdgpu_ring *ring)
+static u64 gfx_v9_0_ring_get_wptr_compute(struct amdgpu_ring *ring)
 {
-	uint64_t wptr;
+	u64 wptr;
 
 	/* XXX check if swapping is necessary on BE */
 	if (ring->use_doorbell)
@@ -4209,8 +4205,8 @@ static void gfx_v9_0_ring_set_wptr_compute(struct amdgpu_ring *ring)
 	}
 }
 
-static void gfx_v9_0_ring_emit_fence_kiq(struct amdgpu_ring *ring, uint64_t addr,
-					 uint64_t seq, unsigned int flags)
+static void gfx_v9_0_ring_emit_fence_kiq(struct amdgpu_ring *ring, u64 addr,
+					 u64 seq, unsigned int flags)
 {
 	struct amdgpu_device *adev = ring->adev;
 
@@ -4730,7 +4726,7 @@ static const struct amdgpu_ring_funcs gfx_v9_0_ring_funcs_compute = {
 		SOC15_FLUSH_GPU_TLB_NUM_REG_WAIT * 7 +
 		2 + /* gfx_v9_0_ring_emit_vm_flush */
 		8 + 8 + 8, /* gfx_v9_0_ring_emit_fence x3 for user fence, vm fence */
-	.emit_ib_size =	4, /* gfx_v9_0_ring_emit_ib_compute */
+	.emit_ib_size =	7, /* gfx_v9_0_ring_emit_ib_compute */
 	.emit_ib = gfx_v9_0_ring_emit_ib_compute,
 	.emit_fence = gfx_v9_0_ring_emit_fence,
 	.emit_pipeline_sync = gfx_v9_0_ring_emit_pipeline_sync,
@@ -4765,7 +4761,7 @@ static const struct amdgpu_ring_funcs gfx_v9_0_ring_funcs_kiq = {
 		SOC15_FLUSH_GPU_TLB_NUM_REG_WAIT * 7 +
 		2 + /* gfx_v9_0_ring_emit_vm_flush */
 		8 + 8 + 8, /* gfx_v9_0_ring_emit_fence_kiq x3 for user fence, vm fence */
-	.emit_ib_size =	4, /* gfx_v9_0_ring_emit_ib_compute */
+	.emit_ib_size =	7, /* gfx_v9_0_ring_emit_ib_compute */
 	.emit_fence = gfx_v9_0_ring_emit_fence_kiq,
 	.test_ring = gfx_v9_0_ring_test_ring,
 	.insert_nop = amdgpu_ring_insert_nop,
@@ -4844,6 +4840,26 @@ static void gfx_v9_0_set_gds_init(struct amdgpu_device *adev)
 		break;
 	default:
 		adev->gds.mem.total_size = 0x10000;
+		break;
+	}
+
+	switch (adev->asic_type) {
+	case CHIP_VEGA10:
+	case CHIP_VEGA20:
+		adev->gds.gds_compute_max_wave_id = 0x7ff;
+		break;
+	case CHIP_VEGA12:
+		adev->gds.gds_compute_max_wave_id = 0x27f;
+		break;
+	case CHIP_RAVEN:
+		if (adev->rev_id >= 0x8)
+			adev->gds.gds_compute_max_wave_id = 0x77; /* raven2 */
+		else
+			adev->gds.gds_compute_max_wave_id = 0x15f; /* raven1 */
+		break;
+	default:
+		/* this really depends on the chip */
+		adev->gds.gds_compute_max_wave_id = 0x7ff;
 		break;
 	}
 

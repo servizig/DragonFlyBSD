@@ -71,7 +71,7 @@ vmap(struct page **pages, unsigned int count,
 	vm_offset_t off;
 	size_t size;
 
-	vmp = kmalloc(sizeof(struct vmap), M_DRM, M_WAITOK | M_ZERO);
+	vmp = __kmalloc(sizeof(struct vmap), M_DRM, M_WAITOK | M_ZERO);
 
 	size = count * PAGE_SIZE;
 	off = kmem_alloc_nofault(kernel_map, size,
@@ -132,20 +132,20 @@ is_vmalloc_addr(const void *x)
 void *
 vmalloc(unsigned long size)
 {
-	return kmalloc(size, M_DRM, M_WAITOK);
+	return __kmalloc(size, M_DRM, M_WAITOK);
 }
 
 void *
 vzalloc(unsigned long size)
 {
-	return kmalloc(size, M_DRM, M_WAITOK | M_ZERO);
+	return __kmalloc(size, M_DRM, M_WAITOK | M_ZERO);
 }
 
 /* allocate zeroed virtually contiguous memory for userspace */
 void *
 vmalloc_user(unsigned long size)
 {
-	return kmalloc(size, M_DRM, M_WAITOK | M_ZERO);
+	return __kmalloc(size, M_DRM, M_WAITOK | M_ZERO);
 }
 
 void
@@ -163,5 +163,5 @@ kvmalloc_array(size_t n, size_t size, gfp_t flags)
 	if (n > SIZE_MAX / size)
 		return NULL;
 
-	return kmalloc(n * size, M_DRM, flags);
+	return __kmalloc(n * size, M_DRM, flags);
 }

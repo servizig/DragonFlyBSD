@@ -42,10 +42,16 @@
 #include <linux/uaccess.h>
 #include <linux/mem_encrypt.h>
 
+#ifdef __DragonFly__
+#include <drmP.h>
 #include <sys/sysctl.h>
 #include <vm/vm.h>
 #include <vm/vm_page.h>
 #include <vm/vm_page2.h>
+#include <vm/vm_extern.h>
+#include <vm/vm_pager.h>
+#endif
+
 
 #define TTM_BO_VM_NUM_PREFAULT 16
 
@@ -161,11 +167,7 @@ static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	 * for reserve, and if it fails, retry the fault after waiting
 	 * for the buffer to become unreserved.
 	 */
-	err = ttm_bo_reserve(bo, true, true, NULL);
-	if (unlikely(err != 0)) {
-		if (err != -EBUSY)
-			return VM_FAULT_NOPAGE;
-
+	if (unlikely(!reservation_object_trylock(bo->resv))) {
 		if (vmf->flags & FAULT_FLAG_ALLOW_RETRY) {
 			if (!(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
 				ttm_bo_get(bo);
@@ -195,6 +197,8 @@ static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	}
 
 	if (bdev->driver->fault_reserve_notify) {
+		struct dma_fence *moving = dma_fence_get(bo->moving);
+
 		err = bdev->driver->fault_reserve_notify(bo);
 		switch (err) {
 		case 0:
@@ -207,6 +211,13 @@ static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 			ret = VM_FAULT_SIGBUS;
 			goto out_unlock;
 		}
+
+		if (bo->moving != moving) {
+			spin_lock(&bdev->glob->lru_lock);
+			ttm_bo_move_to_lru_tail(bo, NULL);
+			spin_unlock(&bdev->glob->lru_lock);
+		}
+		dma_fence_put(moving);
 	}
 
 	/*
@@ -321,7 +332,7 @@ static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 out_io_unlock:
 	ttm_mem_io_unlock(man);
 out_unlock:
-	ttm_bo_unreserve(bo);
+	reservation_object_unlock(bo->resv);
 	return ret;
 #endif
 }
@@ -792,7 +803,7 @@ ttm_bo_vm_dtor(void *handle)
 {
 	struct ttm_buffer_object *bo = handle;
 
-	ttm_bo_unref(&bo);
+	ttm_bo_put(bo);
 }
 
 static struct cdev_pager_ops ttm_pager_ops = {
@@ -849,7 +860,7 @@ ttm_bo_mmap_single(struct file *fp, struct drm_device *dev,
 			*obj_res = vm_obj;
 			*offset = 0;		/* object-relative offset */
 		} else {
-			ttm_bo_unref(&bo);
+			ttm_bo_put(bo);
 			ret = EINVAL;
 		}
 	}

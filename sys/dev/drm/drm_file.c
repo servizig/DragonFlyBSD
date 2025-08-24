@@ -142,14 +142,14 @@ struct drm_file *drm_file_alloc(struct drm_minor *minor)
 
 	INIT_LIST_HEAD(&file->lhead);
 	INIT_LIST_HEAD(&file->fbs);
-	lockinit(&file->fbs_lock, "dpfl", 0, LK_CANRECURSE);
+	mutex_init(&file->fbs_lock);
 	INIT_LIST_HEAD(&file->blobs);
 	INIT_LIST_HEAD(&file->pending_event_list);
 	INIT_LIST_HEAD(&file->event_list);
 	init_waitqueue_head(&file->event_wait);
 	file->event_space = 4096; /* set aside 4k for event buffer */
 
-	lockinit(&file->event_read_lock, "dperl", 0, LK_CANRECURSE);
+	mutex_init(&file->event_read_lock);
 
 	if (drm_core_check_feature(dev, DRIVER_GEM))
 		drm_gem_open(dev, file);
@@ -272,6 +272,18 @@ void drm_file_free(struct drm_file *file)
 	kfree(file);
 }
 
+static void drm_close_helper(struct file *filp)
+{
+	struct drm_file *file_priv = filp->private_data;
+	struct drm_device *dev = file_priv->minor->dev;
+
+	mutex_lock(&dev->filelist_mutex);
+	list_del(&file_priv->lhead);
+	mutex_unlock(&dev->filelist_mutex);
+
+	drm_file_free(file_priv);
+}
+
 static int drm_setup(struct drm_device * dev)
 {
 	int ret;
@@ -344,8 +356,10 @@ int drm_open(struct dev_open_args *ap)
 		goto err_undo;
 	if (need_setup) {
 		retcode = drm_setup(dev);
-		if (retcode)
+		if (retcode) {
+			drm_close_helper(filp);
 			goto err_undo;
+		}
 	}
 #ifdef __DragonFly__
 	device_busy(dev->dev->bsddev);
@@ -607,11 +621,7 @@ int drm_release(struct inode *inode, struct file *filp)
 
 	DRM_DEBUG("open_count = %d\n", dev->open_count);
 
-	mutex_lock(&dev->filelist_mutex);
-	list_del(&file_priv->lhead);
-	mutex_unlock(&dev->filelist_mutex);
-
-	drm_file_free(file_priv);
+	drm_close_helper(filp);
 
 	if (!--dev->open_count)
 		drm_lastclose(dev);
@@ -880,7 +890,7 @@ int drm_event_reserve_init(struct drm_device *dev,
 EXPORT_SYMBOL(drm_event_reserve_init);
 
 /**
- * drm_event_cancel_free - free a DRM event and release it's space
+ * drm_event_cancel_free - free a DRM event and release its space
  * @dev: DRM device
  * @p: tracking structure for the pending event
  *

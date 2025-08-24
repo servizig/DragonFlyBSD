@@ -27,6 +27,7 @@
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_uapi.h>
 #include <drm/drm_print.h>
+#include <drm/drm_util.h>
 
 #include "drm_internal.h"
 #include "drm_crtc_internal.h"
@@ -220,14 +221,14 @@ static int framebuffer_check(struct drm_device *dev,
 		}
 
 		if (r->modifier[i] && !(r->flags & DRM_MODE_FB_MODIFIERS)) {
-			DRM_DEBUG_KMS("bad fb modifier %llu for plane %d\n",
+			DRM_DEBUG_KMS("bad fb modifier %lu for plane %d\n",
 				      r->modifier[i], i);
 			return -EINVAL;
 		}
 
 		if (r->flags & DRM_MODE_FB_MODIFIERS &&
 		    r->modifier[i] != r->modifier[0]) {
-			DRM_DEBUG_KMS("bad fb modifier %llu for plane %d\n",
+			DRM_DEBUG_KMS("bad fb modifier %lu for plane %d\n",
 				      r->modifier[i], i);
 			return -EINVAL;
 		}
@@ -352,7 +353,7 @@ int drm_mode_addfb2(struct drm_device *dev,
 		  "handles: [0]=%u, [1]=%u, [2]=%u, [3]=%u, "
 		  "pitches: [0]=%u, [1]=%u, [2]=%u, [3]=%u,"
 		  "offsets: [0]=%u, [1]=%u, [2]=%u, [3]=%u, "
-		  "modifier: [0]=%llu, [1]=%llu, [2]=%llu, [3]=%llu\n",
+		  "modifier: [0]=%lu, [1]=%lu, [2]=%lu, [3]=%lu\n",
 		  r->fb_id, r->height, r->width, r->pixel_format, r->flags,
 		  r->handles[0], r->handles[1], r->handles[2], r->handles[3],
 		  r->pitches[0], r->pitches[1], r->pitches[2], r->pitches[3],
@@ -369,7 +370,7 @@ int drm_mode_addfb2(struct drm_device *dev,
 		  "handles: [0]=%u, [1]=%u, [2]=%u, [3]=%u, "
 		  "pitches: [0]=%u, [1]=%u, [2]=%u, [3]=%u,"
 		  "offsets: [0]=%u, [1]=%u, [2]=%u, [3]=%u, "
-		  "modifier: [0]=%llu, [1]=%llu, [2]=%llu, [3]=%llu\n",
+		  "modifier: [0]=%lu, [1]=%lu, [2]=%lu, [3]=%lu\n",
 		  r->fb_id, r->height, r->width, r->pixel_format, r->flags,
 		  r->handles[0], r->handles[1], r->handles[2], r->handles[3],
 		  r->pitches[0], r->pitches[1], r->pitches[2], r->pitches[3],
@@ -792,7 +793,7 @@ EXPORT_SYMBOL(drm_framebuffer_lookup);
  * @fb: fb to unregister
  *
  * Drivers need to call this when cleaning up driver-private framebuffers, e.g.
- * those used for fbdev. Note that the caller must hold a reference of it's own,
+ * those used for fbdev. Note that the caller must hold a reference of its own,
  * i.e. the object may not be destroyed through this call (since it'll lead to a
  * locking inversion).
  *

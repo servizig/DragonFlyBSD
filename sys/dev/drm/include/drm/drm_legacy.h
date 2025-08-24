@@ -2,6 +2,9 @@
 #define __DRM_DRM_LEGACY_H__
 
 #include <drm/drm_auth.h>
+#include <drm/drm_hashtab.h>
+
+struct drm_device;
 
 /*
  * Legacy driver interfaces for the Direct Rendering Manager
@@ -156,11 +159,13 @@ struct drm_map_list {
 int drm_legacy_addmap(struct drm_device *d, resource_size_t offset,
 		      unsigned int size, enum drm_map_type type,
 		      enum drm_map_flags flags, struct drm_local_map **map_p);
+struct drm_local_map *drm_legacy_findmap(struct drm_device *dev, unsigned int token);
 void drm_legacy_rmmap(struct drm_device *d, struct drm_local_map *map);
 int drm_legacy_rmmap_locked(struct drm_device *d, struct drm_local_map *map);
 void drm_legacy_master_rmmaps(struct drm_device *dev,
 			      struct drm_master *master);
 struct drm_local_map *drm_legacy_getsarea(struct drm_device *dev);
+int drm_legacy_mmap(struct file *filp, struct vm_area_struct *vma);
 
 int drm_legacy_addbufs_agp(struct drm_device *d, struct drm_buf_desc *req);
 int drm_legacy_addbufs_pci(struct drm_device *d, struct drm_buf_desc *req);
@@ -171,14 +176,15 @@ int drm_legacy_addbufs_pci(struct drm_device *d, struct drm_buf_desc *req);
  * \param dev DRM device.
  * \param filp file pointer of the caller.
  */
-#define LOCK_TEST_WITH_RETURN(dev, file_priv)				\
-do {									\
-	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock) ||		\
-	     dev->lock.file_priv != file_priv) {			\
-		DRM_ERROR("%s called without lock held\n",		\
-			   __FUNCTION__);				\
-		return EINVAL;						\
-	}								\
+#define LOCK_TEST_WITH_RETURN( dev, _file_priv )				\
+do {										\
+	if (!_DRM_LOCK_IS_HELD(_file_priv->master->lock.hw_lock->lock) ||	\
+	    _file_priv->master->lock.file_priv != _file_priv)	{		\
+		DRM_ERROR( "%s called without lock held, held  %d owner %p %p\n",\
+			   __func__, _DRM_LOCK_IS_HELD(_file_priv->master->lock.hw_lock->lock),\
+			   _file_priv->master->lock.file_priv, _file_priv);	\
+		return -EINVAL;							\
+	}									\
 } while (0)
 
 void drm_legacy_idlelock_take(struct drm_lock_data *lock);

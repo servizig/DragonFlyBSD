@@ -133,7 +133,7 @@ drm_gem_init(struct drm_device *dev)
 	struct drm_gem_mm *mm;
 	struct drm_vma_offset_manager *vma_offset_manager;
 
-	lockinit(&dev->object_name_lock, "objnam", 0, LK_CANRECURSE);
+	mutex_init(&dev->object_name_lock);
 	idr_init(&dev->object_name_idr);
 
 	mm = kzalloc(sizeof(struct drm_gem_mm), GFP_KERNEL);
@@ -348,11 +348,11 @@ drm_gem_handle_delete(struct drm_file *filp, u32 handle)
 	 * we may want to use ida for number allocation and a hash table
 	 * for the pointers, anyway.
 	 */
-	lockmgr(&filp->table_lock, LK_EXCLUSIVE);
+	drm_spin_lock(&filp->table_lock);
 
 	/* Check if we currently have a reference on the object */
 	obj = idr_replace(&filp->object_idr, NULL, handle);
-	lockmgr(&filp->table_lock, LK_RELEASE);
+	drm_spin_unlock(&filp->table_lock);
 	if (IS_ERR_OR_NULL(obj))
 		return -EINVAL;
 
@@ -360,9 +360,10 @@ drm_gem_handle_delete(struct drm_file *filp, u32 handle)
 	drm_gem_object_release_handle(handle, obj, filp);
 
 	/* And finally make the handle available for future allocations. */
-	lockmgr(&filp->table_lock, LK_EXCLUSIVE);
+	drm_spin_lock(&filp->table_lock);
 	idr_remove(&filp->object_idr, handle);
-	lockmgr(&filp->table_lock, LK_RELEASE);
+	drm_spin_unlock(&filp->table_lock);
+
 	return 0;
 }
 EXPORT_SYMBOL(drm_gem_handle_delete);
@@ -457,11 +458,11 @@ drm_gem_handle_create_tail(struct drm_file *file_priv,
 	 * allocation under our spinlock.
 	 */
 	idr_preload(GFP_KERNEL);
-	lockmgr(&file_priv->table_lock, LK_EXCLUSIVE);
+	drm_spin_lock(&file_priv->table_lock);
 
 	ret = idr_alloc(&file_priv->object_idr, obj, 1, 0, GFP_NOWAIT);
 
-	lockmgr(&file_priv->table_lock, LK_RELEASE);
+	drm_spin_unlock(&file_priv->table_lock);
 	idr_preload_end();
 
 	mutex_unlock(&dev->object_name_lock);
@@ -490,9 +491,9 @@ drm_gem_handle_create_tail(struct drm_file *file_priv,
 err_revoke:
 	drm_vma_node_revoke(&obj->vma_node, file_priv);
 err_remove:
-	lockmgr(&file_priv->table_lock, LK_EXCLUSIVE);
+	drm_spin_lock(&file_priv->table_lock);
 	idr_remove(&file_priv->object_idr, handle);
-	lockmgr(&file_priv->table_lock, LK_RELEASE);
+	drm_spin_unlock(&file_priv->table_lock);
 err_unref:
 	drm_gem_object_handle_put_unlocked(obj);
 	return ret;
@@ -628,14 +629,14 @@ drm_gem_object_lookup(struct drm_file *filp, u32 handle)
 {
 	struct drm_gem_object *obj;
 
-	lockmgr(&filp->table_lock, LK_EXCLUSIVE);
+	drm_spin_lock(&filp->table_lock);
 
 	/* Check if we currently have a reference on the object */
 	obj = idr_find(&filp->object_idr, handle);
 	if (obj)
 		drm_gem_object_get(obj);
 
-	lockmgr(&filp->table_lock, LK_RELEASE);
+	drm_spin_unlock(&filp->table_lock);
 
 	return obj;
 }
@@ -770,7 +771,7 @@ void
 drm_gem_open(struct drm_device *dev, struct drm_file *file_private)
 {
 	idr_init(&file_private->object_idr);
-	lockinit(&file_private->table_lock, "fptab", 0, 0);
+	spin_lock_init(&file_private->table_lock);
 }
 
 /**

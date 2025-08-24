@@ -297,8 +297,9 @@ static int drm_mode_create_standard_properties(struct drm_device *dev)
 		return -ENOMEM;
 	dev->mode_config.prop_crtc_id = prop;
 
-	prop = drm_property_create(dev, DRM_MODE_PROP_BLOB, "FB_DAMAGE_CLIPS",
-				   0);
+	prop = drm_property_create(dev,
+			DRM_MODE_PROP_ATOMIC | DRM_MODE_PROP_BLOB,
+			"FB_DAMAGE_CLIPS", 0);
 	if (!prop)
 		return -ENOMEM;
 	dev->mode_config.prop_fb_damage_clips = prop;
@@ -381,11 +382,11 @@ static int drm_mode_create_standard_properties(struct drm_device *dev)
  */
 void drm_mode_config_init(struct drm_device *dev)
 {
-	lockinit(&dev->mode_config.mutex, "drmmcm", 0, LK_CANRECURSE);
+	mutex_init(&dev->mode_config.mutex);
 	drm_modeset_lock_init(&dev->mode_config.connection_mutex);
-	lockinit(&dev->mode_config.idr_mutex, "mcfgidr", 0, LK_CANRECURSE);
-	lockinit(&dev->mode_config.fb_lock, "drmfbl", 0, LK_CANRECURSE);
-	lockinit(&dev->mode_config.blob_lock, "drmcbl", 0, LK_CANRECURSE);
+	mutex_init(&dev->mode_config.idr_mutex);
+	mutex_init(&dev->mode_config.fb_lock);
+	mutex_init(&dev->mode_config.blob_lock);
 	INIT_LIST_HEAD(&dev->mode_config.fb_list);
 	INIT_LIST_HEAD(&dev->mode_config.crtc_list);
 	INIT_LIST_HEAD(&dev->mode_config.connector_list);
@@ -393,10 +394,11 @@ void drm_mode_config_init(struct drm_device *dev)
 	INIT_LIST_HEAD(&dev->mode_config.property_list);
 	INIT_LIST_HEAD(&dev->mode_config.property_blob_list);
 	INIT_LIST_HEAD(&dev->mode_config.plane_list);
-	idr_init(&dev->mode_config.crtc_idr);
+	INIT_LIST_HEAD(&dev->mode_config.privobj_list);
+	idr_init(&dev->mode_config.object_idr);
 	idr_init(&dev->mode_config.tile_idr);
 	ida_init(&dev->mode_config.connector_ida);
-	lockinit(&dev->mode_config.connector_list_lock, "dmccll", 0, 0);
+	spin_lock_init(&dev->mode_config.connector_list_lock);
 
 	init_llist_head(&dev->mode_config.connector_free_list);
 	INIT_WORK(&dev->mode_config.connector_free_work, drm_connector_free_work_fn);
@@ -496,7 +498,7 @@ void drm_mode_config_cleanup(struct drm_device *dev)
 
 	ida_destroy(&dev->mode_config.connector_ida);
 	idr_destroy(&dev->mode_config.tile_idr);
-	idr_destroy(&dev->mode_config.crtc_idr);
+	idr_destroy(&dev->mode_config.object_idr);
 	drm_modeset_lock_fini(&dev->mode_config.connection_mutex);
 }
 EXPORT_SYMBOL(drm_mode_config_cleanup);

@@ -24,16 +24,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <linux/fs.h>
-#include <linux/slab.h>
 #include <linux/dma-buf.h>
-#include <linux/dma-fence.h>
-#include <linux/export.h>
-#include <linux/module.h>
-#include <linux/seq_file.h>
-#include <linux/poll.h>
-#include <linux/reservation.h>
-#include <linux/mm.h>
+
+#include <sys/spinlock2.h>
 
 struct fileops dmabuf_fileops;
 
@@ -127,7 +120,7 @@ dma_buf_export(const struct dma_buf_export_info *exp_info)
 	if (fp == NULL)
 		return ERR_PTR(-ENFILE);
 
-	dmabuf = kmalloc(sizeof(struct dma_buf), M_DRM, M_WAITOK);
+	dmabuf = __kmalloc(sizeof(struct dma_buf), M_DRM, M_WAITOK);
 	fp->f_type = DTYPE_DMABUF;
 	fp->f_ops = &dmabuf_fileops;
 	fp->private_data = dmabuf;

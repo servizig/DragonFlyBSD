@@ -50,7 +50,7 @@ static int amd_powerplay_create(struct amdgpu_device *adev)
 	hwmgr->not_vf = !amdgpu_sriov_vf(adev);
 	hwmgr->pm_en = (amdgpu_dpm && hwmgr->not_vf) ? true : false;
 	hwmgr->device = amdgpu_cgs_create_device(adev);
-	lockinit(&hwmgr->smu_lock, "adhwmgrsmul", 0, LK_CANRECURSE);
+	mutex_init(&hwmgr->smu_lock);
 	hwmgr->chip_family = adev->family;
 	hwmgr->chip_id = adev->asic_type;
 	hwmgr->feature_mask = adev->powerplay.pp_feature;
@@ -149,7 +149,7 @@ static void pp_reserve_vram_for_smu(struct amdgpu_device *adev)
 	if (amdgpu_bo_create_kernel(adev, adev->pm.smu_prv_buffer_size,
 						PAGE_SIZE, AMDGPU_GEM_DOMAIN_GTT,
 						&adev->pm.smu_prv_buffer,
-						(u64 *)&gpu_addr,
+						&gpu_addr,
 						&cpu_ptr)) {
 		DRM_ERROR("amdgpu: failed to create smu prv buffer\n");
 		return;
@@ -1404,6 +1404,97 @@ static int pp_set_active_display_count(void *handle, uint32_t count)
 	return ret;
 }
 
+static int pp_get_asic_baco_capability(void *handle, bool *cap)
+{
+	struct pp_hwmgr *hwmgr = handle;
+
+	if (!hwmgr)
+		return -EINVAL;
+
+	if (!hwmgr->pm_en || !hwmgr->hwmgr_func->get_asic_baco_capability)
+		return 0;
+
+	mutex_lock(&hwmgr->smu_lock);
+	hwmgr->hwmgr_func->get_asic_baco_capability(hwmgr, cap);
+	mutex_unlock(&hwmgr->smu_lock);
+
+	return 0;
+}
+
+static int pp_get_asic_baco_state(void *handle, int *state)
+{
+	struct pp_hwmgr *hwmgr = handle;
+
+	if (!hwmgr)
+		return -EINVAL;
+
+	if (!hwmgr->pm_en || !hwmgr->hwmgr_func->get_asic_baco_state)
+		return 0;
+
+	mutex_lock(&hwmgr->smu_lock);
+	hwmgr->hwmgr_func->get_asic_baco_state(hwmgr, (enum BACO_STATE *)state);
+	mutex_unlock(&hwmgr->smu_lock);
+
+	return 0;
+}
+
+static int pp_set_asic_baco_state(void *handle, int state)
+{
+	struct pp_hwmgr *hwmgr = handle;
+
+	if (!hwmgr)
+		return -EINVAL;
+
+	if (!hwmgr->pm_en || !hwmgr->hwmgr_func->set_asic_baco_state)
+		return 0;
+
+	mutex_lock(&hwmgr->smu_lock);
+	hwmgr->hwmgr_func->set_asic_baco_state(hwmgr, (enum BACO_STATE)state);
+	mutex_unlock(&hwmgr->smu_lock);
+
+	return 0;
+}
+
+static int pp_get_ppfeature_status(void *handle, char *buf)
+{
+	struct pp_hwmgr *hwmgr = handle;
+	int ret = 0;
+
+	if (!hwmgr || !hwmgr->pm_en || !buf)
+		return -EINVAL;
+
+	if (hwmgr->hwmgr_func->get_ppfeature_status == NULL) {
+		pr_info_ratelimited("%s was not implemented.\n", __func__);
+		return -EINVAL;
+	}
+
+	mutex_lock(&hwmgr->smu_lock);
+	ret = hwmgr->hwmgr_func->get_ppfeature_status(hwmgr, buf);
+	mutex_unlock(&hwmgr->smu_lock);
+
+	return ret;
+}
+
+static int pp_set_ppfeature_status(void *handle, uint64_t ppfeature_masks)
+{
+	struct pp_hwmgr *hwmgr = handle;
+	int ret = 0;
+
+	if (!hwmgr || !hwmgr->pm_en)
+		return -EINVAL;
+
+	if (hwmgr->hwmgr_func->set_ppfeature_status == NULL) {
+		pr_info_ratelimited("%s was not implemented.\n", __func__);
+		return -EINVAL;
+	}
+
+	mutex_lock(&hwmgr->smu_lock);
+	ret = hwmgr->hwmgr_func->set_ppfeature_status(hwmgr, ppfeature_masks);
+	mutex_unlock(&hwmgr->smu_lock);
+
+	return ret;
+}
+
 static const struct amd_pm_funcs pp_dpm_funcs = {
 	.load_firmware = pp_dpm_load_fw,
 	.wait_for_fw_loading_complete = pp_dpm_fw_loading_complete,
@@ -1454,4 +1545,9 @@ static const struct amd_pm_funcs pp_dpm_funcs = {
 	.set_min_deep_sleep_dcefclk = pp_set_min_deep_sleep_dcefclk,
 	.set_hard_min_dcefclk_by_freq = pp_set_hard_min_dcefclk_by_freq,
 	.set_hard_min_fclk_by_freq = pp_set_hard_min_fclk_by_freq,
+	.get_asic_baco_capability = pp_get_asic_baco_capability,
+	.get_asic_baco_state = pp_get_asic_baco_state,
+	.set_asic_baco_state = pp_set_asic_baco_state,
+	.get_ppfeature_status = pp_get_ppfeature_status,
+	.set_ppfeature_status = pp_set_ppfeature_status,
 };

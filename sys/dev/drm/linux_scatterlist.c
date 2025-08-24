@@ -76,7 +76,7 @@ __sg_alloc_table(struct sg_table *table, unsigned int nents,
 
 		left -= sg_size;
 
-		sg = kmalloc(alloc_size * sizeof(struct scatterlist), M_DRM, gfp_mask);
+		sg = __kmalloc(alloc_size * sizeof(struct scatterlist), M_DRM, gfp_mask);
 		if (unlikely(!sg)) {
 		/*
 		 * Adjust entry count to reflect that the last

@@ -95,7 +95,7 @@ int amdgpu_gfx_rlc_init_sr(struct amdgpu_device *adev, u32 dws)
 	r = amdgpu_bo_create_reserved(adev, dws * 4, PAGE_SIZE,
 				      AMDGPU_GEM_DOMAIN_VRAM,
 				      &adev->gfx.rlc.save_restore_obj,
-				      (u64*)&adev->gfx.rlc.save_restore_gpu_addr,
+				      &adev->gfx.rlc.save_restore_gpu_addr,
 				      (void **)&adev->gfx.rlc.sr_ptr);
 	if (r) {
 		dev_warn(adev->dev, "(%d) create RLC sr bo failed\n", r);
@@ -133,7 +133,7 @@ int amdgpu_gfx_rlc_init_csb(struct amdgpu_device *adev)
 	r = amdgpu_bo_create_reserved(adev, dws * 4, PAGE_SIZE,
 				      AMDGPU_GEM_DOMAIN_VRAM,
 				      &adev->gfx.rlc.clear_state_obj,
-				      (u64*)&adev->gfx.rlc.clear_state_gpu_addr,
+				      &adev->gfx.rlc.clear_state_gpu_addr,
 				      (void **)&adev->gfx.rlc.cs_ptr);
 	if (r) {
 		dev_err(adev->dev, "(%d) failed to create rlc csb bo\n", r);
@@ -166,7 +166,7 @@ int amdgpu_gfx_rlc_init_cpt(struct amdgpu_device *adev)
 	r = amdgpu_bo_create_reserved(adev, adev->gfx.rlc.cp_table_size,
 				      PAGE_SIZE, AMDGPU_GEM_DOMAIN_VRAM,
 				      &adev->gfx.rlc.cp_table_obj,
-				      (u64*)&adev->gfx.rlc.cp_table_gpu_addr,
+				      &adev->gfx.rlc.cp_table_gpu_addr,
 				      (void **)&adev->gfx.rlc.cp_table_ptr);
 	if (r) {
 		dev_err(adev->dev, "(%d) failed to create cp table bo\n", r);
@@ -266,17 +266,17 @@ void amdgpu_gfx_rlc_fini(struct amdgpu_device *adev)
 	/* save restore block */
 	if (adev->gfx.rlc.save_restore_obj) {
 		amdgpu_bo_free_kernel(&adev->gfx.rlc.save_restore_obj,
-				      (u64*)&adev->gfx.rlc.save_restore_gpu_addr,
+				      &adev->gfx.rlc.save_restore_gpu_addr,
 				      (void **)&adev->gfx.rlc.sr_ptr);
 	}
 
 	/* clear state block */
 	amdgpu_bo_free_kernel(&adev->gfx.rlc.clear_state_obj,
-			      (u64*)&adev->gfx.rlc.clear_state_gpu_addr,
+			      &adev->gfx.rlc.clear_state_gpu_addr,
 			      (void **)&adev->gfx.rlc.cs_ptr);
 
 	/* jump table block */
 	amdgpu_bo_free_kernel(&adev->gfx.rlc.cp_table_obj,
-			      (u64*)&adev->gfx.rlc.cp_table_gpu_addr,
+			      &adev->gfx.rlc.cp_table_gpu_addr,
 			      (void **)&adev->gfx.rlc.cp_table_ptr);
 }

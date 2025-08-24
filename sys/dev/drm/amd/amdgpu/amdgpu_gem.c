@@ -54,13 +54,6 @@ int amdgpu_gem_object_create(struct amdgpu_device *adev, unsigned long size,
 
 	memset(&bp, 0, sizeof(bp));
 	*obj = NULL;
-#if 1
-	/* ZZZ remove */
-	/* At least align on page size */
-	if (alignment < PAGE_SIZE) {
-		alignment = PAGE_SIZE;
-	}
-#endif
 
 	bp.size = size;
 	bp.byte_align = alignment;
@@ -104,13 +97,13 @@ void amdgpu_gem_force_release(struct amdgpu_device *adev)
 		int handle;
 
 		WARN_ONCE(1, "Still active user space clients!\n");
-		lockmgr(&file->table_lock, LK_EXCLUSIVE);
+		drm_spin_lock(&file->table_lock);
 		idr_for_each_entry(&file->object_idr, gobj, handle) {
 			WARN_ONCE(1, "And also active allocations!\n");
 			drm_gem_object_put_unlocked(gobj);
 		}
 		idr_destroy(&file->object_idr);
-		lockmgr(&file->table_lock, LK_RELEASE);
+		drm_spin_unlock(&file->table_lock);
 	}
 
 	mutex_unlock(&ddev->filelist_mutex);
@@ -247,12 +240,6 @@ int amdgpu_gem_create_ioctl(struct drm_device *dev, void *data,
 			return -EINVAL;
 		}
 		flags |= AMDGPU_GEM_CREATE_NO_CPU_ACCESS;
-#if 1
-		/* ZZZ remove */
-		/* GDS allocations must be DW aligned */
-		if (args->in.domains & AMDGPU_GEM_DOMAIN_GDS)
-			size = ALIGN(size, 4);
-#endif
 	}
 
 	if (flags & AMDGPU_GEM_CREATE_VM_ALWAYS_VALID) {
@@ -401,7 +388,7 @@ int amdgpu_gem_mmap_ioctl(struct drm_device *dev, void *data,
 	union drm_amdgpu_gem_mmap *args = data;
 	uint32_t handle = args->in.handle;
 	memset(args, 0, sizeof(*args));
-	return amdgpu_mode_dumb_mmap(filp, dev, handle, (uint64_t *)&args->out.addr_ptr);
+	return amdgpu_mode_dumb_mmap(filp, dev, handle, &args->out.addr_ptr);
 }
 
 /**
@@ -488,7 +475,7 @@ int amdgpu_gem_metadata_ioctl(struct drm_device *dev, void *data,
 		r = amdgpu_bo_get_metadata(robj, args->data.data,
 					   sizeof(args->data.data),
 					   &args->data.data_size_bytes,
-					   (uint64_t *)&args->data.flags);
+					   &args->data.flags);
 	} else if (args->op == AMDGPU_GEM_METADATA_OP_SET_METADATA) {
 		if (args->data.data_size_bytes > sizeof(args->data.data)) {
 			r = -EINVAL;
@@ -571,7 +558,7 @@ int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
 
 	if (args->va_address < AMDGPU_VA_RESERVED_SIZE) {
 		dev_dbg(&dev->pdev->dev,
-			"va_address 0x%LX is in reserved area 0x%LX\n",
+			"va_address 0x%lX is in reserved area 0x%LX\n",
 			args->va_address, AMDGPU_VA_RESERVED_SIZE);
 		return -EINVAL;
 	}
@@ -579,7 +566,7 @@ int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
 	if (args->va_address >= AMDGPU_GMC_HOLE_START &&
 	    args->va_address < AMDGPU_GMC_HOLE_END) {
 		dev_dbg(&dev->pdev->dev,
-			"va_address 0x%LX is in VA hole 0x%LX-0x%LX\n",
+			"va_address 0x%lX is in VA hole 0x%LX-0x%LX\n",
 			args->va_address, AMDGPU_GMC_HOLE_START,
 			AMDGPU_GMC_HOLE_END);
 		return -EINVAL;
@@ -874,9 +861,9 @@ static int amdgpu_debugfs_gem_info(struct seq_file *m, void *data)
 			   task ? task->comm : "<unknown>");
 		rcu_read_unlock();
 
-		lockmgr(&file->table_lock, LK_EXCLUSIVE);
+		spin_lock(&file->table_lock);
 		idr_for_each(&file->object_idr, amdgpu_debugfs_gem_bo_info, m);
-		lockmgr(&file->table_lock, LK_RELEASE);
+		spin_unlock(&file->table_lock);
 	}
 
 	mutex_unlock(&dev->filelist_mutex);

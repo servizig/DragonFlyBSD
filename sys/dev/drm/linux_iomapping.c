@@ -47,7 +47,7 @@ __ioremap_common(unsigned long phys_addr, unsigned long size, int cache_mode)
 	BUG_ON(phys_addr & PAGE_MASK);
 	BUG_ON(size & PAGE_MASK);
 
-	imp = kmalloc(sizeof(struct iomap), M_DRM, M_WAITOK);
+	imp = __kmalloc(sizeof(struct iomap), M_DRM, M_WAITOK);
 	imp->paddr = phys_addr;
 	imp->npages = size / PAGE_SIZE;
 	imp->pmap_addr = pmap_mapdev_attr(phys_addr, size, cache_mode);

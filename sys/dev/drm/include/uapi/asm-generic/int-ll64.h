@@ -40,7 +40,7 @@ typedef uint16_t __u16;
 typedef int32_t __s32;
 typedef uint32_t __u32;
 
-typedef long long __s64;
-typedef unsigned long long __u64;
+typedef long __s64;
+typedef unsigned long __u64;
 
 #endif	/* _UAPI_ASM_GENERIC_INT_LL64_H_ */

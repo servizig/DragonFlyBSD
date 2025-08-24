@@ -126,7 +126,7 @@ void amdgpu_gmc_vram_location(struct amdgpu_device *adev, struct amdgpu_gmc *mc,
 		mc->fb_start = mc->vram_start;
 		mc->fb_end = mc->vram_end;
 	}
-	dev_info(adev->dev, "VRAM: %lluM 0x%016llX - 0x%016llX (%lluM used)\n",
+	dev_info(adev->dev, "VRAM: %luM 0x%016lX - 0x%016lX (%luM used)\n",
 			mc->mc_vram_size >> 20, mc->vram_start,
 			mc->vram_end, mc->real_vram_size >> 20);
 }
@@ -170,7 +170,7 @@ void amdgpu_gmc_gart_location(struct amdgpu_device *adev, struct amdgpu_gmc *mc)
 
 	mc->gart_start &= ~(four_gb - 1);
 	mc->gart_end = mc->gart_start + mc->gart_size - 1;
-	dev_info(adev->dev, "GART: %lluM 0x%016llX - 0x%016llX\n",
+	dev_info(adev->dev, "GART: %luM 0x%016lX - 0x%016lX\n",
 			mc->gart_size >> 20, mc->gart_start, mc->gart_end);
 }
 
@@ -210,6 +210,6 @@ void amdgpu_gmc_agp_location(struct amdgpu_device *adev, struct amdgpu_gmc *mc)
 	}
 
 	mc->agp_end = mc->agp_start + mc->agp_size - 1;
-	dev_info(adev->dev, "AGP: %lluM 0x%016llX - 0x%016llX\n",
+	dev_info(adev->dev, "AGP: %luM 0x%016lX - 0x%016lX\n",
 			mc->agp_size >> 20, mc->agp_start, mc->agp_end);
 }

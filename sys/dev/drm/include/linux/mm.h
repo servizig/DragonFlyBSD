@@ -44,6 +44,7 @@
 #include <linux/mm_types.h>
 #include <linux/err.h>
 #include <linux/shrinker.h>
+#include <linux/overflow.h>
 
 #include <asm/page.h>
 #include <asm/pgtable.h>
@@ -196,6 +197,8 @@ kvcalloc(size_t nelem, size_t elemsize, gfp_t gfp)
 }
 
 void * kvmalloc_array(size_t n, size_t size, gfp_t flags);
+
+#define kvmalloc(size, flags) kmalloc(size, flags)
 
 #define kvfree(addr)	kfree(addr)
 

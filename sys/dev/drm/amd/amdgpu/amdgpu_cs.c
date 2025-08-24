@@ -214,6 +214,7 @@ static int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p, union drm_amdgpu_cs
 		case AMDGPU_CHUNK_ID_DEPENDENCIES:
 		case AMDGPU_CHUNK_ID_SYNCOBJ_IN:
 		case AMDGPU_CHUNK_ID_SYNCOBJ_OUT:
+		case AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES:
 			break;
 
 		default:
@@ -313,7 +314,7 @@ static void amdgpu_cs_get_threshold_for_moves(struct amdgpu_device *adev,
 	used_vram = amdgpu_vram_mgr_usage(&adev->mman.bdev.man[TTM_PL_VRAM]);
 	free_vram = used_vram >= total_vram ? 0 : total_vram - used_vram;
 
-	spin_lock(&adev->mm_stats.lock);
+	drm_spin_lock(&adev->mm_stats.lock);
 
 	/* Increase the amount of accumulated us. */
 	time_us = ktime_to_us(ktime_get());
@@ -375,7 +376,7 @@ static void amdgpu_cs_get_threshold_for_moves(struct amdgpu_device *adev,
 		*max_vis_bytes = 0;
 	}
 
-	spin_unlock(&adev->mm_stats.lock);
+	drm_spin_unlock(&adev->mm_stats.lock);
 }
 
 /* Report how many bytes have really been moved for the last command
@@ -385,10 +386,10 @@ static void amdgpu_cs_get_threshold_for_moves(struct amdgpu_device *adev,
 void amdgpu_cs_report_moved_bytes(struct amdgpu_device *adev, u64 num_bytes,
 				  u64 num_vis_bytes)
 {
-	spin_lock(&adev->mm_stats.lock);
+	drm_spin_lock(&adev->mm_stats.lock);
 	adev->mm_stats.accum_us -= bytes_to_us(adev, num_bytes);
 	adev->mm_stats.accum_us_vis -= bytes_to_us(adev, num_vis_bytes);
-	spin_unlock(&adev->mm_stats.lock);
+	drm_spin_unlock(&adev->mm_stats.lock);
 }
 
 static int amdgpu_cs_bo_validate(struct amdgpu_cs_parser *p,
@@ -690,8 +691,8 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 		list_splice(&need_pages, &p->validated);
 	}
 
-	amdgpu_cs_get_threshold_for_moves(p->adev, (u64 *)&p->bytes_moved_threshold,
-					  (u64 *)&p->bytes_moved_vis_threshold);
+	amdgpu_cs_get_threshold_for_moves(p->adev, &p->bytes_moved_threshold,
+					  &p->bytes_moved_vis_threshold);
 	p->bytes_moved = 0;
 	p->bytes_moved_vis = 0;
 	p->evictable = list_last_entry(&p->validated,
@@ -1092,6 +1093,15 @@ static int amdgpu_cs_process_fence_dep(struct amdgpu_cs_parser *p,
 
 		fence = amdgpu_ctx_get_fence(ctx, entity,
 					     deps[i].handle);
+
+		if (chunk->chunk_id == AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES) {
+			struct drm_sched_fence *s_fence = to_drm_sched_fence(fence);
+			struct dma_fence *old = fence;
+
+			fence = dma_fence_get(&s_fence->scheduled);
+			dma_fence_put(old);
+		}
+
 		if (IS_ERR(fence)) {
 			r = PTR_ERR(fence);
 			amdgpu_ctx_put(ctx);
@@ -1179,7 +1189,8 @@ static int amdgpu_cs_dependencies(struct amdgpu_device *adev,
 
 		chunk = &p->chunks[i];
 
-		if (chunk->chunk_id == AMDGPU_CHUNK_ID_DEPENDENCIES) {
+		if (chunk->chunk_id == AMDGPU_CHUNK_ID_DEPENDENCIES ||
+		    chunk->chunk_id == AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES) {
 			r = amdgpu_cs_process_fence_dep(p, chunk);
 			if (r)
 				return r;
@@ -1293,7 +1304,7 @@ int amdgpu_cs_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 
 	r = amdgpu_cs_parser_init(&parser, data);
 	if (r) {
-		DRM_ERROR("Failed to initialize parser !\n");
+		DRM_ERROR("Failed to initialize parser %d!\n", r);
 		goto out;
 	}
 

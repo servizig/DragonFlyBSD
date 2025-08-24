@@ -65,14 +65,14 @@ void ttm_eu_backoff_reservation(struct ww_acquire_ctx *ticket,
 	entry = list_first_entry(list, struct ttm_validate_buffer, head);
 	glob = entry->bo->bdev->glob;
 
-	lockmgr(&glob->lru_lock, LK_EXCLUSIVE);
+	drm_spin_lock(&glob->lru_lock);
 	list_for_each_entry(entry, list, head) {
 		struct ttm_buffer_object *bo = entry->bo;
 
 		ttm_bo_add_to_lru(bo);
 		reservation_object_unlock(bo->resv);
 	}
-	lockmgr(&glob->lru_lock, LK_RELEASE);
+	drm_spin_unlock(&glob->lru_lock);
 
 	if (ticket)
 		ww_acquire_fini(ticket);
@@ -174,9 +174,9 @@ int ttm_eu_reserve_buffers(struct ww_acquire_ctx *ticket,
 
 	if (ticket)
 		ww_acquire_done(ticket);
-	lockmgr(&glob->lru_lock, LK_EXCLUSIVE);
+	drm_spin_lock(&glob->lru_lock);
 	ttm_eu_del_from_lru_locked(list);
-	lockmgr(&glob->lru_lock, LK_RELEASE);
+	drm_spin_unlock(&glob->lru_lock);
 	return 0;
 }
 EXPORT_SYMBOL(ttm_eu_reserve_buffers);

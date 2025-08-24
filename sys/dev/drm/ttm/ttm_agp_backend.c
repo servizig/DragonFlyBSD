@@ -117,7 +117,7 @@ struct ttm_tt *ttm_agp_tt_create(struct ttm_buffer_object *bo,
 {
 	struct ttm_agp_backend *agp_be;
 
-	agp_be = kmalloc(sizeof(*agp_be), M_DRM, M_WAITOK);
+	agp_be = kmalloc(sizeof(*agp_be), GFP_KERNEL);
 	if (!agp_be)
 		return NULL;
 

@@ -41,9 +41,6 @@
 #include "drm_crtc_internal.h"
 #include "drm_legacy.h"
 #include "drm_internal.h"
-#if 0 /* included twice */
-#include "drm_crtc_internal.h"
-#endif
 
 /*
  * drm_debug: Enable debug output.
@@ -82,7 +79,7 @@ MODULE_PARM_DESC(debug, "Enable debug output, where each bit enables a debug cat
 "\t\tBit 8 (0x100) will enable DP messages (displayport code)");
 module_param_named(debug, drm_debug, int, 0600);
 
-static DEFINE_MUTEX(drm_minor_lock);
+static DEFINE_SPINLOCK(drm_minor_lock);
 static struct idr drm_minors_idr;
 
 /*
@@ -299,14 +296,13 @@ void drm_minor_release(struct drm_minor *minor)
  * DOC: driver instance overview
  *
  * A device instance for a drm driver is represented by &struct drm_device. This
- * is allocated with drm_dev_alloc(), usually from bus-specific ->probe()
+ * is initialized with drm_dev_init(), usually from bus-specific ->probe()
  * callbacks implemented by the driver. The driver then needs to initialize all
  * the various subsystems for the drm device like memory management, vblank
  * handling, modesetting support and intial output configuration plus obviously
- * initialize all the corresponding hardware bits. An important part of this is
- * also calling drm_dev_set_unique() to set the userspace-visible unique name of
- * this device instance. Finally when everything is up and running and ready for
- * userspace the device instance can be published using drm_dev_register().
+ * initialize all the corresponding hardware bits. Finally when everything is up
+ * and running and ready for userspace the device instance can be published
+ * using drm_dev_register().
  *
  * There is also deprecated support for initalizing device instances using
  * bus-specific helpers and the &drm_driver.load callback. But due to
@@ -322,9 +318,6 @@ void drm_minor_release(struct drm_minor *minor)
  * Note that the lifetime rules for &drm_device instance has still a lot of
  * historical baggage. Hence use the reference counting provided by
  * drm_dev_get() and drm_dev_put() only carefully.
- *
- * It is recommended that drivers embed &struct drm_device into their own device
- * structure, which is supported through drm_dev_init().
  */
 
 #if 0
@@ -517,6 +510,9 @@ static void drm_fs_inode_free(struct inode *inode)
  * The initial ref-count of the object is 1. Use drm_dev_get() and
  * drm_dev_put() to take and drop further ref-counts.
  *
+ * It is recommended that drivers embed &struct drm_device into their own device
+ * structure.
+ *
  * Drivers that do not want to allocate their own device struct
  * embedding &struct drm_device can call drm_dev_alloc() instead. For drivers
  * that do embed &struct drm_device it must be placed first in the overall
@@ -561,13 +557,13 @@ int drm_dev_init(struct drm_device *dev,
 	INIT_LIST_HEAD(&dev->maplist);
 	INIT_LIST_HEAD(&dev->vblank_event_list);
 
-	lockinit(&dev->buf_lock, "drmdbl", 0, 0);
-	lockinit(&dev->event_lock, "drmev", 0, 0);
-	lockinit(&dev->struct_mutex, "drmslk", 0, LK_CANRECURSE);
-	lockinit(&dev->filelist_mutex, "drmflm", 0, LK_CANRECURSE);
-	lockinit(&dev->clientlist_mutex, "drmclm", 0, LK_CANRECURSE);
-	lockinit(&dev->ctxlist_mutex, "drmclm", 0, LK_CANRECURSE);
-	lockinit(&dev->master_mutex, "drmmm", 0, LK_CANRECURSE);
+	spin_lock_init(&dev->buf_lock);
+	spin_lock_init(&dev->event_lock);
+	mutex_init(&dev->struct_mutex);
+	mutex_init(&dev->filelist_mutex);
+	mutex_init(&dev->clientlist_mutex);
+	mutex_init(&dev->ctxlist_mutex);
+	mutex_init(&dev->master_mutex);
 
 #ifndef __DragonFly__
 	dev->anon_inode = drm_fs_inode_new();
@@ -957,9 +953,9 @@ EXPORT_SYMBOL(drm_dev_unregister);
  * @dev: device of which to set the unique name
  * @name: unique name
  *
- * Sets the unique name of a DRM device using the specified string. Drivers
- * can use this at driver probe time if the unique name of the devices they
- * drive is static.
+ * Sets the unique name of a DRM device using the specified string. This is
+ * already done by drm_dev_init(), drivers should only override the default
+ * unique name for backwards compatibility reasons.
  *
  * Return: 0 on success or a negative error code on failure.
  */

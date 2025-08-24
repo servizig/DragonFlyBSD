@@ -162,7 +162,7 @@ i2c_default_lock_bus(struct i2c_adapter *adapter, unsigned int flags)
 static int
 i2c_default_trylock_bus(struct i2c_adapter *adapter, unsigned int flags)
 {
-	return mutex_trylock(&i2c_lock);
+	return lockmgr_try(&i2c_lock, LK_EXCLUSIVE);
 }
 
 static void

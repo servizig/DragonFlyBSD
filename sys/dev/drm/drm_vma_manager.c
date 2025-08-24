@@ -271,7 +271,7 @@ int drm_vma_node_allow(struct drm_vma_offset_node *node, struct drm_file *tag)
 	 * unlikely that an open-file is added twice to a single node so we
 	 * don't optimize for this case. OOM is checked below only if the entry
 	 * is actually used. */
-	new = kmalloc(sizeof(*entry), M_DRM, GFP_KERNEL);
+	new = kmalloc(sizeof(*entry), GFP_KERNEL);
 
 	lockmgr(&node->vm_lock, LK_EXCLUSIVE);
 

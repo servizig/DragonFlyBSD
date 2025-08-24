@@ -282,7 +282,7 @@ int amdgpu_virt_alloc_mm_table(struct amdgpu_device *adev)
 	r = amdgpu_bo_create_kernel(adev, PAGE_SIZE, PAGE_SIZE,
 				    AMDGPU_GEM_DOMAIN_VRAM,
 				    &adev->virt.mm_table.bo,
-				    (u64 *)&adev->virt.mm_table.gpu_addr,
+				    &adev->virt.mm_table.gpu_addr,
 				    (void *)&adev->virt.mm_table.cpu_addr);
 	if (r) {
 		DRM_ERROR("failed to alloc mm table and error = %d.\n", r);
@@ -307,7 +307,7 @@ void amdgpu_virt_free_mm_table(struct amdgpu_device *adev)
 		return;
 
 	amdgpu_bo_free_kernel(&adev->virt.mm_table.bo,
-			      (u64 *)&adev->virt.mm_table.gpu_addr,
+			      &adev->virt.mm_table.gpu_addr,
 			      (void *)&adev->virt.mm_table.cpu_addr);
 	adev->virt.mm_table.gpu_addr = 0;
 }

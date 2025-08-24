@@ -97,7 +97,7 @@ struct amdgpu_gpu_instance
 struct amdgpu_mgpu_info
 {
 	struct amdgpu_gpu_instance	gpu_ins[MAX_GPU_INSTANCE];
-	struct lock			mutex;
+	struct mutex			mutex;
 	uint32_t			num_gpu;
 	uint32_t			num_dgpu;
 	uint32_t			num_apu;
@@ -411,10 +411,12 @@ struct amdgpu_fpriv {
 	struct amdgpu_vm	vm;
 	struct amdgpu_bo_va	*prt_va;
 	struct amdgpu_bo_va	*csa_va;
-	struct lock		bo_list_lock;
+	struct mutex		bo_list_lock;
 	struct idr		bo_list_handles;
 	struct amdgpu_ctx_mgr	ctx_mgr;
 };
+
+int amdgpu_file_to_fpriv(struct file *filp, struct amdgpu_fpriv **fpriv);
 
 int amdgpu_ib_get(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 		  unsigned size, struct amdgpu_ib *ib);
@@ -547,6 +549,11 @@ struct amdgpu_asic_funcs {
 	bool (*need_full_reset)(struct amdgpu_device *adev);
 	/* initialize doorbell layout for specific asic*/
 	void (*init_doorbell_index)(struct amdgpu_device *adev);
+	/* PCIe bandwidth usage */
+	void (*get_pcie_usage)(struct amdgpu_device *adev, uint64_t *count0,
+			       uint64_t *count1);
+	/* do we need to reset the asic at init time (e.g., kexec) */
+	bool (*need_reset_on_init)(struct amdgpu_device *adev);
 };
 
 /*
@@ -639,7 +646,7 @@ struct amdgpu_nbio_funcs {
 	void (*hdp_flush)(struct amdgpu_device *adev, struct amdgpu_ring *ring);
 	u32 (*get_memsize)(struct amdgpu_device *adev);
 	void (*sdma_doorbell_range)(struct amdgpu_device *adev, int instance,
-				    bool use_doorbell, int doorbell_index);
+			bool use_doorbell, int doorbell_index, int doorbell_size);
 	void (*enable_doorbell_aperture)(struct amdgpu_device *adev,
 					 bool enable);
 	void (*enable_doorbell_selfring_aperture)(struct amdgpu_device *adev,
@@ -734,9 +741,9 @@ struct amdgpu_device {
 #endif
 	struct amdgpu_atif		*atif;
 	struct amdgpu_atcs		atcs;
-	struct lock			srbm_mutex;
+	struct mutex			srbm_mutex;
 	/* GRBM index mutex. Protects concurrent access to GRBM index */
-	struct lock                    grbm_idx_mutex;
+	struct mutex                    grbm_idx_mutex;
 #if 0
 	struct dev_pm_domain		vga_pm_domain;
 #endif
@@ -824,7 +831,7 @@ struct amdgpu_device {
 
 	/* data for buffer migration throttling */
 	struct {
-		struct spinlock		lock;
+		spinlock_t		lock;
 		s64			last_update_us;
 		s64			accum_us; /* accumulated microseconds */
 		s64			accum_us_vis; /* for visible VRAM */
@@ -891,7 +898,7 @@ struct amdgpu_device {
 
 	struct amdgpu_ip_block          ip_blocks[AMDGPU_MAX_IP_NUM];
 	int				num_ip_blocks;
-	struct lock	mn_lock;
+	struct mutex	mn_lock;
 	DECLARE_HASHTABLE(mn_hash, 7);
 
 	/* tracking pinned memory */
@@ -914,10 +921,10 @@ struct amdgpu_device {
 
 	/* link all shadow bo */
 	struct list_head                shadow_list;
-	struct lock                    shadow_list_lock;
+	struct mutex                    shadow_list_lock;
 	/* keep an lru list of rings by HW IP */
 	struct list_head		ring_lru_list;
-	struct spinlock			ring_lru_list_lock;
+	spinlock_t			ring_lru_list_lock;
 
 	/* record hw reset is performed */
 	bool has_hw_reset;
@@ -929,7 +936,7 @@ struct amdgpu_device {
 	/* record last mm index being written through WREG32*/
 	unsigned long last_mm_index;
 	bool                            in_gpu_reset;
-	struct lock  lock_reset;
+	struct mutex  lock_reset;
 	struct amdgpu_doorbell_index doorbell_index;
 
 	int asic_reset_res;
@@ -1069,6 +1076,8 @@ int emu_soc_asic_init(struct amdgpu_device *adev);
 #define amdgpu_asic_invalidate_hdp(adev, r) (adev)->asic_funcs->invalidate_hdp((adev), (r))
 #define amdgpu_asic_need_full_reset(adev) (adev)->asic_funcs->need_full_reset((adev))
 #define amdgpu_asic_init_doorbell_index(adev) (adev)->asic_funcs->init_doorbell_index((adev))
+#define amdgpu_asic_get_pcie_usage(adev, cnt0, cnt1) ((adev)->asic_funcs->get_pcie_usage((adev), (cnt0), (cnt1)))
+#define amdgpu_asic_need_reset_on_init(adev) (adev)->asic_funcs->need_reset_on_init((adev))
 
 /* Common functions */
 bool amdgpu_device_should_recover_gpu(struct amdgpu_device *adev);

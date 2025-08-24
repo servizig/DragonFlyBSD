@@ -46,13 +46,9 @@
 
 #define assert_spin_locked(x)	KKASSERT(lockinuse(x))
 
-void lkpi_spin_lock(struct lock*);
-void lkpi_spin_unlock(struct lock*);
-
-#undef spin_lock
-#define spin_lock(lock) lkpi_spin_lock(lock)
-#undef spin_unlock
-#define spin_unlock(lock) lkpi_spin_unlock(lock)
+#define drm_spin_lock(lock) lockmgr(lock, LK_EXCLUSIVE | LK_SPIN)
+#define drm_spin_unlock(lock) lockmgr(lock, LK_RELEASE)
+#define spin_lock_init(lock) lockinit(lock, #lock, 0, 0)
 
 /*
  * The spin_lock_irq() family of functions stop hardware interrupts

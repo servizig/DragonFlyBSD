@@ -212,7 +212,7 @@ static void amdgpu_do_test_moves(struct amdgpu_device *adev)
 
 		amdgpu_bo_kunmap(gtt_obj[i]);
 
-		DRM_INFO("Tested GTT->VRAM and VRAM->GTT copy for GTT offset 0x%llx\n",
+		DRM_INFO("Tested GTT->VRAM and VRAM->GTT copy for GTT offset 0x%lx\n",
 			 gart_addr - adev->gmc.gart_start);
 		continue;
 

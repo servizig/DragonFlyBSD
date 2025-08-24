@@ -224,7 +224,7 @@ static int drm_bufs_info DRM_SYSCTL_HANDLER_ARGS
 		return 0;
 	}
 	tempdma = *dma;
-	templists = kmalloc(sizeof(int) * dma->buf_count, M_DRM,
+	templists = kmalloc(sizeof(int) * dma->buf_count,
 			    M_WAITOK | M_NULLOK);
 	for (i = 0; i < dma->buf_count; i++)
 		templists[i] = dma->buflist[i]->list;
@@ -272,7 +272,7 @@ static int drm_clients_info DRM_SYSCTL_HANDLER_ARGS
 	list_for_each_entry(priv, &dev->filelist, lhead)
 		privcount++;
 
-	tempprivs = kmalloc(sizeof(struct drm_file) * privcount, M_DRM,
+	tempprivs = kmalloc(sizeof(struct drm_file) * privcount,
 			    M_WAITOK | M_NULLOK);
 	if (tempprivs == NULL) {
 		DRM_UNLOCK(dev);

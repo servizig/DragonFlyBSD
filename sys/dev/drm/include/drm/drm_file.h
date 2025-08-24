@@ -50,6 +50,8 @@ struct drm_file;
 struct drm_device;
 struct device;
 
+struct inode;
+
 /*
  * FIXME: Not sure we want to have drm_minor here in the end, but to avoid
  * header include loops we need it here for now.
@@ -83,7 +85,7 @@ struct drm_minor {
 	struct dentry *debugfs_root;
 
 	struct list_head debugfs_list;
-	struct lock debugfs_lock; /* Protects debugfs_list. */
+	struct mutex debugfs_lock; /* Protects debugfs_list. */
 };
 
 /**
@@ -286,7 +288,7 @@ struct drm_file {
 	struct list_head fbs;
 
 	/** @fbs_lock: Protects @fbs. */
-	struct lock fbs_lock;
+	struct mutex fbs_lock;
 
 	/**
 	 * @blobs:
@@ -332,7 +334,7 @@ struct drm_file {
 	int event_space;
 
 	/** @event_read_lock: Serializes drm_read(). */
-	struct lock event_read_lock;
+	struct mutex event_read_lock;
 
 	/**
 	 * @prime:

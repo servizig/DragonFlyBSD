@@ -361,12 +361,12 @@ struct drm_mode_config {
 	 *
 	 * This is the big scary modeset BKL which protects everything that
 	 * isn't protect otherwise. Scope is unclear and fuzzy, try to remove
-	 * anything from under it's protection and move it into more well-scoped
+	 * anything from under its protection and move it into more well-scoped
 	 * locks.
 	 *
 	 * The one important thing this protects is the use of @acquire_ctx.
 	 */
-	struct lock mutex;
+	struct mutex mutex;
 
 	/**
 	 * @connection_mutex:
@@ -391,18 +391,18 @@ struct drm_mode_config {
 	/**
 	 * @idr_mutex:
 	 *
-	 * Mutex for KMS ID allocation and management. Protects both @crtc_idr
+	 * Mutex for KMS ID allocation and management. Protects both @object_idr
 	 * and @tile_idr.
 	 */
-	struct lock idr_mutex;
+	struct mutex idr_mutex;
 
 	/**
-	 * @crtc_idr:
+	 * @object_idr:
 	 *
 	 * Main KMS ID tracking object. Use this idr for all IDs, fb, crtc,
 	 * connector, modes - just makes life easier to have only one.
 	 */
-	struct idr crtc_idr;
+	struct idr object_idr;
 
 	/**
 	 * @tile_idr:
@@ -413,7 +413,7 @@ struct drm_mode_config {
 	struct idr tile_idr;
 
 	/** @fb_lock: Mutex to protect fb the global @fb_list and @num_fb. */
-	struct lock fb_lock;
+	struct mutex fb_lock;
 	/** @num_fb: Number of entries on @fb_list. */
 	int num_fb;
 	/** @fb_list: List of all &struct drm_framebuffer. */
@@ -512,6 +512,15 @@ struct drm_mode_config {
 	 */
 	struct list_head property_list;
 
+	/**
+	 * @privobj_list:
+	 *
+	 * List of private objects linked with &drm_private_obj.head. This is
+	 * invariant over the lifetime of a device and hence doesn't need any
+	 * locks.
+	 */
+	struct list_head privobj_list;
+
 	int min_width, min_height;
 	int max_width, max_height;
 	const struct drm_mode_config_funcs *funcs;
@@ -529,7 +538,7 @@ struct drm_mode_config {
 	 * Mutex for blob property allocation and management, protects
 	 * @property_blob_list and &drm_file.blobs.
 	 */
-	struct lock blob_lock;
+	struct mutex blob_lock;
 
 	/**
 	 * @property_blob_list:
@@ -688,22 +697,22 @@ struct drm_mode_config {
 	struct drm_property *tv_mode_property;
 	/**
 	 * @tv_left_margin_property: Optional TV property to set the left
-	 * margin.
+	 * margin (expressed in pixels).
 	 */
 	struct drm_property *tv_left_margin_property;
 	/**
 	 * @tv_right_margin_property: Optional TV property to set the right
-	 * margin.
+	 * margin (expressed in pixels).
 	 */
 	struct drm_property *tv_right_margin_property;
 	/**
 	 * @tv_top_margin_property: Optional TV property to set the right
-	 * margin.
+	 * margin (expressed in pixels).
 	 */
 	struct drm_property *tv_top_margin_property;
 	/**
 	 * @tv_bottom_margin_property: Optional TV property to set the right
-	 * margin.
+	 * margin (expressed in pixels).
 	 */
 	struct drm_property *tv_bottom_margin_property;
 	/**

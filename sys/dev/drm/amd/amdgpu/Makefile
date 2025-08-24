@@ -25,14 +25,6 @@ KMOD=	amdgpu
 	${.CURDIR}/../display/dc/gpio/dce80 \
 	${.CURDIR}/../display/dc/gpio/dcn10 \
 	${.CURDIR}/../display/dc/gpio/diagnostics \
-	${.CURDIR}/../display/dc/i2caux \
-	${.CURDIR}/../display/dc/i2caux/dce100 \
-	${.CURDIR}/../display/dc/i2caux/dce110 \
-	${.CURDIR}/../display/dc/i2caux/dce112 \
-	${.CURDIR}/../display/dc/i2caux/dce120 \
-	${.CURDIR}/../display/dc/i2caux/dce80 \
-	${.CURDIR}/../display/dc/i2caux/dcn10 \
-	${.CURDIR}/../display/dc/i2caux/diagnostics \
 	${.CURDIR}/../display/dc/irq \
 	${.CURDIR}/../display/dc/irq/dce110 \
 	${.CURDIR}/../display/dc/irq/dce120 \
@@ -175,6 +167,7 @@ SRCS+= hwmgr.c processpptables.c \
 		pp_overdriver.c smu_helper.c \
 		vega20_processpptables.c vega20_hwmgr.c vega20_powertune.c \
 		vega20_thermal.c
+SRCS+= common_baco.c vega10_baco.c vega20_baco.c
 
 # powerplay/smumgr
 SRCS+= smumgr.c smu8_smumgr.c tonga_smumgr.c fiji_smumgr.c \
@@ -243,32 +236,6 @@ SRCS+= hw_translate_dcn10.c hw_factory_dcn10.c
 # Diagnostics on FPGA
 SRCS+= hw_translate_diag.c hw_factory_diag.c
 
-# dc/i2caux
-SRCS+= aux_engine.c engine_base.c i2caux.c i2c_engine.c \
-	i2c_generic_hw_engine.c i2c_hw_engine.c i2c_sw_engine.c
-# DCE 8x family
-SRCS+= i2caux_dce80.c i2c_hw_engine_dce80.c \
-	i2c_sw_engine_dce80.c
-
-# DCE 100 family
-SRCS+= i2caux_dce100.c
-
-# DCE 110 family
-SRCS+= i2caux_dce110.c i2c_sw_engine_dce110.c i2c_hw_engine_dce110.c \
-	aux_engine_dce110.c
-
-# DCE 112 family
-SRCS+= i2caux_dce112.c
-
-# DCN 1.0 family
-# ifdef CONFIG_DRM_AMD_DC_DCN1_0
-SRCS+= i2caux_dcn10.c
-
-# DCE 120 family
-SRCS+= i2caux_dce120.c
-
-SRCS+= i2caux_diag.c
-
 # dc/irq
 SRCS+= irq_service.c
 
@@ -323,7 +290,7 @@ SRCS+= dce80_timing_generator.c dce80_hw_sequencer.c \
 
 SRCS+= dc.c dc_link.c dc_resource.c dc_hw_sequencer.c dc_sink.c \
 	dc_surface.c dc_link_hwss.c dc_link_dp.c dc_link_ddc.c dc_debug.c dc_stream.c
-SRCS+= dc_helper.c
+SRCS+= dc_helper.c dc_vm_helper.c
 
 # modules/freesync
 SRCS+= freesync.c

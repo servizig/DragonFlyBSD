@@ -93,7 +93,7 @@ static ssize_t ttm_mem_zone_show(struct kobject *kobj,
 		container_of(kobj, struct ttm_mem_zone, kobj);
 	uint64_t val = 0;
 
-	lockmgr(&zone->glob->lock, LK_EXCLUSIVE);
+	drm_spin_lock(&zone->glob->lock);
 	if (attr == &ttm_mem_sys)
 		val = zone->zone_mem;
 	else if (attr == &ttm_mem_emer)
@@ -104,7 +104,7 @@ static ssize_t ttm_mem_zone_show(struct kobject *kobj,
 		val = zone->swap_limit;
 	else if (attr == &ttm_mem_used)
 		val = zone->used_mem;
-	lockmgr(&zone->glob->lock, LK_RELEASE);
+	drm_spin_unlock(&zone->glob->lock);
 
 	return ksnprintf(buffer, PAGE_SIZE, "%llu\n",
 			(unsigned long long) val >> 10);
@@ -130,7 +130,7 @@ static ssize_t ttm_mem_zone_store(struct kobject *kobj,
 	val64 = val;
 	val64 <<= 10;
 
-	lockmgr(&zone->glob->lock, LK_EXCLUSIVE);
+	drm_spin_lock(&zone->glob->lock);
 	if (val64 > zone->zone_mem)
 		val64 = zone->zone_mem;
 	if (attr == &ttm_mem_emer) {
@@ -143,7 +143,7 @@ static ssize_t ttm_mem_zone_store(struct kobject *kobj,
 			zone->emer_mem = val64;
 	} else if (attr == &ttm_mem_swap)
 		zone->swap_limit = val64;
-	lockmgr(&zone->glob->lock, LK_RELEASE);
+	drm_spin_unlock(&zone->glob->lock);
 
 	ttm_check_swapping(zone->glob);
 
@@ -183,9 +183,9 @@ static ssize_t ttm_mem_global_show(struct kobject *kobj,
 		container_of(kobj, struct ttm_mem_global, kobj);
 	uint64_t val = 0;
 
-	lockmgr(&glob->lock, LK_EXCLUSIVE);
+	drm_spin_lock(&glob->lock);
 	val = glob->lower_mem_limit;
-	lockmgr(&glob->lock, LK_RELEASE);
+	drm_spin_unlock(&glob->lock);
 	/* convert from number of pages to KB */
 	val <<= (PAGE_SHIFT - 10);
 	return snprintf(buffer, PAGE_SIZE, "%llu\n",
@@ -211,9 +211,9 @@ static ssize_t ttm_mem_global_store(struct kobject *kobj,
 	/* convert from KB to number of pages */
 	val64 >>= (PAGE_SHIFT - 10);
 
-	lockmgr(&glob->lock, LK_EXCLUSIVE);
+	drm_spin_lock(&glob->lock);
 	glob->lower_mem_limit = val64;
-	lockmgr(&glob->lock, LK_RELEASE);
+	drm_spin_unlock(&glob->lock);
 
 	return size;
 }
@@ -453,7 +453,7 @@ static void ttm_check_swapping(struct ttm_mem_global *glob)
 	unsigned int i;
 	struct ttm_mem_zone *zone;
 
-	lockmgr(&glob->lock, LK_EXCLUSIVE);
+	drm_spin_lock(&glob->lock);
 	for (i = 0; i < glob->num_zones; ++i) {
 		zone = glob->zones[i];
 		if (zone->used_mem > zone->swap_limit) {
@@ -462,7 +462,7 @@ static void ttm_check_swapping(struct ttm_mem_global *glob)
 		}
 	}
 
-	lockmgr(&glob->lock, LK_RELEASE);
+	drm_spin_unlock(&glob->lock);
 
 	if (unlikely(needs_swapping))
 		(void)queue_work(glob->swap_queue, &glob->work);
@@ -476,14 +476,14 @@ static void ttm_mem_global_free_zone(struct ttm_mem_global *glob,
 	unsigned int i;
 	struct ttm_mem_zone *zone;
 
-	lockmgr(&glob->lock, LK_EXCLUSIVE);
+	drm_spin_lock(&glob->lock);
 	for (i = 0; i < glob->num_zones; ++i) {
 		zone = glob->zones[i];
 		if (single_zone && zone != single_zone)
 			continue;
 		zone->used_mem -= amount;
 	}
-	lockmgr(&glob->lock, LK_RELEASE);
+	drm_spin_unlock(&glob->lock);
 }
 
 void ttm_mem_global_free(struct ttm_mem_global *glob,
@@ -534,7 +534,7 @@ static int ttm_mem_global_reserve(struct ttm_mem_global *glob,
 	unsigned int i;
 	struct ttm_mem_zone *zone;
 
-	lockmgr(&glob->lock, LK_EXCLUSIVE);
+	drm_spin_lock(&glob->lock);
 	for (i = 0; i < glob->num_zones; ++i) {
 		zone = glob->zones[i];
 		if (single_zone && zone != single_zone)
@@ -558,7 +558,7 @@ static int ttm_mem_global_reserve(struct ttm_mem_global *glob,
 
 	ret = 0;
 out_unlock:
-	lockmgr(&glob->lock, LK_RELEASE);
+	drm_spin_unlock(&glob->lock);
 	ttm_check_swapping(glob);
 
 	return ret;

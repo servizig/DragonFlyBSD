@@ -77,12 +77,12 @@ int drm_legacy_sg_alloc(struct drm_device *dev, void *data,
 
 	DRM_DEBUG("request size=%ld\n", request->size);
 
-	entry = kmalloc(sizeof(*entry), M_DRM, M_WAITOK | M_ZERO);
+	entry = kmalloc(sizeof(*entry), M_WAITOK | M_ZERO);
 
 	size = round_page(request->size);
 	entry->pages = OFF_TO_IDX(size);
 	entry->busaddr = kmalloc(entry->pages * sizeof(*entry->busaddr),
-	    M_DRM, M_WAITOK | M_ZERO);
+	    M_WAITOK | M_ZERO);
 
 	entry->vaddr = kmem_alloc_attr(kernel_map, size,
 				       VM_SUBSYS_DRM_SCAT, M_WAITOK | M_ZERO,

@@ -140,7 +140,7 @@ struct amdgpu_display_manager {
 	 * Guards access to DC functions that can issue register write
 	 * sequences.
 	 */
-	struct lock dc_lock;
+	struct mutex dc_lock;
 
 	/**
 	 * @irq_handler_list_low_tab:
@@ -237,7 +237,7 @@ struct amdgpu_dm_connector {
 	int max_vfreq ;
 	int pixel_clock_mhz;
 
-	struct lock hpd_lock;
+	struct mutex hpd_lock;
 
 	bool fake_enable;
 };

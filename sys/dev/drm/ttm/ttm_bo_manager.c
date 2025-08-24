@@ -72,12 +72,12 @@ static int ttm_bo_man_get_node(struct ttm_mem_type_manager *man,
 	if (place->flags & TTM_PL_FLAG_TOPDOWN)
 		mode = DRM_MM_INSERT_HIGH;
 
-	lockmgr(&rman->lock, LK_EXCLUSIVE);
+	drm_spin_lock(&rman->lock);
 	ret = drm_mm_insert_node_in_range(mm, node,
 					  mem->num_pages,
 					  mem->page_alignment, 0,
 					  place->fpfn, lpfn, mode);
-	lockmgr(&rman->lock, LK_RELEASE);
+	drm_spin_unlock(&rman->lock);
 
 	if (unlikely(ret)) {
 		kfree(node);
@@ -95,9 +95,9 @@ static void ttm_bo_man_put_node(struct ttm_mem_type_manager *man,
 	struct ttm_range_manager *rman = (struct ttm_range_manager *) man->priv;
 
 	if (mem->mm_node) {
-		lockmgr(&rman->lock, LK_EXCLUSIVE);
+		drm_spin_lock(&rman->lock);
 		drm_mm_remove_node(mem->mm_node);
-		lockmgr(&rman->lock, LK_RELEASE);
+		drm_spin_unlock(&rman->lock);
 
 		kfree(mem->mm_node);
 		mem->mm_node = NULL;
@@ -114,7 +114,7 @@ static int ttm_bo_man_init(struct ttm_mem_type_manager *man,
 		return -ENOMEM;
 
 	drm_mm_init(&rman->mm, 0, p_size);
-	lockinit(&rman->lock, "ttmrman", 0, 0);
+	spin_lock_init(&rman->lock);
 	man->priv = rman;
 	return 0;
 }
@@ -124,15 +124,15 @@ static int ttm_bo_man_takedown(struct ttm_mem_type_manager *man)
 	struct ttm_range_manager *rman = (struct ttm_range_manager *) man->priv;
 	struct drm_mm *mm = &rman->mm;
 
-	lockmgr(&rman->lock, LK_EXCLUSIVE);
+	drm_spin_lock(&rman->lock);
 	if (drm_mm_clean(mm)) {
 		drm_mm_takedown(mm);
-		lockmgr(&rman->lock, LK_RELEASE);
+		drm_spin_unlock(&rman->lock);
 		kfree(rman);
 		man->priv = NULL;
 		return 0;
 	}
-	lockmgr(&rman->lock, LK_RELEASE);
+	drm_spin_unlock(&rman->lock);
 	return -EBUSY;
 }
 
@@ -141,9 +141,9 @@ static void ttm_bo_man_debug(struct ttm_mem_type_manager *man,
 {
 	struct ttm_range_manager *rman = (struct ttm_range_manager *) man->priv;
 
-	lockmgr(&rman->lock, LK_EXCLUSIVE);
+	drm_spin_lock(&rman->lock);
 	drm_mm_print(&rman->mm, printer);
-	lockmgr(&rman->lock, LK_RELEASE);
+	drm_spin_unlock(&rman->lock);
 }
 
 const struct ttm_mem_type_manager_func ttm_bo_manager_func = {

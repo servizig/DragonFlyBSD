@@ -2040,7 +2040,7 @@ int amdgpu_atombios_init(struct amdgpu_device *adev)
 		return -ENOMEM;
 	}
 
-	lockinit(&adev->mode_info.atom_context->mutex, "agmiacm", 0, LK_CANRECURSE);
+	mutex_init(&adev->mode_info.atom_context->mutex);
 	if (adev->is_atom_fw) {
 		amdgpu_atomfirmware_scratch_regs_init(adev);
 		amdgpu_atomfirmware_allocate_fb_scratch(adev);

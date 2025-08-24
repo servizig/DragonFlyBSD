@@ -103,7 +103,7 @@ static bool igp_read_bios_from_vram(struct amdgpu_device *adev)
 		return false;
 	}
 
-	adev->bios = kmalloc(size, M_DRM, GFP_KERNEL);
+	adev->bios = kmalloc(size, GFP_KERNEL);
 	if (!adev->bios) {
 		iounmap(bios);
 		return false;
@@ -171,7 +171,7 @@ static bool amdgpu_read_bios_from_rom(struct amdgpu_device *adev)
 	/* valid vbios, go on */
 	len = AMD_VBIOS_LENGTH(header);
 	len = ALIGN(len, 4);
-	adev->bios = kmalloc(len, M_DRM, GFP_KERNEL);
+	adev->bios = kmalloc(len, GFP_KERNEL);
 	if (!adev->bios) {
 		DRM_ERROR("no memory to allocate for BIOS\n");
 		return false;
@@ -335,7 +335,7 @@ static bool amdgpu_atrm_get_bios(struct amdgpu_device *adev)
 	if (!found)
 		return false;
 
-	adev->bios = kmalloc(size, M_DRM, GFP_KERNEL);
+	adev->bios = kmalloc(size, GFP_KERNEL);
 	if (!adev->bios) {
 		DRM_ERROR("Unable to allocate bios\n");
 		return false;
@@ -445,33 +445,26 @@ static inline bool amdgpu_acpi_vfct_bios(struct amdgpu_device *adev)
 
 bool amdgpu_get_bios(struct amdgpu_device *adev)
 {
-	if (amdgpu_atrm_get_bios(adev)) {
+	if (amdgpu_atrm_get_bios(adev))
 		goto success;
-	}
 
-	if (amdgpu_acpi_vfct_bios(adev)) {
+	if (amdgpu_acpi_vfct_bios(adev))
 		goto success;
-	}
 
-	if (igp_read_bios_from_vram(adev)) {
+	if (igp_read_bios_from_vram(adev))
 		goto success;
-	}
 
-	if (amdgpu_read_bios(adev)) {
+	if (amdgpu_read_bios(adev))
 		goto success;
-	}
 
-	if (amdgpu_read_bios_from_rom(adev)) {
+	if (amdgpu_read_bios_from_rom(adev))
 		goto success;
-	}
 
-	if (amdgpu_read_disabled_bios(adev)) {
+	if (amdgpu_read_disabled_bios(adev))
 		goto success;
-	}
 
-	if (amdgpu_read_platform_bios(adev)) {
+	if (amdgpu_read_platform_bios(adev))
 		goto success;
-	}
 
 	DRM_ERROR("Unable to locate a BIOS ROM\n");
 	return false;

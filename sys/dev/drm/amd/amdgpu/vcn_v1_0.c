@@ -1329,7 +1329,7 @@ static void vcn_v1_0_dec_ring_insert_end(struct amdgpu_ring *ring)
  *
  * Write a fence and a trap command to the ring.
  */
-static void vcn_v1_0_dec_ring_emit_fence(struct amdgpu_ring *ring, uint64_t addr, uint64_t seq,
+static void vcn_v1_0_dec_ring_emit_fence(struct amdgpu_ring *ring, u64 addr, u64 seq,
 				     unsigned flags)
 {
 	struct amdgpu_device *adev = ring->adev;
@@ -1371,7 +1371,7 @@ static void vcn_v1_0_dec_ring_emit_fence(struct amdgpu_ring *ring, uint64_t addr
 static void vcn_v1_0_dec_ring_emit_ib(struct amdgpu_ring *ring,
 					struct amdgpu_job *job,
 					struct amdgpu_ib *ib,
-					bool ctx_switch)
+					uint32_t flags)
 {
 	struct amdgpu_device *adev = ring->adev;
 	unsigned vmid = AMDGPU_JOB_GET_VMID(job);
@@ -1503,8 +1503,8 @@ static void vcn_v1_0_enc_ring_set_wptr(struct amdgpu_ring *ring)
  *
  * Write enc a fence and a trap command to the ring.
  */
-static void vcn_v1_0_enc_ring_emit_fence(struct amdgpu_ring *ring, uint64_t addr,
-			uint64_t seq, unsigned flags)
+static void vcn_v1_0_enc_ring_emit_fence(struct amdgpu_ring *ring, u64 addr,
+			u64 seq, unsigned flags)
 {
 	WARN_ON(flags & AMDGPU_FENCE_FLAG_64BIT);
 
@@ -1531,7 +1531,7 @@ static void vcn_v1_0_enc_ring_insert_end(struct amdgpu_ring *ring)
 static void vcn_v1_0_enc_ring_emit_ib(struct amdgpu_ring *ring,
 					struct amdgpu_job *job,
 					struct amdgpu_ib *ib,
-					bool ctx_switch)
+					uint32_t flags)
 {
 	unsigned vmid = AMDGPU_JOB_GET_VMID(job);
 
@@ -1661,7 +1661,7 @@ static void vcn_v1_0_jpeg_ring_insert_end(struct amdgpu_ring *ring)
  *
  * Write a fence and a trap command to the ring.
  */
-static void vcn_v1_0_jpeg_ring_emit_fence(struct amdgpu_ring *ring, uint64_t addr, uint64_t seq,
+static void vcn_v1_0_jpeg_ring_emit_fence(struct amdgpu_ring *ring, u64 addr, u64 seq,
 				     unsigned flags)
 {
 	struct amdgpu_device *adev = ring->adev;
@@ -1736,7 +1736,7 @@ static void vcn_v1_0_jpeg_ring_emit_fence(struct amdgpu_ring *ring, uint64_t add
 static void vcn_v1_0_jpeg_ring_emit_ib(struct amdgpu_ring *ring,
 					struct amdgpu_job *job,
 					struct amdgpu_ib *ib,
-					bool ctx_switch)
+					uint32_t flags)
 {
 	struct amdgpu_device *adev = ring->adev;
 	unsigned vmid = AMDGPU_JOB_GET_VMID(job);

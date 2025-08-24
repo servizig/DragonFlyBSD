@@ -522,7 +522,7 @@ static int ttm_buffer_object_transfer(struct ttm_buffer_object *bo,
 	struct ttm_transfer_obj *fbo;
 	int ret;
 
-	fbo = kmalloc(sizeof(*fbo), M_DRM, GFP_KERNEL);
+	fbo = kmalloc(sizeof(*fbo), GFP_KERNEL);
 	if (!fbo)
 		return -ENOMEM;
 
@@ -542,7 +542,7 @@ static int ttm_buffer_object_transfer(struct ttm_buffer_object *bo,
 	INIT_LIST_HEAD(&fbo->base.lru);
 	INIT_LIST_HEAD(&fbo->base.swap);
 	INIT_LIST_HEAD(&fbo->base.io_reserve_lru);
-	lockinit(&fbo->base.wu_mutex, "dtfbwm", 0, LK_CANRECURSE);
+	mutex_init(&fbo->base.wu_mutex);
 	fbo->base.moving = NULL;
 	drm_vma_node_reset(&fbo->base.vma_node);
 	atomic_set(&fbo->base.cpu_writers, 0);
@@ -829,12 +829,12 @@ int ttm_bo_pipeline_move(struct ttm_buffer_object *bo,
 		 * this eviction and free up the allocation
 		 */
 
-		lockmgr(&from->move_lock, LK_EXCLUSIVE);
+		drm_spin_lock(&from->move_lock);
 		if (!from->move || dma_fence_is_later(fence, from->move)) {
 			dma_fence_put(from->move);
 			from->move = dma_fence_get(fence);
 		}
-		lockmgr(&from->move_lock, LK_RELEASE);
+		drm_spin_unlock(&from->move_lock);
 
 		ttm_bo_free_old_node(bo);
 

@@ -725,7 +725,7 @@ struct amdgpu_ttm_tt {
 	uint64_t		userptr;
 	struct task_struct	*usertask;
 	uint32_t		userflags;
-	struct spinlock		guptasklock;
+	spinlock_t              guptasklock;
 	struct list_head        guptasks;
 	atomic_t		mmu_invalidations;
 	uint32_t		last_set_pages;
@@ -783,9 +783,9 @@ int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 		struct amdgpu_ttm_gup_task_list guptask;
 
 		guptask.task = current;
-		spin_lock(&gtt->guptasklock);
+		drm_spin_lock(&gtt->guptasklock);
 		list_add(&guptask.list, &gtt->guptasks);
-		spin_unlock(&gtt->guptasklock);
+		drm_spin_unlock(&gtt->guptasklock);
 
 		r = get_user_pages(userptr, num_pages, flags, p, NULL);
 
@@ -798,9 +798,9 @@ int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 					flags, p, NULL, NULL);
 #endif
 
-		spin_lock(&gtt->guptasklock);
+		drm_spin_lock(&gtt->guptasklock);
 		list_del(&guptask.list);
-		spin_unlock(&gtt->guptasklock);
+		drm_spin_unlock(&gtt->guptasklock);
 
 		if (r < 0)
 			goto release_pages;
@@ -963,7 +963,7 @@ int amdgpu_ttm_gart_bind(struct amdgpu_device *adev,
 
 gart_bind_fail:
 	if (r)
-		DRM_ERROR("failed to bind %lu pages at 0x%08llX\n",
+		DRM_ERROR("failed to bind %lu pages at 0x%08lX\n",
 			  ttm->num_pages, gtt->offset);
 
 	return r;
@@ -1014,7 +1014,7 @@ static int amdgpu_ttm_backend_bind(struct ttm_tt *ttm,
 		ttm->pages, gtt->ttm.dma_address, flags);
 
 	if (r)
-		DRM_ERROR("failed to bind %lu pages at 0x%08llX\n",
+		DRM_ERROR("failed to bind %lu pages at 0x%08lX\n",
 			  ttm->num_pages, gtt->offset);
 	return r;
 }
@@ -1121,7 +1121,7 @@ static int amdgpu_ttm_backend_unbind(struct ttm_tt *ttm)
 	/* unbind shouldn't be done for GDS/GWS/OA in ttm_bo_clean_mm */
 	r = amdgpu_gart_unbind(adev, gtt->offset, ttm->num_pages);
 	if (r)
-		DRM_ERROR("failed to unbind %lu pages at 0x%08llX\n",
+		DRM_ERROR("failed to unbind %lu pages at 0x%08lX\n",
 			  gtt->ttm.ttm.num_pages, gtt->offset);
 	return r;
 }
@@ -1280,7 +1280,7 @@ kprintf("amdgpu_ttm_tt_set_userptr: gtt->usertask will not be set\n");
 	get_task_struct(gtt->usertask);
 #endif
 
-	spin_init(&gtt->guptasklock, "agttgutl");
+	spin_lock_init(&gtt->guptasklock);
 	INIT_LIST_HEAD(&gtt->guptasks);
 	atomic_set(&gtt->mmu_invalidations, 0);
 	gtt->last_set_pages = 0;
@@ -1329,14 +1329,14 @@ bool amdgpu_ttm_tt_affect_userptr(struct ttm_tt *ttm, unsigned long start,
 	/* Search the lists of tasks that hold this mapping and see
 	 * if current is one of them.  If it is return false.
 	 */
-	spin_lock(&gtt->guptasklock);
+	drm_spin_lock(&gtt->guptasklock);
 	list_for_each_entry(entry, &gtt->guptasks, list) {
 		if (entry->task == current) {
-			spin_unlock(&gtt->guptasklock);
+			drm_spin_unlock(&gtt->guptasklock);
 			return false;
 		}
 	}
-	spin_unlock(&gtt->guptasklock);
+	drm_spin_unlock(&gtt->guptasklock);
 
 	atomic_inc(&gtt->mmu_invalidations);
 
@@ -1570,7 +1570,8 @@ static struct ttm_bo_driver amdgpu_bo_driver = {
 	.io_mem_reserve = &amdgpu_ttm_io_mem_reserve,
 	.io_mem_free = &amdgpu_ttm_io_mem_free,
 	.io_mem_pfn = amdgpu_ttm_io_mem_pfn,
-	.access_memory = &amdgpu_ttm_access_memory
+	.access_memory = &amdgpu_ttm_access_memory,
+	.del_from_lru_notify = &amdgpu_vm_del_from_lru_notify
 };
 
 /*
@@ -1688,7 +1689,7 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 	int r;
 	u64 vis_vram_limit;
 
-	lockinit(&adev->mman.gtt_window_lock, "amdgpummgttwl", 0, LK_CANRECURSE);
+	mutex_init(&adev->mman.gtt_window_lock);
 
 	/* No others user of address space so set it to 0 */
 	r = ttm_bo_device_init(&adev->mman.bdev,
@@ -1703,7 +1704,9 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 		DRM_ERROR("failed initializing buffer object driver(%d).\n", r);
 		return r;
 	}
+#ifdef __DragonFly__
 	adev->ddev->drm_ttm_bdev = &adev->mman.bdev;
+#endif
 	adev->mman.initialized = true;
 
 	/* We opt to avoid OOM on system pages allocations */
@@ -1783,7 +1786,7 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 	}
 
 	r = amdgpu_bo_create_kernel(adev, adev->gds.mem.gfx_partition_size,
-				    PAGE_SIZE, AMDGPU_GEM_DOMAIN_GDS,
+				    4, AMDGPU_GEM_DOMAIN_GDS,
 				    &adev->gds.gds_gfx_bo, NULL, NULL);
 	if (r)
 		return r;
@@ -1796,7 +1799,7 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 	}
 
 	r = amdgpu_bo_create_kernel(adev, adev->gds.gws.gfx_partition_size,
-				    PAGE_SIZE, AMDGPU_GEM_DOMAIN_GWS,
+				    1, AMDGPU_GEM_DOMAIN_GWS,
 				    &adev->gds.gws_gfx_bo, NULL, NULL);
 	if (r)
 		return r;
@@ -1809,7 +1812,7 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 	}
 
 	r = amdgpu_bo_create_kernel(adev, adev->gds.oa.gfx_partition_size,
-				    PAGE_SIZE, AMDGPU_GEM_DOMAIN_OA,
+				    1, AMDGPU_GEM_DOMAIN_OA,
 				    &adev->gds.oa_gfx_bo, NULL, NULL);
 	if (r)
 		return r;

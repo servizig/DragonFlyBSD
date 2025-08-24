@@ -27,7 +27,7 @@
 #include <linux/acpi.h>
 
 #include <drm/drmP.h>
-#include <drm/drm_crtc_helper.h>
+#include <drm/drm_probe_helper.h>
 #include <drm/amdgpu_drm.h>
 #include "dm_services.h"
 #include "amdgpu.h"
@@ -44,10 +44,12 @@ unsigned long long dm_get_elapse_time_in_ns(struct dc_context *ctx,
 	return current_time_stamp - last_time_stamp;
 }
 
-void dm_perf_trace_timestamp(const char *func_name, unsigned int line);
+#if 0 /* -Werror=unused-function */
+static
 void dm_perf_trace_timestamp(const char *func_name, unsigned int line)
 {
 }
+#endif
 
 bool dm_write_persistent_data(struct dc_context *ctx,
 		const struct dc_sink *sink,

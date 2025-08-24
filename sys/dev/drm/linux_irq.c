@@ -69,7 +69,7 @@ request_irq(unsigned int irq, irq_handler_t handler,
 	struct drm_device *ddev = dev;
 	device_t bdev = ddev->dev->bsddev;
 
-	irq_entry = kmalloc(sizeof(*irq_entry), M_DRM, M_WAITOK);
+	irq_entry = __kmalloc(sizeof(*irq_entry), M_DRM, M_WAITOK);
 
 	/* From drm_init_pdev() */
 	irq_entry->rid = ddev->pdev->_irqrid;

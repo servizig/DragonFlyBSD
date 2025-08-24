@@ -89,15 +89,15 @@ static inline int __must_check kref_get_unless_zero(struct kref *kref)
 
 static inline int kref_put_mutex(struct kref *kref,
 				 void (*release)(struct kref *kref),
-				 struct lock *lock)
+				 struct mutex *mutex)
 {
 	if (!atomic_add_unless(&kref->refcount.refs, -1, 1)) {
-		mutex_lock(lock);
+		lockmgr(&mutex->lock, LK_EXCLUSIVE);
 		if (likely(atomic_dec_and_test(&kref->refcount.refs))) {
 			release(kref);
 			return 1;
 		}
-		mutex_unlock(lock);
+		lockmgr(&mutex->lock, LK_RELEASE);
 		return 0;
 	}
 
