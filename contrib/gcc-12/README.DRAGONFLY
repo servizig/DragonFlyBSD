@@ -28,7 +28,9 @@ The following files have been patched
 =====================================
   gcc/c-family/c-format.cc		extra TZ "%+" format for strftime()
   gcc/config/dragonfly.h		default dynamic linker path
+  gcc/doc/gcc.1				document -save-temps=objects
   gcc/gcc.cc				default paths for base tools
+					add -save-temps=objects option
   libgcc/gthr-posix.h			avoid weakref (ld.gold issue)
   libgcc/unwind-dw2-fde-dip.c		avoid redefining ElfW
   libstdc++-v3/config/locale/dragonfly/codecvt_members.cc
