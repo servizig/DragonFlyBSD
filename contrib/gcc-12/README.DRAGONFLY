@@ -27,6 +27,7 @@ Configured with
 The following files have been patched
 =====================================
   gcc/c-family/c-format.cc		extra TZ "%+" format for strftime()
+  gcc/common.opt			set dwarf_version=4 and dwarf_strict=1
   gcc/config/dragonfly.h		default dynamic linker path
   gcc/doc/gcc.1				document -save-temps=objects
   gcc/gcc.cc				default paths for base tools
