@@ -108,6 +108,8 @@
 #include <machine/intr_machdep.h>
 #include <machine/framebuffer.h>
 
+#include <bus/pci/x86_64/pci_early_quirks.h>
+
 #ifdef OLD_BUS_ARCH
 #include <bus/isa/isa_device.h>
 #endif
@@ -129,10 +131,6 @@
 #define MAXBUFSTRUCTSIZE	((size_t)512 * 1024 * 1024)
 
 extern u_int64_t hammer_time(u_int64_t, u_int64_t);
-
-extern void printcpuinfo(void);	/* XXX header file */
-extern void identify_cpu(void);
-extern void panicifcpuunsupported(void);
 
 static void cpu_startup(void *);
 static void pic_finish(void *);
@@ -2750,6 +2748,8 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 	}
 
 	lidt(&r_idt_arr[0]);
+
+	pci_early_quirks();
 
 	/*
 	 * Initialize the console before we print anything out.

@@ -40,10 +40,9 @@
 
 #include <vfs/hammer2/hammer2_disk.h>
 
-/* user-specifiable check modes only */
 #define HAMMER2_CHECK_STRINGS		{ "none", "disabled", "crc32", \
-					  "xxhash64", "sha192" }
-#define HAMMER2_CHECK_STRINGS_COUNT	5
+					  "xxhash64", "sha192", "freemap" }
+#define HAMMER2_CHECK_STRINGS_COUNT	6
 
 #define HAMMER2_COMP_STRINGS		{ "none", "autozero", "lz4", "zlib" }
 #define HAMMER2_COMP_STRINGS_COUNT	4
@@ -120,6 +119,5 @@ void *hammer2_decompress_LZ4(void *inbuf, size_t insize,
 			size_t outsize, int *statusp);
 void *hammer2_decompress_ZLIB(void *inbuf, size_t insize,
 			size_t outsize, int *statusp);
-
 
 #endif /* !HAMMER2_HAMMER2_SUBS_H_ */

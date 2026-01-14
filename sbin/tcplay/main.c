@@ -198,6 +198,8 @@ usage(void)
 	    " -k <key file>, --keyfile=<key file>\n"
 	    "\t Specifies a key file to use for the password derivation, can appear\n"
 	    "\t multiple times.\n"
+	    " -q, --batch-mode\n"
+	    "\t Do not ask for confirmation. Use with care!\n"
 	    );
 
 	exit(EXIT_FAILURE);
@@ -235,6 +237,7 @@ static struct option longopts[] = {
 	{ "insecure-erase",	no_argument,		NULL, 'z' },
 	{ "help",		no_argument,		NULL, 'h' },
 	{ "no-retries",         no_argument,            NULL, FLAG_LONG_NO_RETRIES },
+	{ "batch-mode",		no_argument,		NULL, 'q' },
 	{ NULL,			0,			NULL, 0   },
 };
 
@@ -256,7 +259,7 @@ main(int argc, char *argv[])
 	    create_vol = 0, modify_vol = 0;
 
 	if ((error = tc_play_init()) != 0) {
-		fprintf(stderr, "Initialization failed, exiting.");
+		fprintf(stderr, "Initialization failed, exiting.\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -265,13 +268,13 @@ main(int argc, char *argv[])
 	signal(SIGINFO, sig_handler);
 
 	if ((opts = opts_init()) == NULL) {
-		fprintf(stderr, "Initialization failed (opts), exiting.");
+		fprintf(stderr, "Initialization failed (opts), exiting.\n");
 		exit(EXIT_FAILURE);
 	}
 
 	opts->interactive = 1;
 
-	while ((ch = getopt_long(argc, argv, "a:b:cd:ef:ghij:k:m:ps:tu:vwx:y:z",
+	while ((ch = getopt_long(argc, argv, "a:b:cd:ef:ghij:k:m:pqs:tu:vwx:y:z",
 	    longopts, NULL)) != -1) {
 		switch(ch) {
 		case 'a':
@@ -333,6 +336,9 @@ main(int argc, char *argv[])
 			break;
 		case 'p':
 			opts->prompt_passphrase = 1;
+			break;
+		case 'q':
+			opts->interactive = 0;
 			break;
 		case 's':
 			opts->flags |= TC_FLAG_SYS;

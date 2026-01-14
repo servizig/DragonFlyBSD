@@ -1991,6 +1991,8 @@ WorkerProcess(int ac, char **av)
 		FetchOnlyOpt = 1;
 	if (WorkerProcFlags & WORKER_PROC_PKGV17)
 		PkgVersionPkgSuffix = 1;
+	if (WorkerProcFlags & WORKER_PROC_PORTSBASEOPT)
+		DFlyPortsBaseOpt = 1;
 
 	bzero(&wmsg, sizeof(wmsg));
 
@@ -2865,8 +2867,22 @@ skip:
 static void
 phaseReapAll(void)
 {
-	struct reaper_status rs;
 	int status;
+
+#if __DragonFly_version >= 600510
+	struct reaper_kill rk;
+
+	memset(&rk, 0, sizeof(rk));
+	rk.signal = SIGKILL;
+
+	while (procctl(P_PID, getpid(), PROC_REAP_KILL, &rk) == 0) {
+		if (rk.killed == 0)
+			break;
+		while (wait3(&status, 0, NULL) > 0)
+			;
+	}
+#else
+	struct reaper_status rs;
 
 	while (procctl(P_PID, getpid(), PROC_REAP_STATUS, &rs) == 0) {
 		if ((rs.flags & PROC_REAP_ACQUIRE) == 0)
@@ -2878,6 +2894,8 @@ phaseReapAll(void)
 				;
 		}
 	}
+#endif
+
 	while (wait3(&status, 0, NULL) > 0)
 		;
 }

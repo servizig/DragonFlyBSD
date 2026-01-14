@@ -37,6 +37,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <netinet/in.h>
@@ -60,14 +61,14 @@
 
 struct syscall syscalls[] = {
 	{ "readlink", 1, 3,
-	  { { String, 0 } , { String | OUT, 1 }, { Int, 2 }}},
-	{ "lseek", 2, 3,
-	  { { Int, 0 }, {Quad, 2 }, { Int, 4 }}},
+	  { { String, 0 } , { String | OUT, 1 }, { Int64, 2 }}},
+	{ "lseek", 2, 4,
+	  { { Int, 0 }, {Hex64, 2 }, { Int, 3 }}},
 	{ "mmap", 2, 6,
-	  { { Hex, 0 }, {Int, 1}, {Hex, 2}, {Hex, 3}, {Int, 4}, {Quad, 6}}},
+	  { { Hex64, 0 }, {Hex64, 1}, {Hex, 2}, {Hex, 3}, {Int, 4}, {Hex64, 5}}},
 	{ "open", 1, 3,
 	  { { String | IN, 0} , { Hex, 1}, {Octal, 2}}},
-	{ "close", 1, 1, { { Int, 0 } } },
+	{ "close", 1, 1, { { Int | IN, 0 } } },
 	{ "fstat", 1, 2,
 	  { { Int, 0},  {Ptr | OUT , 1 }}},
 	{ "stat", 1, 2,
@@ -75,24 +76,28 @@ struct syscall syscalls[] = {
 	{ "lstat", 1, 2,
 	  { { String | IN, 0 }, { Ptr | OUT, 1 }}},
 	{ "write", 1, 3,
-	  { { Int, 0}, { Ptr | IN, 1 }, { Int, 2 }}},
+	  { { Int, 0}, { Ptr | IN, 1 }, { Int64, 2 }}},
 	{ "ioctl", 1, 3,
-	  { { Int, 0}, { Ioctl, 1 }, { Hex, 2 }}},
-	{ "break", 1, 1, { { Hex, 0 }}},
-	{ "exit", 0, 1, { { Hex, 0 }}},
+	  { { Int, 0}, { Ioctl, 1 }, { Hex64, 2 }}},
+	{ "execve", 0, 3,
+	  { { String | IN, 0} , { Ptr, 1}, {Ptr, 2}}},
+	{ "sbrk", 1, 1, { { Hex64, 0 }}},
+	{ "exit", 0, 1, { { Int, 0 }}},
 	{ "access", 1, 2, { { String | IN, 0 }, { Int, 1 }}},
+	{ "chdir", 1, 1, { { String | IN, 0 }}},
+	{ "fchdir", 1, 1, { { Int | IN, 0 }}},
 	{ "sigaction", 1, 3,
 	  { { Signal, 0 }, { Ptr | IN, 1 }, { Ptr | OUT, 2 }}},
 	{ "accept", 1, 3,
-	  { { Hex, 0 }, { Sockaddr | OUT, 1 }, { Ptr | OUT, 2 } } },
+	  { { Int, 0 }, { Sockaddr | OUT, 1 }, { Ptr | OUT, 2 } } },
 	{ "bind", 1, 3,
-	  { { Hex, 0 }, { Sockaddr | IN, 1 }, { Int, 2 } } },
+	  { { Int, 0 }, { Sockaddr | IN, 1 }, { Int, 2 } } },
 	{ "connect", 1, 3,
-	  { { Hex, 0 }, { Sockaddr | IN, 1 }, { Int, 2 } } },
+	  { { Int, 0 }, { Sockaddr | IN, 1 }, { Int, 2 } } },
 	{ "getpeername", 1, 3,
-	  { { Hex, 0 }, { Sockaddr | OUT, 1 }, { Ptr | OUT, 2 } } },
+	  { { Int, 0 }, { Sockaddr | OUT, 1 }, { Ptr | OUT, 2 } } },
 	{ "getsockname", 1, 3,
-	  { { Hex, 0 }, { Sockaddr | OUT, 1 }, { Ptr | OUT, 2 } } },
+	  { { Int, 0 }, { Sockaddr | OUT, 1 }, { Ptr | OUT, 2 } } },
 	{ 0, 0, 0, { { 0, 0 }}},
 };
 
@@ -120,83 +125,39 @@ get_syscall(const char *name) {
  */
 
 static int
-get_struct(int procfd, void *offset, void *buf, int len) {
-	char *pos;
-	FILE *p;
-	int c, fd;
+get_struct(int procfd, off_t offset, void *buf, int len) {
+	ssize_t count;
 
-	if ((fd = dup(procfd)) == -1)
-		err(1, "dup");
-	if ((p = fdopen(fd, "r")) == NULL)
-		err(1, "fdopen");
-	fseeko(p, (uintptr_t)offset, SEEK_SET);
-	for (pos = (char *)buf; len--; pos++) {
-		if ((c = fgetc(p)) == EOF)
-			return -1;
-		*pos = c;
-	}
-	fclose(p);
-	return 0;
+	count = pread(procfd, buf, len, offset);
+	if (count != len)
+		return -1;
+	else
+		return 0;
 }
 
 /*
  * get_string
- * Copy a string from the process.  Note that it is
- * expected to be a C string, but if max is set, it will
- * only get that much.
+ * Copy a C string from the process. The maximum length of the string is
+ * max if non-zero, and MAXPATHLEN otherwise.
+ * The returned buffer is allocated with malloc(), and needs to be free()'d
+ * after use.
  */
 
 char *
-get_string(int procfd, void *offset, int max) {
-	char *buf;
-	int size, len, c, fd;
-	FILE *p;
+get_string(int procfd, off_t offset, size_t max) {
+	char *buf, *str;
 
-	if ((fd = dup(procfd)) == -1)
-		err(1, "dup");
-	if ((p = fdopen(fd, "r")) == NULL)
-		err(1, "fdopen");
-	buf = malloc( size = (max ? max : 64 ) );
-	len = 0;
-	buf[0] = 0;
-	fseeko(p, (uintptr_t)offset, SEEK_SET);
-	while ((c = fgetc(p)) != EOF) {
-		buf[len++] = c;
-		if (c == 0 || len == max) {
-			buf[len] = 0;
-			break;
-		}
-		if (len == size) {
-			char *tmp;
-			tmp = realloc(buf, size+64);
-			if (tmp == NULL) {
-				buf[len] = 0;
-				fclose(p);
-				return buf;
-			}
-			size += 64;
-			buf = tmp;
-		}
-	}
-	fclose(p);
-	return buf;
-}
+	max = max ? max : MAXPATHLEN;
+	buf = malloc(max);
+	ssize_t count;
 
+	count = pread(procfd, buf, max, offset);
+	if (count <= 0)
+		buf[0] = '\0';
 
-/*
- * Gag.  This is really unportable.  Multiplication is more portable.
- * But slower, from the code I saw.
- */
-
-static long long
-make_quad(unsigned long p1, unsigned long p2) {
-  union {
-    long long ll;
-    unsigned long l[2];
-  } t;
-  t.l[0] = p1;
-  t.l[1] = p2;
-  return t.ll;
+	str = strndup(buf, count);
+	free(buf);
+	return str;
 }
 
 
@@ -215,50 +176,38 @@ print_arg(int fd, struct syscall_args *sc, unsigned long *args) {
   char *tmp = NULL;
   switch (sc->type & ARG_MASK) {
   case Hex:
-    tmp = malloc(12);
-    sprintf(tmp, "0x%lx", args[sc->offset]);
+    asprintf(&tmp, "0x%x", (uint32_t)args[sc->offset]);
     break;
   case Octal:
-    tmp = malloc(13);
-    sprintf(tmp, "0%lo", args[sc->offset]);
+    asprintf(&tmp, "0%o", (uint32_t)args[sc->offset]);
     break;
   case Int:
-    tmp = malloc(12);
-    sprintf(tmp, "%ld", args[sc->offset]);
+    asprintf(&tmp, "%d", (int32_t)args[sc->offset]);
+    break;
+  case Hex64:
+    asprintf(&tmp, "0x%lx", args[sc->offset]);
+    break;
+  case Int64:
+    asprintf(&tmp, "%ld", args[sc->offset]);
     break;
   case String:
     {
       char *tmp2;
-      tmp2 = get_string(fd, (void*)args[sc->offset], 0);
-      tmp = malloc(strlen(tmp2) + 3);
-      sprintf(tmp, "\"%s\"", tmp2);
+      tmp2 = get_string(fd, (off_t)args[sc->offset], 0);
+      asprintf(&tmp, "\"%s\"", tmp2);
       free(tmp2);
     }
   break;
-  case Quad:
-    {
-      unsigned long long t;
-      unsigned long l1, l2;
-      l1 = args[sc->offset];
-      l2 = args[sc->offset+1];
-      t = make_quad(l1, l2);
-      tmp = malloc(24);
-      sprintf(tmp, "0x%qx", t);
-      break;
-    }
   case Ptr:
-    tmp = malloc(12);
-    sprintf(tmp, "0x%lx", args[sc->offset]);
+    asprintf(&tmp, "0x%lx", args[sc->offset]);
     break;
   case Ioctl:
     {
       const char *temp = ioctlname(args[sc->offset]);
       if (temp)
 	tmp = strdup(temp);
-      else {
-	tmp = malloc(12);
-	sprintf(tmp, "0x%lx", args[sc->offset]);
-      }
+      else
+	asprintf(&tmp, "0x%lx", args[sc->offset]);
     }
     break;
   case Signal:
@@ -266,14 +215,13 @@ print_arg(int fd, struct syscall_args *sc, unsigned long *args) {
       long sig;
 
       sig = args[sc->offset];
-      tmp = malloc(12);
-      if (sig > 0 && sig < NSIG) {
+      if (sig > 0 && sig < sys_nsig) {
 	int i;
-	sprintf(tmp, "sig%s", sys_signame[sig]);
+	asprintf(&tmp, "sig%s", sys_signame[sig]);
 	for (i = 0; tmp[i] != '\0'; ++i)
 	  tmp[i] = toupper(tmp[i]);
       } else {
-        sprintf(tmp, "%ld", sig);
+        asprintf(&tmp, "%ld", sig);
       }
     }
     break;
@@ -290,17 +238,17 @@ print_arg(int fd, struct syscall_args *sc, unsigned long *args) {
       int i;
 
       /* yuck: get ss_len */
-      if (get_struct(fd, (void *)args[sc->offset], &ss,
+      if (get_struct(fd, (off_t)args[sc->offset], &ss,
 	sizeof(ss.ss_len) + sizeof(ss.ss_family)) == -1)
 	err(1, "get_struct %p", (void *)args[sc->offset]);
       /* sockaddr_un never have the length filled in! */
       if (ss.ss_family == AF_UNIX) {
-	if (get_struct(fd, (void *)args[sc->offset], &ss,
+	if (get_struct(fd, (off_t)args[sc->offset], &ss,
 	  sizeof(*sun))
 	  == -1)
 	  err(2, "get_struct %p", (void *)args[sc->offset]);
       } else {
-	if (get_struct(fd, (void *)args[sc->offset], &ss,
+	if (get_struct(fd, (off_t)args[sc->offset], &ss,
 	    ss.ss_len < sizeof(ss) ? ss.ss_len : sizeof(ss))
 	  == -1)
 	  err(2, "get_struct %p", (void *)args[sc->offset]);

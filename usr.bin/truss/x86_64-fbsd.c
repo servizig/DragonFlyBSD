@@ -88,14 +88,11 @@ static struct freebsd_syscall {
 /* Clear up and free parts of the fsc structure. */
 static inline void
 clear_fsc(void) {
-  if (fsc.args) {
-    free(fsc.args);
-  }
+  free(fsc.args);
   if (fsc.s_args) {
     int i;
     for (i = 0; i < fsc.nargs; i++)
-      if (fsc.s_args[i])
-	free(fsc.s_args[i]);
+      free(fsc.s_args[i]);
     free(fsc.s_args);
   }
   memset(&fsc, 0, sizeof(fsc));
@@ -114,6 +111,7 @@ x86_64_syscall_entry(struct trussinfo *trussinfo, int nargs) {
   struct reg regs = { .r_err = 0 };
   int syscall_num;
   int i, reg;
+  int is_xsyscall;
   struct syscall *sc;
 
   if (fd == -1 || trussinfo->pid != cpid) {
@@ -130,8 +128,7 @@ x86_64_syscall_entry(struct trussinfo *trussinfo, int nargs) {
   }
 
   clear_fsc();
-  lseek(fd, 0L, 0);
-  i = read(fd, &regs, sizeof(regs));
+  i = pread(fd, &regs, sizeof(regs), 0L);
 
   /*
    * FreeBSD has two special kinds of system call redirctions --
@@ -140,9 +137,11 @@ x86_64_syscall_entry(struct trussinfo *trussinfo, int nargs) {
    */
   reg = 0;
   syscall_num = regs.r_rax;
+  is_xsyscall = 0;
   switch (syscall_num) {
   case SYS_syscall:
   case SYS___syscall:
+    is_xsyscall = 1;
     syscall_num = regs.r_rdi;
     reg++;
     break;
@@ -155,8 +154,25 @@ x86_64_syscall_entry(struct trussinfo *trussinfo, int nargs) {
     fprintf(trussinfo->outfile, "-- UNKNOWN SYSCALL %d --\n", syscall_num);
   }
 
-  if (nargs == 0)
+  sc = fsc.name ? get_syscall(fsc.name) : NULL;
+  if (sc) {
+    fsc.nargs = sc->nargs;
+  } else {
+#ifdef DEBUG
+    fprintf(trussinfo->outfile, "unknown syscall %s -- setting args to %d\n",
+	   fsc.name, nargs);
+#endif
+    fsc.nargs = nargs;
+  }
+
+  if (is_xsyscall) {
+    /* We need to figure out nargs ourselves in case of xsyscall() for now. */
+    if (nargs == 0)
+      nargs = fsc.nargs;
+  }
+  if (nargs == 0) {
     return;
+  }
 
   fsc.args = malloc((1+nargs) * sizeof(unsigned long));
   for (i = 0; i < nargs && reg < 6; i++, reg++) {
@@ -170,24 +186,14 @@ x86_64_syscall_entry(struct trussinfo *trussinfo, int nargs) {
     }
   }
   if (nargs > i) {
-    lseek(Procfd, regs.r_rsp + sizeof(register_t), SEEK_SET);
-    if (read(Procfd, &fsc.args[i], (nargs-i) * sizeof(register_t)) == -1)
+    if (pread(Procfd, &fsc.args[i], (nargs-i) * sizeof(register_t),
+	      regs.r_rsp + 2*sizeof(register_t)) == -1) {
+      free(fsc.args);
       return;
+    }
   }
 
-  sc = fsc.name ? get_syscall(fsc.name) : NULL;
-  if (sc) {
-    fsc.nargs = sc->nargs;
-  } else {
-#ifdef DEBUG
-    fprintf(trussinfo->trussinfo->outfile, "unknown syscall %s -- setting args to %d\n",
-	   fsc.name, nargs);
-#endif
-    fsc.nargs = nargs;
-  }
-
-  fsc.s_args = malloc((1+fsc.nargs) * sizeof(char*));
-  memset(fsc.s_args, 0, fsc.nargs * sizeof(char*));
+  fsc.s_args = calloc(1+fsc.nargs, sizeof(char*));
   fsc.sc = sc;
 
   /*
@@ -205,7 +211,7 @@ x86_64_syscall_entry(struct trussinfo *trussinfo, int nargs) {
 #endif
     for (i = 0; i < fsc.nargs; i++) {
 #ifdef DEBUG
-      fprintf(stderr, "0x%x%s",
+      fprintf(stderr, "0x%lx%s",
 	     sc
 	     ? fsc.args[sc->args[i].offset]
 	     : fsc.args[i],
@@ -221,7 +227,7 @@ x86_64_syscall_entry(struct trussinfo *trussinfo, int nargs) {
   }
 
 #ifdef DEBUG
-  fprintf(trussinfo->trussinfo->outfile, "\n");
+  fprintf(trussinfo->outfile, "\n");
 #endif
 
   /*
@@ -235,6 +241,9 @@ x86_64_syscall_entry(struct trussinfo *trussinfo, int nargs) {
       (!strcmp(fsc.name, "execve") || !strcmp(fsc.name, "exit"))) {
     print_syscall(trussinfo, fsc.name, fsc.nargs, fsc.s_args);
   }
+
+  if (sc != NULL && sc->ret_type == 0)
+    fprintf(trussinfo->outfile, "\n");
 
   return;
 }
@@ -271,8 +280,7 @@ x86_64_syscall_exit(struct trussinfo *trussinfo, int syscall_num __unused) {
     cpid = trussinfo->pid;
   }
 
-  lseek(fd, 0L, 0);
-  if (read(fd, &regs, sizeof(regs)) != sizeof(regs)) {
+  if (pread(fd, &regs, sizeof(regs), 0L) != sizeof(regs)) {
 	  fprintf(trussinfo->outfile, "\n");
 	  return 0;
   }
@@ -286,10 +294,8 @@ x86_64_syscall_exit(struct trussinfo *trussinfo, int syscall_num __unused) {
 
   sc = fsc.sc;
   if (!sc) {
-    for (i = 0; i < fsc.nargs; i++) {
-      fsc.s_args[i] = malloc(12);
-      sprintf(fsc.s_args[i], "0x%lx", fsc.args[i]);
-    }
+    for (i = 0; i < fsc.nargs; i++)
+      asprintf(&fsc.s_args[i], "0x%lx", fsc.args[i]);
   } else {
     /*
      * Here, we only look for arguments that have OUT masked in --
@@ -303,8 +309,7 @@ x86_64_syscall_exit(struct trussinfo *trussinfo, int syscall_num __unused) {
 	 * it may not be valid.
 	 */
 	if (errorp) {
-	  temp = malloc(12);
-	  sprintf(temp, "0x%lx", fsc.args[sc->args[i].offset]);
+	  asprintf(&temp, "0x%lx", fsc.args[sc->args[i].offset]);
 	} else {
 	  temp = print_arg(Procfd, &sc->args[i], fsc.args);
 	}

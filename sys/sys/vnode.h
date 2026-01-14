@@ -96,7 +96,7 @@ struct mountctl_opt {
 };
 
 /*
- * The vnode infrastructure is being reorgranized.  Most reference-related
+ * The vnode infrastructure is being reorganized.  Most reference-related
  * fields are locked by the BGL, and most file I/O related operations and
  * vnode teardown functions are locked by the vnode lock.
  *
@@ -535,6 +535,7 @@ int	vop_stdnoread(struct vop_read_args *ap);
 int	vop_stdnowrite(struct vop_write_args *ap);
 int	vop_stdpathconf (struct vop_pathconf_args *ap);
 int	vop_stdfdatasync(struct vop_fdatasync_args *ap);
+int	vop_stdioctl(struct vop_ioctl_args *);
 int	vop_eopnotsupp (struct vop_generic_args *ap);
 int	vop_ebadf (struct vop_generic_args *ap);
 int	vop_einval (struct vop_generic_args *ap);
@@ -593,6 +594,11 @@ void	vn_syncer_thr_create(struct mount *);
 void	vn_syncer_thr_stop(struct mount *);
 void	vn_syncer_one(struct mount *);
 long	vn_syncer_count(struct mount *);
+
+int	vn_bmap_seekhole_locked(struct vnode *vp, u_long cmd, off_t *off,
+	    struct ucred *cred);
+int	vn_bmap_seekhole(struct vnode *vp, u_long cmd, off_t *off,
+	    struct ucred *cred);
 
 u_quad_t init_va_filerev(void);
 

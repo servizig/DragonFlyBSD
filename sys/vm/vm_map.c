@@ -160,6 +160,15 @@ __read_mostly static int vm_map_backing_shadow_test = 1;
 SYSCTL_INT(_vm, OID_AUTO, map_backing_shadow_test, CTLFLAG_RW,
 	   &vm_map_backing_shadow_test, 0, "ba.object shadow test");
 
+/* VPAGETABLE debugging counters */
+static long vpagetable_setmap_count = 0;
+SYSCTL_LONG(_vm, OID_AUTO, vpagetable_setmap, CTLFLAG_RW,
+	    &vpagetable_setmap_count, 0, "Number of MADV_SETMAP calls");
+static long vpagetable_inval_count = 0;
+SYSCTL_LONG(_vm, OID_AUTO, vpagetable_inval, CTLFLAG_RW,
+	    &vpagetable_inval_count, 0, "Number of MADV_INVAL calls");
+extern int debug_vpagetable;
+
 static void vmspace_drop_notoken(struct vmspace *vm);
 static void vm_map_entry_shadow(vm_map_entry_t entry);
 static vm_map_entry_t vm_map_entry_create(int *);
@@ -176,7 +185,7 @@ static void vm_map_backing_detach (vm_map_entry_t entry, vm_map_backing_t ba);
 static void _vm_map_clip_end (vm_map_t, vm_map_entry_t, vm_offset_t, int *);
 static void _vm_map_clip_start (vm_map_t, vm_map_entry_t, vm_offset_t, int *);
 static void vm_map_entry_delete (vm_map_t, vm_map_entry_t, int *);
-static void vm_map_entry_unwire (vm_map_t, vm_map_entry_t);
+static void vm_map_entry_unwire_all (vm_map_t, vm_map_entry_t);
 static void vm_map_copy_entry (vm_map_t, vm_map_t, vm_map_entry_t,
 		vm_map_entry_t);
 static void vm_map_unclip_range (vm_map_t map, vm_map_entry_t start_entry,
@@ -481,16 +490,15 @@ vmspace_terminate(struct vmspace *vm, int final)
 		 * Get rid of most of the resources.  Leave the kernel pmap
 		 * intact.
 		 *
-		 * If the pmap does not contain wired pages we can bulk-delete
-		 * the pmap as a performance optimization before removing the
-		 * related mappings.
-		 *
-		 * If the pmap contains wired pages we cannot do this
-		 * pre-optimization because currently vm_fault_unwire()
-		 * expects the pmap pages to exist and will not decrement
-		 * p->wire_count if they do not.
+		 * We can bulk-delete the pmap as a performance optimization
+		 * before removing the related mappings.
 		 */
 		shmexit(vm);
+		pmap_remove_pages(vmspace_pmap(vm), VM_MIN_USER_ADDRESS,
+				  VM_MAX_USER_ADDRESS);
+		vm_map_remove(&vm->vm_map, VM_MIN_USER_ADDRESS,
+			      VM_MAX_USER_ADDRESS);
+#if 0
 		if (vmspace_pmap(vm)->pm_stats.wired_count) {
 			vm_map_remove(&vm->vm_map, VM_MIN_USER_ADDRESS,
 				      VM_MAX_USER_ADDRESS);
@@ -502,6 +510,7 @@ vmspace_terminate(struct vmspace *vm, int final)
 			vm_map_remove(&vm->vm_map, VM_MIN_USER_ADDRESS,
 				      VM_MAX_USER_ADDRESS);
 		}
+#endif
 		lwkt_reltoken(&vm->vm_map.token);
 	} else {
 		KKASSERT((vm->vm_flags & VMSPACE_EXIT1) != 0);
@@ -557,6 +566,7 @@ vmspace_swap_count(struct vmspace *vm)
 	RB_FOREACH(cur, vm_map_rb_tree, &map->rb_root) {
 		switch(cur->maptype) {
 		case VM_MAPTYPE_NORMAL:
+		case VM_MAPTYPE_VPAGETABLE:
 			if ((object = cur->ba.object) == NULL)
 				break;
 			if (object->swblock_count) {
@@ -593,6 +603,7 @@ vmspace_anonymous_count(struct vmspace *vm)
 	RB_FOREACH(cur, vm_map_rb_tree, &map->rb_root) {
 		switch(cur->maptype) {
 		case VM_MAPTYPE_NORMAL:
+		case VM_MAPTYPE_VPAGETABLE:
 			if ((object = cur->ba.object) == NULL)
 				break;
 			if (object->type != OBJT_DEFAULT &&
@@ -1044,6 +1055,7 @@ vm_map_backing_attach(vm_map_entry_t entry, vm_map_backing_t ba)
 	vm_object_t obj;
 
 	switch(entry->maptype) {
+	case VM_MAPTYPE_VPAGETABLE:
 	case VM_MAPTYPE_NORMAL:
 		obj = ba->object;
 		lockmgr(&obj->backing_lk, LK_EXCLUSIVE);
@@ -1062,6 +1074,7 @@ vm_map_backing_detach(vm_map_entry_t entry, vm_map_backing_t ba)
 	vm_object_t obj;
 
 	switch(entry->maptype) {
+	case VM_MAPTYPE_VPAGETABLE:
 	case VM_MAPTYPE_NORMAL:
 		obj = ba->object;
 		lockmgr(&obj->backing_lk, LK_EXCLUSIVE);
@@ -1115,6 +1128,7 @@ vm_map_entry_dispose(vm_map_t map, vm_map_entry_t entry, int *countp)
 	 */
 	switch(entry->maptype) {
 	case VM_MAPTYPE_NORMAL:
+	case VM_MAPTYPE_VPAGETABLE:
 		if (entry->ba.map_object) {
 			vm_map_backing_detach(entry, &entry->ba);
 			vm_object_deallocate(entry->ba.object);
@@ -1283,23 +1297,26 @@ vm_map_insert(vm_map_t map, int *countp,
 
 	protoeflags = 0;
 
-	if (cow & MAP_COPY_ON_WRITE)
+	if (cow & COWF_COPY_ON_WRITE)
 		protoeflags |= MAP_ENTRY_COW|MAP_ENTRY_NEEDS_COPY;
 
-	if (cow & MAP_NOFAULT) {
+	if (cow & COWF_NOFAULT) {
 		protoeflags |= MAP_ENTRY_NOFAULT;
 
 		KASSERT(object == NULL,
-			("vm_map_insert: paradoxical MAP_NOFAULT request"));
+			("vm_map_insert: paradoxical NOFAULT request"));
 	}
-	if (cow & MAP_DISABLE_SYNCER)
+	if (cow & COWF_DISABLE_SYNCER)
 		protoeflags |= MAP_ENTRY_NOSYNC;
-	if (cow & MAP_DISABLE_COREDUMP)
+	if (cow & COWF_DISABLE_COREDUMP)
 		protoeflags |= MAP_ENTRY_NOCOREDUMP;
-	if (cow & MAP_IS_STACK)
+	if (cow & COWF_IS_STACK)
 		protoeflags |= MAP_ENTRY_STACK;
-	if (cow & MAP_IS_KSTACK)
+	if (cow & COWF_IS_KSTACK)
 		protoeflags |= MAP_ENTRY_KSTACK;
+
+	if (maptype == VM_MAPTYPE_VPAGETABLE)
+		protoeflags |= MAP_ENTRY_VPAGETABLE_WIRED;
 
 	lwkt_gettoken(&map->token);
 
@@ -1378,10 +1395,18 @@ vm_map_insert(vm_map_t map, int *countp,
 	new_entry->ba.flags = 0;
 	new_entry->ba.pmap = map->pmap;
 
+	if (protoeflags & MAP_ENTRY_VPAGETABLE_WIRED)
+		new_entry->ba.flags |= VM_MAP_BACK_VPAGETABLE;
+
 	new_entry->inheritance = VM_INHERIT_DEFAULT;
 	new_entry->protection = prot;
 	new_entry->max_protection = max;
-	new_entry->wired_count = 0;
+	if (protoeflags & MAP_ENTRY_VPAGETABLE_WIRED)
+		new_entry->wired_count = 1;
+	else
+		new_entry->wired_count = 0;
+	if (protoeflags & MAP_ENTRY_USER_WIRED)
+		++new_entry->wired_count;
 
 	/*
 	 * Insert the new entry into the list
@@ -1411,10 +1436,12 @@ vm_map_insert(vm_map_t map, int *countp,
 	 * page tables cannot be prepopulated without a lot of work, so
 	 * don't try.
 	 */
-	if ((cow & (MAP_PREFAULT|MAP_PREFAULT_PARTIAL)) &&
-	    maptype != VM_MAPTYPE_UKSMAP) {
+	if ((cow & (COWF_PREFAULT | COWF_PREFAULT_PARTIAL)) &&
+	    maptype != VM_MAPTYPE_VPAGETABLE &&
+	    maptype != VM_MAPTYPE_UKSMAP)
+    {
 		int dorelock = 0;
-		if (vm_map_relock_enable && (cow & MAP_PREFAULT_RELOCK)) {
+		if (vm_map_relock_enable && (cow & COWF_PREFAULT_RELOCK)) {
 			dorelock = 1;
 			vm_object_lock_swap();
 			vm_object_drop(object);
@@ -1422,7 +1449,7 @@ vm_map_insert(vm_map_t map, int *countp,
 		pmap_object_init_pt(map->pmap, new_entry,
 				    new_entry->ba.start,
 				    new_entry->ba.end - new_entry->ba.start,
-				    cow & MAP_PREFAULT_PARTIAL);
+				    cow & COWF_PREFAULT_PARTIAL);
 		if (dorelock) {
 			vm_object_hold(object);
 			vm_object_lock_swap();
@@ -1439,7 +1466,7 @@ vm_map_insert(vm_map_t map, int *countp,
  * Find sufficient space for `length' bytes in the given map, starting at
  * `start'.  Returns 0 on success, 1 on no space.
  *
- * This function will returned an arbitrarily aligned pointer.  If no
+ * This function will return an arbitrarily aligned pointer.  If no
  * particular alignment is required you should pass align as 1.  Note that
  * the map may return PAGE_SIZE aligned pointers if all the lengths used in
  * the map are a multiple of PAGE_SIZE, even if you pass a smaller align
@@ -1477,10 +1504,16 @@ vm_map_findspace(vm_map_t map, vm_offset_t start, vm_size_t length,
 	/*
 	 * Use freehint to adjust the start point, hopefully reducing
 	 * the iteration to O(1).
+	 *
+	 * NOTE: The freehint array is not ordered and does not guarantee
+	 *	 that the minimum free address hole will be returned, so
+	 *	 do not use the shortcut for MAP_32BIT.
 	 */
-	hole_start = vm_map_freehint_find(map, length, align);
-	if (start < hole_start)
-		start = hole_start;
+	if ((flags & MAP_32BIT) == 0) {
+		hole_start = vm_map_freehint_find(map, length, align);
+		if (start < hole_start)
+			start = hole_start;
+	}
 	if (vm_map_lookup_entry(map, start, &tmp))
 		start = tmp->ba.end;
 	entry = tmp;	/* may be NULL */
@@ -1511,6 +1544,8 @@ vm_map_findspace(vm_map_t map, vm_offset_t start, vm_size_t length,
 		 */
 		end = start + length;
 		if (end > vm_map_max(map) || end < start)
+			return (1);
+		if ((flags & MAP_32BIT) && end > 0x100000000L)
 			return (1);
 
 		/*
@@ -1593,6 +1628,12 @@ vm_map_find(vm_map_t map, void *map_object, void *map_aux,
 	void *aux_info;
 	int result;
 	int count;
+	int flags;
+
+	/*
+	 * Translate cow flags to mmap flags.  A bit of a hack.
+	 */
+	flags = (cow & COWF_32BIT) ? MAP_32BIT : 0;
 
 	/*
 	 * Certain UKSMAPs may need aux_info.
@@ -1635,7 +1676,7 @@ vm_map_find(vm_map_t map, void *map_object, void *map_aux,
 	if (object)
 		vm_object_hold_shared(object);
 	if (fitit) {
-		if (vm_map_findspace(map, start, length, align, 0, addr)) {
+		if (vm_map_findspace(map, start, length, align, flags, addr)) {
 			if (object)
 				vm_object_drop(object);
 			vm_map_unlock(map);
@@ -1718,7 +1759,7 @@ vm_map_simplify_entry(vm_map_t map, vm_map_entry_t entry, int *countp)
 		if ((entry->ba.end == next->ba.start) &&
 		    (next->maptype == entry->maptype) &&
 		    (next->ba.object == entry->ba.object) &&
-		     (prev->ba.backing_ba == entry->ba.backing_ba) &&
+		     (next->ba.backing_ba == entry->ba.backing_ba) &&
 		     (!entry->ba.object ||
 			(entry->ba.offset + esize == next->ba.offset)) &&
 		    (next->eflags == entry->eflags) &&
@@ -2170,7 +2211,8 @@ vm_map_protect(vm_map_t map, vm_offset_t start, vm_offset_t end,
 		 */
 		if (new_prot & PROT_WRITE &&
 		    (current->eflags & MAP_ENTRY_NEEDS_COPY) == 0 &&
-		    current->maptype == VM_MAPTYPE_NORMAL &&
+		    (current->maptype == VM_MAPTYPE_NORMAL ||
+		     current->maptype == VM_MAPTYPE_VPAGETABLE) &&
 		    current->ba.object &&
 		    current->ba.object->type == OBJT_VNODE) {
 			struct vnode *vp;
@@ -2335,13 +2377,32 @@ vm_map_madvise(vm_map_t map, vm_offset_t start, vm_offset_t end,
 			case MADV_SETMAP:
 				/*
 				 * Set the page directory page for a map
-				 * governed by a virtual page table.
+				 * governed by a virtual page table.  Mark
+				 * the entry as being governed by a virtual
+				 * page table if it is not.
 				 *
-				 * Software virtual page table support has
-				 * been removed, this MADV is no longer
-				 * supported.
+				 * XXX the page directory page is stored
+				 * in the avail_ssize field if the map_entry.
+				 *
+				 * XXX the map simplification code does not
+				 * compare this field so weird things may
+				 * happen if you do not apply this function
+				 * to the entire mapping governed by the
+				 * virtual page table.
 				 */
-				error = EINVAL;
+				if (current->maptype != VM_MAPTYPE_VPAGETABLE) {
+					error = EINVAL;
+					break;
+				}
+				++vpagetable_setmap_count;
+				if (debug_vpagetable) {
+					kprintf("MADV_SETMAP: start=%lx end=%lx pde=%lx pid=%d\n",
+						current->ba.start, current->ba.end, value,
+						(curproc ? curproc->p_pid : -1));
+				}
+				current->aux.master_pde = value;
+				pmap_remove(map->pmap,
+					    current->ba.start, current->ba.end);
 				break;
 			case MADV_INVAL:
 				/*
@@ -2354,6 +2415,12 @@ vm_map_madvise(vm_map_t map, vm_offset_t start, vm_offset_t end,
 				 * (exclusive locked map version does not
 				 * need the range interlock).
 				 */
+				++vpagetable_inval_count;
+				if (debug_vpagetable) {
+					kprintf("MADV_INVAL: start=%lx end=%lx pid=%d\n",
+						current->ba.start, current->ba.end,
+						(curproc ? curproc->p_pid : -1));
+				}
 				pmap_remove(map->pmap,
 					    current->ba.start, current->ba.end);
 				break;
@@ -2375,7 +2442,9 @@ vm_map_madvise(vm_map_t map, vm_offset_t start, vm_offset_t end,
 		 * Since we don't clip the vm_map_entry, we have to clip
 		 * the vm_object pindex and count.
 		 *
-		 * NOTE!  These functions are only supported on normal maps.
+		 * NOTE!  These functions are only supported on normal maps,
+		 *	  except MADV_INVAL which is also supported on
+		 *	  virtual page tables.
 		 *
 		 * NOTE!  These functions only apply to the top-most object.
 		 *	  It is not applicable to backing objects.
@@ -2385,8 +2454,11 @@ vm_map_madvise(vm_map_t map, vm_offset_t start, vm_offset_t end,
 		     current = vm_map_rb_tree_RB_NEXT(current)) {
 			vm_offset_t useStart;
 
-			if (current->maptype != VM_MAPTYPE_NORMAL)
+			if (current->maptype != VM_MAPTYPE_NORMAL &&
+			    (current->maptype != VM_MAPTYPE_VPAGETABLE ||
+			     behav != MADV_INVAL)) {
 				continue;
+			}
 
 			pindex = OFF_TO_IDX(current->ba.offset);
 			delta = atop(current->ba.end - current->ba.start);
@@ -2442,7 +2514,7 @@ vm_map_madvise(vm_map_t map, vm_offset_t start, vm_offset_t end,
 				    map->pmap, current,
 				    useStart,
 				    (delta << PAGE_SHIFT),
-				    MAP_PREFAULT_MADVISE
+				    COWF_PREFAULT_MADVISE
 				);
 			}
 		}
@@ -2556,7 +2628,8 @@ vm_map_user_wiring(vm_map_t map, vm_offset_t start, vm_offset_t real_end,
 			 * management structures and the faulting in of the
 			 * page.
 			 */
-			if (entry->maptype == VM_MAPTYPE_NORMAL) {
+			if (entry->maptype == VM_MAPTYPE_NORMAL ||
+			    entry->maptype == VM_MAPTYPE_VPAGETABLE) {
 				int copyflag = entry->eflags &
 					       MAP_ENTRY_NEEDS_COPY;
 				if (copyflag && ((entry->protection &
@@ -2582,9 +2655,10 @@ vm_map_user_wiring(vm_map_t map, vm_offset_t start, vm_offset_t real_end,
 			if (rv) {
 				CLIP_CHECK_BACK(entry, save_start);
 				for (;;) {
-					KASSERT(entry->wired_count == 1, ("bad wired_count on entry"));
+					KASSERT(entry->wired_count >= 1,
+						("bad wired_count on entry"));
 					entry->eflags &= ~MAP_ENTRY_USER_WIRED;
-					entry->wired_count = 0;
+					--entry->wired_count;
 					if (entry->ba.end == save_end)
 						break;
 					entry = vm_map_rb_tree_RB_NEXT(entry);
@@ -2660,9 +2734,7 @@ vm_map_user_wiring(vm_map_t map, vm_offset_t start, vm_offset_t real_end,
 			KASSERT(entry->eflags & MAP_ENTRY_USER_WIRED,
 				("expected USER_WIRED on entry %p", entry));
 			entry->eflags &= ~MAP_ENTRY_USER_WIRED;
-			entry->wired_count--;
-			if (entry->wired_count == 0)
-				vm_fault_unwire(map, entry);
+			vm_fault_unwire(map, entry);
 			entry = vm_map_rb_tree_RB_NEXT(entry);
 		}
 	}
@@ -2759,7 +2831,8 @@ vm_map_kernel_wiring(vm_map_t map, vm_offset_t start,
 			 * do not have to do this for entries that point to sub
 			 * maps because we won't hold the lock on the sub map.
 			 */
-			if (entry->maptype == VM_MAPTYPE_NORMAL) {
+			if (entry->maptype == VM_MAPTYPE_NORMAL ||
+			    entry->maptype == VM_MAPTYPE_VPAGETABLE) {
 				int copyflag = entry->eflags &
 					       MAP_ENTRY_NEEDS_COPY;
 				if (copyflag && ((entry->protection &
@@ -2867,9 +2940,7 @@ vm_map_kernel_wiring(vm_map_t map, vm_offset_t start,
 		 */
 		entry = start_entry;
 		while (entry && entry->ba.start < end) {
-			entry->wired_count--;
-			if (entry->wired_count == 0)
-				vm_fault_unwire(map, entry);
+			vm_fault_unwire(map, entry);
 			entry = vm_map_rb_tree_RB_NEXT(entry);
 		}
 	}
@@ -2904,7 +2975,7 @@ vm_map_set_wired_quick(vm_map_t map, vm_offset_t addr, vm_size_t size,
 	scan = entry;
 	while (scan && scan->ba.start < addr + size) {
 		KKASSERT(scan->wired_count == 0);
-		scan->wired_count = 1;
+		++scan->wired_count;
 		scan = vm_map_rb_tree_RB_NEXT(scan);
 	}
 	vm_map_unclip_range(map, entry, addr, addr + size,
@@ -3001,6 +3072,7 @@ vm_map_clean(vm_map_t map, vm_offset_t start, vm_offset_t end,
 			break;
 		}
 		case VM_MAPTYPE_NORMAL:
+		case VM_MAPTYPE_VPAGETABLE:
 			ba = &current->ba;
 			break;
 		default:
@@ -3111,16 +3183,24 @@ vm_map_clean(vm_map_t map, vm_offset_t start, vm_offset_t end,
 }
 
 /*
- * Make the region specified by this entry pageable.
+ * Make the region specified by this entry pageable.  Used during
+ * vm_map_entry destruction.
  *
  * The vm_map must be exclusively locked.
  */
 static void 
-vm_map_entry_unwire(vm_map_t map, vm_map_entry_t entry)
+vm_map_entry_unwire_all(vm_map_t map, vm_map_entry_t entry)
 {
-	entry->eflags &= ~MAP_ENTRY_USER_WIRED;
-	entry->wired_count = 0;
-	vm_fault_unwire(map, entry);
+	if (entry->eflags & MAP_ENTRY_USER_WIRED) {
+		entry->eflags &= ~MAP_ENTRY_USER_WIRED;
+		vm_fault_unwire(map, entry);
+	}
+	if (entry->eflags & MAP_ENTRY_VPAGETABLE_WIRED) {
+		entry->eflags &= ~MAP_ENTRY_VPAGETABLE_WIRED;
+		vm_fault_unwire(map, entry);
+	}
+	while (entry->wired_count)
+		vm_fault_unwire(map, entry);
 }
 
 /*
@@ -3218,6 +3298,7 @@ again:
 
 		switch(entry->maptype) {
 		case VM_MAPTYPE_NORMAL:
+		case VM_MAPTYPE_VPAGETABLE:
 		case VM_MAPTYPE_SUBMAP:
 			object = entry->ba.object;
 			break;
@@ -3236,8 +3317,8 @@ again:
 		 * to not blindly iterate the range when pt and pd pages
 		 * are missing.
 		 */
-		if (entry->wired_count != 0)
-			vm_map_entry_unwire(map, entry);
+		if (entry->wired_count)
+			vm_map_entry_unwire_all(map, entry);
 
 		offidxend = offidxstart + count;
 
@@ -3423,6 +3504,7 @@ vm_map_backing_replicated(vm_map_t map, vm_map_entry_t entry, int flags)
 
 		if (ba->map_object) {
 			switch(entry->maptype) {
+			case VM_MAPTYPE_VPAGETABLE:
 			case VM_MAPTYPE_NORMAL:
 				object = ba->object;
 				if (ba != &entry->ba ||
@@ -3466,7 +3548,8 @@ vm_map_backing_adjust_start(vm_map_entry_t entry, vm_ooffset_t start)
 {
 	vm_map_backing_t ba;
 
-	if (entry->maptype == VM_MAPTYPE_NORMAL) {
+	if (entry->maptype == VM_MAPTYPE_NORMAL ||
+	    entry->maptype == VM_MAPTYPE_VPAGETABLE) {
 		for (ba = &entry->ba; ba; ba = ba->backing_ba) {
 			if (ba->object) {
 				lockmgr(&ba->object->backing_lk, LK_EXCLUSIVE);
@@ -3489,7 +3572,8 @@ vm_map_backing_adjust_end(vm_map_entry_t entry, vm_ooffset_t end)
 {
 	vm_map_backing_t ba;
 
-	if (entry->maptype == VM_MAPTYPE_NORMAL) {
+	if (entry->maptype == VM_MAPTYPE_NORMAL ||
+	    entry->maptype == VM_MAPTYPE_VPAGETABLE) {
 		for (ba = &entry->ba; ba; ba = ba->backing_ba) {
 			if (ba->object) {
 				lockmgr(&ba->object->backing_lk, LK_EXCLUSIVE);
@@ -3518,7 +3602,8 @@ vm_map_copy_entry(vm_map_t src_map, vm_map_t dst_map,
 {
 	vm_object_t obj;
 
-	KKASSERT(dst_entry->maptype == VM_MAPTYPE_NORMAL);
+	KKASSERT(dst_entry->maptype == VM_MAPTYPE_NORMAL ||
+		 dst_entry->maptype == VM_MAPTYPE_VPAGETABLE);
 
 	if (src_entry->wired_count) {
 		/*
@@ -3648,6 +3733,7 @@ vmspace_fork(struct vmspace *vm1, struct proc *p2, struct lwp *lp2)
 						  old_entry, &count);
 			break;
 		case VM_MAPTYPE_NORMAL:
+		case VM_MAPTYPE_VPAGETABLE:
 			vmspace_fork_normal_entry(old_map, new_map,
 						  old_entry, &count);
 			break;
@@ -3753,7 +3839,10 @@ vmspace_fork_normal_entry(vm_map_t old_map, vm_map_t new_map,
 		*new_entry = *old_entry;
 
 		new_entry->eflags &= ~MAP_ENTRY_USER_WIRED;
-		new_entry->wired_count = 0;
+		if (new_entry->eflags & MAP_ENTRY_VPAGETABLE_WIRED)
+			new_entry->wired_count = 1;
+		else
+			new_entry->wired_count = 0;
 
 		/*
 		 * Replicate and index the vm_map_backing.  Don't share
@@ -3785,7 +3874,10 @@ vmspace_fork_normal_entry(vm_map_t old_map, vm_map_t new_map,
 		*new_entry = *old_entry;
 
 		new_entry->eflags &= ~MAP_ENTRY_USER_WIRED;
-		new_entry->wired_count = 0;
+		if (new_entry->eflags & MAP_ENTRY_VPAGETABLE_WIRED)
+			new_entry->wired_count = 1;
+		else
+			new_entry->wired_count = 0;
 
 		vm_map_backing_replicated(new_map, new_entry, 0);
 		vm_map_entry_link(new_map, new_entry);
@@ -3840,7 +3932,10 @@ vmspace_fork_uksmap_entry(struct proc *p2, struct lwp *lp2,
 	*new_entry = *old_entry;
 
 	new_entry->eflags &= ~MAP_ENTRY_USER_WIRED;
-	new_entry->wired_count = 0;
+	if (new_entry->eflags & MAP_ENTRY_VPAGETABLE_WIRED)
+		new_entry->wired_count = 1;
+	else
+		new_entry->wired_count = 0;
 	KKASSERT(new_entry->ba.backing_ba == NULL);
 
 	if (new_entry->aux.dev) {
@@ -3889,7 +3984,7 @@ vm_map_stack (vm_map_t map, vm_offset_t *addrbos, vm_size_t max_ssize,
 	int		count;
 	vm_offset_t	tmpaddr;
 
-	cow |= MAP_IS_STACK;
+	cow |= COWF_IS_STACK;
 
 	if (max_ssize < sgrowsiz)
 		init_ssize = max_ssize;
@@ -4266,7 +4361,7 @@ vmspace_unshare(struct proc *p)
  * No requirements.
  */
 vm_offset_t
-vm_map_hint(struct proc *p, vm_offset_t addr, vm_prot_t prot)
+vm_map_hint(struct proc *p, vm_offset_t addr, vm_prot_t prot, int flags)
 {
 	struct vmspace *vms = p->p_vmspace;
 	struct rlimit limit;
@@ -4280,6 +4375,14 @@ vm_map_hint(struct proc *p, vm_offset_t addr, vm_prot_t prot)
 		limit.rlim_cur = maxdsiz;
 	dsiz = limit.rlim_cur;
 
+	/*
+	 * dsiz usually exceeds 4GB (default is 32GB).  If requesting
+	 * a 32-bit address space, adjust it down to one page.
+	 */
+	if ((flags & MAP_32BIT) && dsiz > PAGE_SIZE) {
+		dsiz = PAGE_SIZE;
+	}
+
 	if (!randomize_mmap || addr != 0) {
 		/*
 		 * Set a reasonable start point for the hint if it was
@@ -4288,7 +4391,8 @@ vm_map_hint(struct proc *p, vm_offset_t addr, vm_prot_t prot)
 		 */
 		if (addr == 0 ||
 		    (addr >= round_page((vm_offset_t)vms->vm_taddr) &&
-		     addr < round_page((vm_offset_t)vms->vm_daddr + dsiz))) {
+		     addr < round_page((vm_offset_t)vms->vm_daddr + dsiz)))
+		{
 			addr = round_page((vm_offset_t)vms->vm_daddr + dsiz);
 		}
 
@@ -4420,8 +4524,9 @@ RetryLookup:
 	}
 
 	/*
-	 * Flag regular pages that are supposed to be wired.  Remove prior
-	 * semantics that disallowed protection changes for such pages.
+	 * Flag regular pages that are supposed to be wired.  Wired pages
+	 * are just like regular pages and simply prevent the pageout code
+	 * from operating on them.
 	 *
 	 * The prior semantics are not used by modern systems.  Applications
 	 * do not assume an inability to change protection modes and may
@@ -4432,12 +4537,8 @@ RetryLookup:
 	 * or fork() may still cause page faults on the locked memory.
 	 */
 	*wflags = 0;
-	if (entry->wired_count) {
+	if (entry->wired_count)
 		*wflags |= FW_WIRED;
-#if 0
-		prot = fault_type = entry->protection;
-#endif
-	}
 
 	if (curthread->td_lwp && curthread->td_lwp->lwp_vmspace &&
 	    pmap_emulate_ad_bits(&curthread->td_lwp->lwp_vmspace->vm_pmap)) {
@@ -4446,9 +4547,10 @@ RetryLookup:
 	}
 
 	/*
-	 * Only NORMAL maps are object-based.  UKSMAPs are not.
+	 * Only NORMAL and VPAGETABLE maps are object-based.  UKSMAPs are not.
 	 */
-	if (entry->maptype != VM_MAPTYPE_NORMAL) {
+	if (entry->maptype != VM_MAPTYPE_NORMAL &&
+	    entry->maptype != VM_MAPTYPE_VPAGETABLE) {
 		*bap = NULL;
 		goto skip;
 	}

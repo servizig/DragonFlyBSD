@@ -212,8 +212,8 @@ enum libusb_log_level {
 	LIBUSB_LOG_LEVEL_DEBUG
 };
 
-/* 
- * XXX 
+/*
+ * XXX
  * libusb_set_debug should take parameters from libusb_log_level
  * above according to
  *   http://libusb.sourceforge.net/api-1.0/group__lib.html
@@ -247,6 +247,15 @@ struct libusb_hotplug_callback_handle_struct;
 struct libusb_pollfd {
 	int	fd;
 	short	events;
+};
+
+struct libusb_version {
+	const uint16_t major;
+	const uint16_t minor;
+	const uint16_t micro;
+	const uint16_t nano;
+	const char *rc;
+	const char *describe;
 };
 
 typedef struct libusb_context libusb_context;
@@ -399,6 +408,7 @@ typedef struct libusb_transfer {
 /* Library initialisation */
 
 void	libusb_set_debug(libusb_context * ctx, int level);
+const struct libusb_version *libusb_get_version(void);
 const char *libusb_strerror(int code);
 const char *libusb_error_name(int code);
 int	libusb_init(libusb_context ** context);
@@ -409,6 +419,7 @@ void	libusb_exit(struct libusb_context *ctx);
 ssize_t libusb_get_device_list(libusb_context * ctx, libusb_device *** list);
 void	libusb_free_device_list(libusb_device ** list, int unref_devices);
 uint8_t	libusb_get_bus_number(libusb_device * dev);
+uint8_t	libusb_get_port_number(libusb_device * dev);
 int	libusb_get_port_numbers(libusb_device *dev, uint8_t *buf, uint8_t bufsize);
 int	libusb_get_port_path(libusb_context *ctx, libusb_device *dev, uint8_t *buf, uint8_t bufsize);
 uint8_t	libusb_get_device_address(libusb_device * dev);
@@ -434,6 +445,7 @@ int	libusb_get_driver(libusb_device_handle * devh, int interface, char *name, in
 int 	libusb_detach_kernel_driver_np(libusb_device_handle * devh, int interface);
 int 	libusb_detach_kernel_driver(libusb_device_handle * devh, int interface);
 int 	libusb_attach_kernel_driver(libusb_device_handle * devh, int interface);
+int	libusb_set_auto_detach_kernel_driver(libusb_device_handle *dev, int enable);
 int	libusb_set_interface_alt_setting(libusb_device_handle * devh, int interface_number, int alternate_setting);
 
 /* USB Descriptors */

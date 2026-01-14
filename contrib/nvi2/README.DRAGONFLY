@@ -2,11 +2,24 @@ nex/nvi version 2
 =================
 
 Original source can be downloaded from:
-https://github.com/lichray/nvi2/archive
+https://github.com/lichray/nvi2/archive/${file}
 
-file = v2.2.0.tar.gz
-size = 439545
-sha1 = 00606c4ffaa2d3cb7b69ab73722114c59e2d811b
+file = v2.2.2.tar.gz
+date = October 9, 2025
+size = 443425
+sha1 = a875d9622f41bb0ee966e9e30f52c7483b7abe74
 
-A list of files and directories removed is in README.DELETED
-Use "git diff vendor/NVI2 contrib/nvi2" to see local modifications.
+A list of files and directories removed is in README.DELETED.
+
+No local modifications.
+
+Upgrade Notes
+-------------
+1. Configure and generate config files with cmake.
+2. Merge config.h into usr.bin/vi/config.h, and update usr.bin/vi/Makefile
+   accordingly.
+3. For usr.bin/vi/catalog, update Makefile for any catalog changes, and
+   then do "make utf8convert" and "make check".
+4. Do some tests, including:
+   - The vi(1) is building ok within "initrd" and "rescue".
+   - The vi(1) is working well in the rescue boot mode.

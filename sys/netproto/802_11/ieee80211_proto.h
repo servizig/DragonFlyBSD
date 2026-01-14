@@ -156,6 +156,8 @@ struct mbuf *ieee80211_alloc_rts(struct ieee80211com *ic,
 		const uint8_t [IEEE80211_ADDR_LEN], uint16_t);
 struct mbuf *ieee80211_alloc_cts(struct ieee80211com *,
 		const uint8_t [IEEE80211_ADDR_LEN], uint16_t);
+struct mbuf *ieee80211_alloc_prot(struct ieee80211_node *,
+		const struct mbuf *, uint8_t, int);
 
 uint8_t *ieee80211_add_rates(uint8_t *, const struct ieee80211_rateset *);
 uint8_t *ieee80211_add_xrates(uint8_t *, const struct ieee80211_rateset *);
@@ -310,6 +312,22 @@ struct ieee80211_wme_state {
 void	ieee80211_wme_initparams(struct ieee80211vap *);
 void	ieee80211_wme_updateparams(struct ieee80211vap *);
 void	ieee80211_wme_updateparams_locked(struct ieee80211vap *);
+
+/*
+ * Return pointer to the QoS field from a Qos frame.
+ */
+static __inline uint8_t *
+ieee80211_getqos(void *data)
+{
+	struct ieee80211_frame *wh = data;
+
+	KASSERT(IEEE80211_QOS_HAS_SEQ(wh), ("QoS field is absent!"));
+
+	if (IEEE80211_IS_DSTODS(wh))
+		return (((struct ieee80211_qosframe_addr4 *)wh)->i_qos);
+	else
+		return (((struct ieee80211_qosframe *)wh)->i_qos);
+}
 
 /*
  * Return the WME TID from a QoS frame.  If no TID

@@ -28,15 +28,10 @@
  */
 #include "opt_acpi.h"
 #include <sys/param.h>
-#include <sys/bus.h>
 #include <sys/kernel.h>
 #include <sys/module.h>
 #include <sys/sysctl.h>
 #include <sys/systimer.h>
-#include <sys/rman.h>
-
-#include <machine/lock.h>
-#include <bus/pci/pcivar.h>
 
 #include "acpi.h"
 #include "accommon.h"
@@ -52,8 +47,14 @@
 #define _COMPONENT	ACPI_TIMER
 ACPI_MODULE_NAME("TIMER")
 
+#define ACPI_TIMER32_MASK	((1UL << 32) - 1)
+#define ACPI_TIMER32_HIBITS	(~ACPI_TIMER32_MASK)
+#define ACPI_TIMER24_MASK	((1UL << 24) - 1)
+#define ACPI_TIMER24_HIBITS	(~ACPI_TIMER24_MASK)
+
 static device_t			acpi_timer_dev;
-static UINT32			acpi_timer_resolution;
+static uint32_t			acpi_timer_resolution;
+static uint32_t			acpi_timer_offset;
 
 static sysclock_t acpi_timer_get_timecount(void);
 static sysclock_t acpi_timer_get_timecount24(void);
@@ -77,7 +78,6 @@ static int	acpi_timer_identify(driver_t *driver, device_t parent);
 static int	acpi_timer_probe(device_t dev);
 static int	acpi_timer_attach(device_t dev);
 static int	acpi_timer_sysctl_freq(SYSCTL_HANDLER_ARGS);
-
 static int	acpi_timer_test(void);
 
 static device_method_t acpi_timer_methods[] = {
@@ -98,6 +98,38 @@ static driver_t acpi_timer_driver = {
 static devclass_t acpi_timer_devclass;
 DRIVER_MODULE(acpi_timer, acpi, acpi_timer_driver, acpi_timer_devclass, NULL, NULL);
 MODULE_DEPEND(acpi_timer, acpi, 1, 1, 1);
+
+/*
+ * Fetch current time value from hardware that may not correctly
+ * latch the counter.  We need to read until we have three monotonic
+ * samples and then use the middle one, otherwise we are not protected
+ * against the fact that the bits can be wrong in two directions.  If
+ * we only cared about monosity, two reads would be enough.
+ */
+static __always_inline uint32_t
+_acpi_get_timer_safe(void)
+{
+    uint32_t u1, u2, u3;
+
+    AcpiGetTimer(&u2);
+    AcpiGetTimer(&u3);
+    do {
+	u1 = u2;
+	u2 = u3;
+	AcpiGetTimer(&u3);
+    } while (u1 > u2 || u2 > u3);
+
+    return (u2 + acpi_timer_offset);
+}
+
+static __always_inline uint32_t
+_acpi_get_timer(void)
+{
+    uint32_t u1;
+
+    AcpiGetTimer(&u1);
+    return (u1 + acpi_timer_offset);
+}
 
 /*
  * Locate the ACPI timer using the FADT, set up and allocate the I/O resources
@@ -160,6 +192,7 @@ acpi_timer_attach(device_t dev)
     for (i = 0; i < 10; i++)
 	j += acpi_timer_test();
     if (j == 10) {
+	/* Reliable hardware */
 	if (acpi_timer_resolution == 32) {
 	    acpi_cputimer.name = "ACPI-fast";
 	    acpi_cputimer.count = acpi_timer_get_timecount;
@@ -186,31 +219,18 @@ acpi_timer_attach(device_t dev)
 
 /*
  * Construct the timer.  Adjust the base so the system clock does not
- * jump weirdly.
+ * jump weirdly.  We want it to remain monotonic, so setup acpi_timer_offset
+ * such that the low 24 or 32 bits continues sequencing relative to the low
+ * bits of oldclock.
  */
 static void
 acpi_timer_construct(struct cputimer *timer, sysclock_t oldclock)
 {
-    timer->base = 0;
-    timer->base = oldclock - acpi_timer_get_timecount_safe();
+    acpi_timer_offset = 0;
+    acpi_timer_offset = (uint32_t)oldclock - _acpi_get_timer_safe();
+    timer->base = oldclock;
 }
 
-/*
- * Fetch current time value from reliable hardware.
- *
- * The cputimer interface requires a 32 bit return value.  If the ACPI timer
- * is only 24 bits then we have to keep track of the upper 8 bits on our
- * own.
- *
- * per-cpu tracking fields can cause problems on VMs if one or more cpus
- * stalls long-enough for the timer to turn-over twice, so instead optimize
- * the locking case by not updating acpi_cputimer.base until the timer
- * has gone more than 1/16 its full range.
- *
- * These are horrible hacks, but at least the SMP interference is minimal
- * with them.  Note that just reading the ACPI timer itself represents a
- * bottleneck due to the slow I/O.
- */
 static sysclock_t
 acpi_timer_get_timecount24(void)
 {
@@ -220,18 +240,15 @@ acpi_timer_get_timecount24(void)
 
     last_counter = acpi_cputimer.base;
     for (;;) {
-	    cpu_ccfence();
-	    AcpiGetTimer(&counter);
-	    if (counter < (last_counter & 0x00FFFFFFU))
-		next_counter = ((last_counter + 0x01000000U) &
-			        0xFFFFFFFFFF000000LU) | counter;
-	    else
-		next_counter = (last_counter &
-			        0xFFFFFFFFFF000000LU) | counter;
-	    if (atomic_fcmpset_long(&acpi_cputimer.base, &last_counter,
-				    next_counter)) {
-		break;
-	    }
+	cpu_ccfence();
+	counter = _acpi_get_timer() & (uint32_t)ACPI_TIMER24_MASK;
+	next_counter = (last_counter & ACPI_TIMER24_HIBITS) | counter;
+	if (counter < (last_counter & ACPI_TIMER24_MASK))
+	    next_counter += (1LU << 24);
+	if (atomic_fcmpset_long(&acpi_cputimer.base, &last_counter,
+				next_counter)) {
+	    break;
+	}
     }
     return next_counter;
 }
@@ -245,43 +262,17 @@ acpi_timer_get_timecount(void)
 
     last_counter = acpi_cputimer.base;
     for (;;) {
-	    cpu_ccfence();
-	    AcpiGetTimer(&counter);
-	    if (counter < (last_counter & 0xFFFFFFFFU))
-		next_counter = ((last_counter + 0x0100000000U) &
-			        0xFFFFFFFF00000000LU) | counter;
-	    else
-		next_counter = (last_counter &
-			        0xFFFFFFFF00000000LU) | counter;
-	    if (atomic_fcmpset_long(&acpi_cputimer.base, &last_counter,
-				    next_counter)) {
-		break;
-	    }
+	cpu_ccfence();
+	counter = _acpi_get_timer();
+	next_counter = (last_counter & ACPI_TIMER32_HIBITS) | counter;
+	if (counter < (last_counter & ACPI_TIMER32_MASK))
+	    next_counter += (1LU << 32);
+	if (atomic_fcmpset_long(&acpi_cputimer.base, &last_counter,
+				next_counter)) {
+	    break;
+	}
     }
     return next_counter;
-}
-
-/*
- * Fetch current time value from hardware that may not correctly
- * latch the counter.  We need to read until we have three monotonic
- * samples and then use the middle one, otherwise we are not protected
- * against the fact that the bits can be wrong in two directions.  If
- * we only cared about monosity, two reads would be enough.
- */
-static __inline sysclock_t
-_acpi_timer_get_timecount_safe(void)
-{
-    u_int u1, u2, u3;
-
-    AcpiGetTimer(&u2);
-    AcpiGetTimer(&u3);
-    do {
-	u1 = u2;
-	u2 = u3;
-	AcpiGetTimer(&u3);
-    } while (u1 > u2 || u2 > u3);
-
-    return (u2);
 }
 
 static sysclock_t
@@ -293,41 +284,35 @@ acpi_timer_get_timecount_safe(void)
 
     last_counter = acpi_cputimer.base;
     for (;;) {
-	    cpu_ccfence();
-	    counter = _acpi_timer_get_timecount_safe();
-
-	    if (acpi_timer_resolution == 32) {
-		    if (counter < (last_counter & 0xFFFFFFFFU))
-			next_counter = ((last_counter + 0x0100000000U) &
-					0xFFFFFFFF00000000LU) | counter;
-		    else
-			next_counter = (last_counter &
-					0xFFFFFFFF00000000LU) | counter;
-	    } else {
-		    if (counter < (last_counter & 0x00FFFFFFU))
-			next_counter = ((last_counter + 0x01000000U) &
-					0xFFFFFFFFFF000000LU) | counter;
-		    else
-			next_counter = (last_counter &
-					0xFFFFFFFFFF000000LU) | counter;
-	    }
-	    if (atomic_fcmpset_long(&acpi_cputimer.base, &last_counter,
-				    next_counter)) {
-		break;
-	    }
+	cpu_ccfence();
+	counter = _acpi_get_timer_safe();
+	if (acpi_timer_resolution == 32) {
+	    next_counter = (last_counter & ACPI_TIMER32_HIBITS) | counter;
+	    if (counter < (last_counter & ACPI_TIMER32_MASK))
+		next_counter += (1LU << 32);
+	} else {
+	    counter &= (uint32_t)ACPI_TIMER24_MASK;
+	    next_counter = (last_counter & ACPI_TIMER24_HIBITS) | counter;
+	    if (counter < (last_counter & ACPI_TIMER24_MASK))
+		next_counter += (1LU << 24);
+	}
+	if (atomic_fcmpset_long(&acpi_cputimer.base, &last_counter,
+				next_counter)) {
+	    break;
+	}
     }
     return next_counter;
 }
 
 /*
  * Timecounter freqency adjustment interface.
- */ 
+ */
 static int
 acpi_timer_sysctl_freq(SYSCTL_HANDLER_ARGS)
 {
     int error;
     u_int freq;
- 
+
     if (acpi_cputimer.freq == 0)
 	return (EOPNOTSUPP);
     freq = acpi_cputimer.freq;
@@ -337,7 +322,7 @@ acpi_timer_sysctl_freq(SYSCTL_HANDLER_ARGS)
 
     return (error);
 }
- 
+
 SYSCTL_PROC(_machdep, OID_AUTO, acpi_timer_freq, CTLTYPE_INT | CTLFLAG_RW,
     0, sizeof(u_int), acpi_timer_sysctl_freq, "I", "ACPI timer frequency");
 

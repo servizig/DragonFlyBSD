@@ -1,13 +1,13 @@
 /*
  * Copyright (c) 2005 The DragonFly Project.  All rights reserved.
- * 
+ *
  * This code is derived from software contributed to The DragonFly Project
  * by Matthew Dillon <dillon@backplane.com>
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
@@ -17,7 +17,7 @@
  * 3. Neither the name of The DragonFly Project nor the names of its
  *    contributors may be used to endorse or promote products derived
  *    from this software without specific, prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -90,7 +90,8 @@ static struct lwkt_serialize cputimer_intr_ps_slize =
 void
 cputimer_select(struct cputimer *timer, int pri)
 {
-    sysclock_t oldclock;
+    sysclock_t oldclock, newclock;
+    struct cputimer *oldtimer;
 
     /*
      * Calculate helper fields
@@ -98,22 +99,24 @@ cputimer_select(struct cputimer *timer, int pri)
     cputimer_set_frequency(timer, timer->freq);
 
     /*
-     * Install a new cputimer if its priority allows it.  If timer is
-     * passed as NULL we deinstall the current timer and revert to our
-     * dummy.
+     * Install a new cputimer if its priority allows it.
      */
     if (pri == 0)
 	pri = timer->pri;
-    if (timer == NULL || pri >= sys_cputimer->pri) {
-	oldclock = sys_cputimer->count();
-	sys_cputimer->destruct(sys_cputimer);
-	sys_cputimer = &dummy_cputimer;
-	if (timer) {
-	    sys_cputimer = timer;
-	    timer->construct(timer, oldclock);
-	    cputimer_intr_config(timer);
-	    systimer_changed();
+    if (pri >= sys_cputimer->pri) {
+	oldtimer = sys_cputimer;
+	oldclock = oldtimer->count();
+	timer->construct(timer, oldclock);
+	newclock = timer->count();
+	if (newclock < oldclock) {
+		kprintf("Warning: timer %s jumped backward! "
+			"oldclock=%ju, newclock=%ju\n",
+			timer->name, (uintmax_t)oldclock, (uintmax_t)newclock);
 	}
+	cputimer_intr_config(timer);
+	sys_cputimer = timer;
+	oldtimer->destruct(oldtimer);
+	systimer_changed();
     }
 }
 
@@ -152,12 +155,12 @@ cputimer_deregister(struct cputimer *timer)
      * timer, revert to the dummy timer.
      */
     SLIST_FOREACH(scan, &cputimerhead, next) {
-	    if (timer == scan) {
-		if (timer == sys_cputimer)
-		    cputimer_select(&dummy_cputimer, 0x7FFFFFFF);
-		SLIST_REMOVE(&cputimerhead, timer, cputimer, next);
-		break;
-	    }
+	if (timer == scan) {
+	    if (timer == sys_cputimer)
+		cputimer_select(&dummy_cputimer, 0x7FFFFFFF);
+	    SLIST_REMOVE(&cputimerhead, timer, cputimer, next);
+	    break;
+	}
     }
 
     /*

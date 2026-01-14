@@ -261,7 +261,14 @@ cscope_add(SCR *sp, EXCMD *cmdp, CHAR_T *dname)
 	csc->dname = csc->buf;
 	csc->dlen = len;
 	memcpy(csc->dname, np, len);
+#if defined HAVE_STRUCT_STAT_ST_MTIMESPEC
+	csc->mtim = sb.st_mtimespec;
+#elif defined HAVE_STRUCT_STAT_ST_MTIM
 	csc->mtim = sb.st_mtim;
+#else
+	csc->mtim.tv_sec = sb.st_mtime;
+	csc->mtim.tv_nsec = 0;
+#endif
 
 	/* Get the search paths for the cscope. */
 	if (get_paths(sp, csc))
@@ -506,7 +513,7 @@ cscope_find(SCR *sp, EXCMD *cmdp, CHAR_T *pattern)
 	/* Search all open connections for a match. */
 	matches = 0;
 	/* Copy next connect here in case csc is killed. */
-	SLIST_FOREACH_MUTABLE(csc, exp->cscq, q, csc_next) {
+	SLIST_FOREACH_SAFE(csc, exp->cscq, q, csc_next) {
 		/*
 		 * Send the command to the cscope program.  (We skip the
 		 * first two bytes of the command, because we stored the
@@ -812,8 +819,15 @@ csc_file(SCR *sp, CSC *csc, char *name, char **dirp, size_t *dlenp, int *isolder
 			free(buf);
 			*dirp = *pp;
 			*dlenp = strlen(*pp);
+#if defined HAVE_STRUCT_STAT_ST_MTIMESPEC
+			*isolderp = timespeccmp(
+			    &sb.st_mtimespec, &csc->mtim, <);
+#elif defined HAVE_STRUCT_STAT_ST_MTIM
 			*isolderp = timespeccmp(
 			    &sb.st_mtim, &csc->mtim, <);
+#else
+			*isolderp = sb.st_mtime < csc->mtim.tv_sec;
+#endif
 			return;
 		}
 		free(buf);
@@ -844,7 +858,7 @@ csc_help(SCR *sp, char *cmd)
 {
 	CC const *ccp;
 
-	if (cmd != NULL && *cmd != '\0')
+	if (cmd != NULL && *cmd != '\0') {
 		if ((ccp = lookup_ccmd(cmd)) == NULL) {
 			ex_printf(sp,
 			    "%s doesn't match any cscope command\n", cmd);
@@ -855,6 +869,7 @@ csc_help(SCR *sp, char *cmd)
 			ex_printf(sp, "  Usage: %s\n", ccp->usage_msg);
 			return (0);
 		}
+	}
 
 	ex_printf(sp, "cscope commands:\n");
 	for (ccp = cscope_cmds; ccp->name != NULL; ++ccp)

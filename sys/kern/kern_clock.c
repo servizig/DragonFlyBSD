@@ -326,8 +326,8 @@ initclocks(void *dummy)
 	initclocks_pcpu();
 	clocks_running = 1;
 	if (kpmap) {
-	    kpmap->tsc_freq = tsc_frequency;
-	    kpmap->tick_freq = hz;
+		kpmap->tsc_freq = tsc_frequency;
+		kpmap->tick_freq = hz;
 	}
 }
 
@@ -346,13 +346,13 @@ initclocks_pcpu(void)
 
 	crit_enter();
 	if (gd->gd_cpuid == 0) {
-	    gd->gd_time_seconds = 1;
-	    gd->gd_cpuclock_base = sys_cputimer->count();
-	    hardtime[0].time_second = gd->gd_time_seconds;
-	    hardtime[0].cpuclock_base = gd->gd_cpuclock_base;
+		gd->gd_time_seconds = 1;
+		gd->gd_cpuclock_base = sys_cputimer->count();
+		hardtime[0].time_second = gd->gd_time_seconds;
+		hardtime[0].cpuclock_base = gd->gd_cpuclock_base;
 	} else {
-	    gd->gd_time_seconds = globaldata_find(0)->gd_time_seconds;
-	    gd->gd_cpuclock_base = globaldata_find(0)->gd_cpuclock_base;
+		gd->gd_time_seconds = globaldata_find(0)->gd_time_seconds;
+		gd->gd_cpuclock_base = globaldata_find(0)->gd_cpuclock_base;
 	}
 
 	systimer_intr_enable();
@@ -405,7 +405,7 @@ collect_cputime_callback(int n)
 
 /*
  * This routine is called on just the BSP, just after SMP initialization
- * completes to * finish initializing any clocks that might contend/block
+ * completes, to finish initializing any clocks that might contend/block
  * (e.g. like on a token).  We can't do this in initclocks_pcpu() because
  * that function is called from the idle thread bootstrap for each cpu and
  * not allowed to block at all.
@@ -510,8 +510,8 @@ set_timeofday(struct timespec *ts)
 	nbt->tv_sec = ts->tv_sec - nbt->tv_sec;
 	nbt->tv_nsec = ts->tv_nsec - nbt->tv_nsec;
 	if (nbt->tv_nsec < 0) {
-	    nbt->tv_nsec += 1000000000;
-	    --nbt->tv_sec;
+		nbt->tv_nsec += 1000000000;
+		--nbt->tv_sec;
 	}
 
 	/*
@@ -528,6 +528,7 @@ set_timeofday(struct timespec *ts)
 	 */
 	spin_lock(&ntp_spin);
 	boottime.tv_sec = nbt->tv_sec;
+	boottime.tv_nsec = nbt->tv_nsec;
 	ntp_delta = 0;
 
 	/*
@@ -581,8 +582,10 @@ hardclock(systimer_t info, int in_ipi, struct intrframe *frame)
 		cputicks = info->time - gd->gd_cpuclock_base;
 		if (cputicks >= sys_cputimer->freq) {
 			cputicks /= sys_cputimer->freq;
-			if (cputicks != 0 && cputicks != 1)
-				kprintf("Warning: hardclock missed > 1 sec\n");
+			if (cputicks > 1) {
+				kprintf("Warning: hardclock missed "
+					"%ju seconds\n", (uintmax_t)cputicks);
+			}
 			gd->gd_time_seconds += cputicks;
 			gd->gd_cpuclock_base += sys_cputimer->freq * cputicks;
 			/* uncorrected monotonic 1-sec gran */
@@ -662,8 +665,8 @@ hardclock(systimer_t info, int in_ipi, struct intrframe *frame)
 		if ((ntp_delta > 0 && ntp_delta < ntp_tick_delta) ||
 		    (ntp_delta < 0 && ntp_delta > ntp_tick_delta)) {
 			ntp_tick_delta = ntp_delta;
- 		}
- 	    }
+		}
+	    }
 
 	    /*
 	     * Apply permanent frequency corrections.  (sysctl API)
@@ -678,7 +681,7 @@ hardclock(systimer_t info, int in_ipi, struct intrframe *frame)
 		    nbt->tv_nsec -= (-ntp_tick_acc) >> 32;
 		    ntp_tick_acc += ((-ntp_tick_acc) >> 32) << 32;
 		}
- 	    }
+	    }
 
 	    if (nbt->tv_nsec >= 1000000000) {
 		    nbt->tv_sec++;

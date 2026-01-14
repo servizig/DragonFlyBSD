@@ -1152,7 +1152,6 @@ next_hmp:
 		hmp->vchain.data = (void *)&hmp->voldata;
 		hmp->vchain.bref.type = HAMMER2_BREF_TYPE_VOLUME;
 		hmp->vchain.bref.data_off = 0 | HAMMER2_PBUFRADIX;
-		hmp->vchain.bref.mirror_tid = hmp->voldata.mirror_tid;
 		hammer2_chain_init(&hmp->vchain);
 
 		/*
@@ -1170,7 +1169,6 @@ next_hmp:
 		hmp->fchain.data = (void *)&hmp->voldata.freemap_blockset;
 		hmp->fchain.bref.type = HAMMER2_BREF_TYPE_FREEMAP;
 		hmp->fchain.bref.data_off = 0 | HAMMER2_PBUFRADIX;
-		hmp->fchain.bref.mirror_tid = hmp->voldata.freemap_tid;
 		hmp->fchain.bref.methods =
 			HAMMER2_ENC_CHECK(HAMMER2_CHECK_FREEMAP) |
 			HAMMER2_ENC_COMP(HAMMER2_COMP_NONE);
@@ -1285,7 +1283,7 @@ next_hmp:
 		spmp->iroot = hammer2_inode_get(spmp, &xop, -1, -1);
 		spmp->spmp_hmp = hmp;
 		spmp->pfs_types[0] = ripdata->meta.pfs_type;
-		spmp->pfs_hmps[0] = hmp;
+		spmp->ronly = ronly;
 		hammer2_inode_ref(spmp->iroot);
 		hammer2_inode_unlock(spmp->iroot);
 		hammer2_cluster_unlock(&xop.cluster);
@@ -1424,6 +1422,7 @@ next_hmp:
 		return EBUSY;
 	}
 
+	pmp->ronly = ronly;
 	pmp->hflags = info.hflags;
 	mp->mnt_flag |= MNT_LOCAL;
 	mp->mnt_kern_flag |= MNTK_ALL_MPSAFE;   /* all entry pts are SMP */
@@ -1544,9 +1543,17 @@ int
 hammer2_remount(hammer2_dev_t *hmp, struct mount *mp, char *path __unused,
 		struct ucred *cred)
 {
+	hammer2_pfs_t *pmp;
 	hammer2_volume_t *vol;
 	struct m_vnode *devvp;
-	int i, error, result = 0;
+	int i, ronly_save, error, result = 0;
+
+	pmp = MPTOPMP(mp);
+	ronly_save = pmp->ronly;
+	if (pmp->ronly == 1 && (mp->mnt_kern_flag & MNTK_WANTRDWR))
+		pmp->ronly = 0;
+	else if (pmp->ronly == 0 && (mp->mnt_flag & MNT_RDONLY))
+		pmp->ronly = 1;
 
 	if (!(hmp->ronly && (mp->mnt_kern_flag & MNTK_WANTRDWR)))
 		return 0;
@@ -1576,6 +1583,9 @@ hammer2_remount(hammer2_dev_t *hmp, struct mount *mp, char *path __unused,
 	if (result == 0) {
 		kprintf("hammer2: enable read/write\n");
 		hmp->ronly = 0;
+		hmp->spmp->ronly = 0; /* never used */
+	} else {
+		pmp->ronly = ronly_save;
 	}
 
 	return result;
@@ -2671,9 +2681,10 @@ restart:
 			lwkt_gettoken(NULL);
 			if ((ip->flags & (HAMMER2_INODE_MODIFIED |
 					  HAMMER2_INODE_RESIZED |
-					  HAMMER2_INODE_DIRTYDATA)) == 0) {
+					  HAMMER2_INODE_DIRTYDATA)) == 0)
 			    //RB_EMPTY(&vp->v_rbdirty_tree) &&
-			    //!bio_track_active(&vp->v_track_write)) {
+			    //!bio_track_active(&vp->v_track_write))
+			{
 				vclrisdirty(vp);
 			} else {
 				hammer2_inode_delayed_sideq(ip);

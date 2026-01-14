@@ -83,6 +83,12 @@ SYSCTL_INT(_vm, OID_AUTO, max_proc_mmap, CTLFLAG_RW, &max_proc_mmap, 0, "");
 int vkernel_enable;
 SYSCTL_INT(_vm, OID_AUTO, vkernel_enable, CTLFLAG_RW, &vkernel_enable, 0, "");
 
+/* VPAGETABLE debugging */
+static long vpagetable_mmap_count = 0;
+SYSCTL_LONG(_vm, OID_AUTO, vpagetable_mmap, CTLFLAG_RW,
+	    &vpagetable_mmap_count, 0, "Number of MAP_VPAGETABLE mappings created");
+extern int debug_vpagetable;
+
 /*
  * sstk_args(int incr)
  *
@@ -163,11 +169,21 @@ kern_mmap(struct vmspace *vms, caddr_t uaddr, size_t ulen,
 	}
 
 	/*
-	 * Virtual page table support has been removed and now always
-	 * returns EOPNOTSUPP.
+	 * Virtual page tables cannot be used with MAP_STACK.  Apart from
+	 * it not making any sense, the aux union is used by both
+	 * types.
+	 *
+	 * Because the virtual page table is stored in the backing object
+	 * and might be updated by the kernel, the mapping must be R+W.
 	 */
-	if (flags & MAP_VPAGETABLE)
-		return (EOPNOTSUPP);
+	if (flags & MAP_VPAGETABLE) {
+		if (vkernel_enable == 0)
+			return (EOPNOTSUPP);
+		if (flags & MAP_STACK)
+			return (EINVAL);
+		if ((prot & (PROT_READ|PROT_WRITE)) != (PROT_READ|PROT_WRITE))
+			return (EINVAL);
+	}
 
 	/*
 	 * Align the file position to a page boundary,
@@ -211,7 +227,7 @@ kern_mmap(struct vmspace *vms, caddr_t uaddr, size_t ulen,
 		 * Get a hint of where to map. It also provides mmap offset
 		 * randomization if enabled.
 		 */
-		addr = vm_map_hint(p, addr, prot);
+		addr = vm_map_hint(p, addr, prot, flags);
 	}
 
 	if (flags & MAP_ANON) {
@@ -230,6 +246,9 @@ kern_mmap(struct vmspace *vms, caddr_t uaddr, size_t ulen,
 			return (EBADF);
 		if (fp->f_type != DTYPE_VNODE) {
 			error = EINVAL;
+			if (fp->f_type == DTYPE_DMABUF) {
+				kprintf("dmabuf-mmap-attempt\n");
+			}
 			goto done;
 		}
 		/*
@@ -1071,13 +1090,10 @@ sys_mlockall(struct sysmsg *sysmsg, const struct mlockall_args *uap)
 
 done:
 	RB_FOREACH(entry, vm_map_rb_tree, &map->rb_root) {
-		if ((entry->eflags & MAP_ENTRY_USER_WIRED) == 0)
-			continue;
-
-		entry->eflags &= ~MAP_ENTRY_USER_WIRED;
-		entry->wired_count--;
-		if (entry->wired_count == 0)
+		if (entry->eflags & MAP_ENTRY_USER_WIRED) {
+			entry->eflags &= ~MAP_ENTRY_USER_WIRED;
 			vm_fault_unwire(map, entry);
+		}
 	}
 
 	vm_map_unlock(map);
@@ -1137,9 +1153,7 @@ retry:
 	
 		/* Drop wired count, if it hits zero, unwire the entry */
 		entry->eflags &= ~MAP_ENTRY_USER_WIRED;
-		entry->wired_count--;
-		if (entry->wired_count == 0)
-			vm_fault_unwire(map, entry);
+		vm_fault_unwire(map, entry);
 	}
 
 	vm_map_unlock(map);
@@ -1314,7 +1328,7 @@ vm_mmap(vm_map_t map, vm_offset_t *addr, vm_size_t size, vm_prot_t prot,
 				lwkt_reltoken(&map->token);
 				return(ENOMEM);
 			}
-			docow = MAP_PREFAULT_PARTIAL;
+			docow = COWF_PREFAULT_PARTIAL;
 		} else {
 			/*
 			 * Implicit single instance of a default memory
@@ -1352,7 +1366,7 @@ vm_mmap(vm_map_t map, vm_offset_t *addr, vm_size_t size, vm_prot_t prot,
 			 */
 			uksmap = vp->v_rdev->si_ops->d_uksmap;
 			object = NULL;
-			docow = MAP_PREFAULT_PARTIAL;
+			docow = COWF_PREFAULT_PARTIAL;
 			flags &= ~(MAP_PRIVATE|MAP_COPY);
 			flags |= MAP_SHARED;
 		} else if (vp->v_type == VCHR) {
@@ -1375,7 +1389,7 @@ vm_mmap(vm_map_t map, vm_offset_t *addr, vm_size_t size, vm_prot_t prot,
 				return(error);
 			}
 
-			docow = MAP_PREFAULT_PARTIAL;
+			docow = COWF_PREFAULT_PARTIAL;
 			flags &= ~(MAP_PRIVATE|MAP_COPY);
 			flags |= MAP_SHARED;
 		} else {
@@ -1392,7 +1406,7 @@ vm_mmap(vm_map_t map, vm_offset_t *addr, vm_size_t size, vm_prot_t prot,
 				lwkt_reltoken(&map->token);
 				return (error);
 			}
-			docow = MAP_PREFAULT_PARTIAL;
+			docow = COWF_PREFAULT_PARTIAL;
 			object = vnode_pager_reference(vp);
 			if (object == NULL && vp->v_type == VREG) {
 				lwkt_reltoken(&map->token);
@@ -1415,11 +1429,13 @@ vm_mmap(vm_map_t map, vm_offset_t *addr, vm_size_t size, vm_prot_t prot,
 	 * Deal with the adjusted flags
 	 */
 	if ((flags & (MAP_ANON|MAP_SHARED)) == 0)
-		docow |= MAP_COPY_ON_WRITE;
+		docow |= COWF_COPY_ON_WRITE;
 	if (flags & MAP_NOSYNC)
-		docow |= MAP_DISABLE_SYNCER;
+		docow |= COWF_DISABLE_SYNCER;
 	if (flags & MAP_NOCORE)
-		docow |= MAP_DISABLE_COREDUMP;
+		docow |= COWF_DISABLE_COREDUMP;
+	if (flags & MAP_32BIT)
+		docow |= COWF_32BIT;
 
 	/*
 	 * This may place the area in its own page directory if (size) is
@@ -1446,6 +1462,18 @@ vm_mmap(vm_map_t map, vm_offset_t *addr, vm_size_t size, vm_prot_t prot,
 	} else if (flags & MAP_STACK) {
 		rv = vm_map_stack(map, addr, size, flags,
 				  prot, maxprot, docow);
+	} else if (flags & MAP_VPAGETABLE) {
+		++vpagetable_mmap_count;
+		if (debug_vpagetable) {
+			kprintf("MAP_VPAGETABLE: addr=%lx size=%lx pid=%d\n",
+				*addr, size,
+				(curproc ? curproc->p_pid : -1));
+		}
+		rv = vm_map_find(map, object, NULL,
+				 foff, addr, size,
+				 align, fitit,
+				 VM_MAPTYPE_VPAGETABLE, VM_SUBSYS_MMAP,
+				 prot, maxprot, docow);
 	} else {
 		rv = vm_map_find(map, object, NULL,
 				 foff, addr, size,

@@ -4921,7 +4921,7 @@ static int
 hammer2_base_find(hammer2_chain_t *parent,
 		  hammer2_blockref_t *base, int count,
 		  hammer2_key_t *key_nextp,
-		  hammer2_key_t key_beg, hammer2_key_t key_end)
+		  hammer2_key_t key_beg, hammer2_key_t key_end __unused)
 {
 	hammer2_blockref_t *scan;
 	hammer2_key_t scan_end;
@@ -5517,7 +5517,7 @@ hammer2_chain_setcheck(hammer2_chain_t *chain, void *bdata)
  */
 static void
 hammer2_characterize_failed_chain(hammer2_chain_t *chain, uint64_t check,
-				  int bits)
+				  int bits, void *bdata)
 {
 	hammer2_chain_t *lchain;
 	hammer2_chain_t *ochain;
@@ -5543,6 +5543,24 @@ hammer2_characterize_failed_chain(hammer2_chain_t *chain, uint64_t check,
 			chain->bref.check.xxhash64.value,
 			check);
 	}
+
+	/*
+	 * In-kernel memory information
+	 */
+	kprintf("   chain %p bdata %p dio %p bp %p ",
+		chain,
+		bdata,
+		chain->dio,
+		(chain->dio ? chain->dio->bp : NULL));
+
+	if (chain->dio) {
+		kprintf("bp_loff %016jx,%d bdata %p/%p",
+			(intmax_t)chain->dio->bp->b_loffset,
+			chain->dio->bp->b_bufsize,
+			bdata,
+			chain->dio->bp->b_data);
+	}
+	kprintf("\n");
 
 	/*
 	 * Run up the chains to try to find the governing inode so we
@@ -5583,6 +5601,7 @@ hammer2_characterize_failed_chain(hammer2_chain_t *chain, uint64_t check,
 		kprintf("   In pfs %s on device %s\n",
 			pfsname, ochain->hmp->devrepname);
 	}
+	//print_backtrace(-1);
 }
 
 /*
@@ -5609,7 +5628,8 @@ hammer2_chain_testcheck(hammer2_chain_t *chain, void *bdata)
 		check32 = hammer2_icrc32(bdata, chain->bytes);
 		r = (chain->bref.check.iscsi32.value == check32);
 		if (r == 0) {
-			hammer2_characterize_failed_chain(chain, check32, 32);
+			hammer2_characterize_failed_chain(chain, check32,
+							  32, bdata);
 		}
 		hammer2_process_icrc32 += chain->bytes;
 		break;
@@ -5617,7 +5637,8 @@ hammer2_chain_testcheck(hammer2_chain_t *chain, void *bdata)
 		check64 = XXH64(bdata, chain->bytes, XXH_HAMMER2_SEED);
 		r = (chain->bref.check.xxhash64.value == check64);
 		if (r == 0) {
-			hammer2_characterize_failed_chain(chain, check64, 64);
+			hammer2_characterize_failed_chain(chain, check64,
+							  64, bdata);
 		}
 		hammer2_process_xxhash64 += chain->bytes;
 		break;
@@ -5750,9 +5771,6 @@ hammer2_chain_inode_find(hammer2_pfs_t *pmp, hammer2_key_t inum,
 		hammer2_inode_drop(ip);
 		if (*chainp)
 			return (*chainp)->error;
-		hammer2_chain_unlock(*chainp);
-		hammer2_chain_drop(*chainp);
-		*chainp = NULL;
 		if (*parentp) {
 			hammer2_chain_unlock(*parentp);
 			hammer2_chain_drop(*parentp);

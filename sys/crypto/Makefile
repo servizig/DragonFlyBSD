@@ -2,14 +2,13 @@
 
 KMOD=	crypto
 
-.PATH:	${.CURDIR}/../opencrypto
-# excluded: cryptodev.c
-SRCS=	cast.c criov.c crypto.c cryptosoft.c deflate.c gmac.c rmd160.c \
-	skipjack.c xform.c
-SRCS+=	cryptodev_if.c cryptodev_if.h
+SRCS+=	crypto.c
 
 SRCS+=	sha1.c
 SRCS+=	chachapoly.c
+
+.PATH:	${.CURDIR}/rmd160
+SRCS+=	rmd160.c
 
 .PATH:	${.CURDIR}/blake2
 SRCS+=	blake2s.c
@@ -35,6 +34,9 @@ SRCS+=	poly1305.c
 .PATH:	${.CURDIR}/rijndael
 SRCS+=	rijndael-alg-fst.c rijndael-api.c
 
+.PATH:	${.CURDIR}/aesni
+SRCS+=	aesencdec_${MACHINE_ARCH}.S aeskeys_${MACHINE_ARCH}.S aesni_wrap.c
+
 .PATH:	${.CURDIR}/serpent
 SRCS+=	serpent.c
 
@@ -47,7 +49,8 @@ SRCS+=	siphash.c
 .PATH:	${.CURDIR}/twofish
 SRCS+=	twofish.c
 
-SRCS+=	bus_if.h device_if.h opt_ddb.h
+.PATH:	${.CURDIR}/cryptoapi
+SRCS+=	cryptoapi.c
 
 SUBDIR=	rc4
 

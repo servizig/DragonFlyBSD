@@ -71,6 +71,7 @@ MLINKS += libusb.3 libusb_set_debug.3
 MLINKS += libusb.3 libusb_get_device_list.3
 MLINKS += libusb.3 libusb_free_device_list.3
 MLINKS += libusb.3 libusb_get_bus_number.3
+MLINKS += libusb.3 libusb_get_port_number.3
 MLINKS += libusb.3 libusb_get_device_address.3
 MLINKS += libusb.3 libusb_get_device_speed.3
 MLINKS += libusb.3 libusb_get_max_packet_size.3
@@ -95,6 +96,7 @@ MLINKS += libusb.3 libusb_get_driver_np.3
 MLINKS += libusb.3 libusb_detach_kernel_driver.3
 MLINKS += libusb.3 libusb_detach_kernel_driver_np.3
 MLINKS += libusb.3 libusb_attach_kernel_driver.3
+MLINKS += libusb.3 libusb_set_auto_detach_kernel_driver.3
 MLINKS += libusb.3 libusb_get_device_descriptor.3
 MLINKS += libusb.3 libusb_get_active_config_descriptor.3
 MLINKS += libusb.3 libusb_get_config_descriptor.3
@@ -131,6 +133,7 @@ MLINKS += libusb.3 libusb_set_pollfd_notifiers.3
 MLINKS += libusb.3 libusb_get_pollfds.3
 MLINKS += libusb.3 libusb_hotplug_register_callback.3
 MLINKS += libusb.3 libusb_hotplug_deregister_callback.3
+MLINKS += libusb.3 libusb_get_version.3
 
 # LibUSB v0.1
 MLINKS += libusb.3 usb_open.3

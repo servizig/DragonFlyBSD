@@ -5,25 +5,41 @@
 LIB=		z
 SHLIBDIR?=	/lib
 MAN=		zlib.3
-WARNS?=		2
+WARNS?=		3
 
-CONTRIBDIR=	${.CURDIR}/../../contrib/zlib-1.2
+ZLIBDIR=	${.CURDIR}/../../contrib/zlib
 
-.PATH: ${CONTRIBDIR}
+VERSION_DEF=	${.CURDIR}/Versions.def
+SYMBOL_MAPS=	${.CURDIR}/Symbol.map
 
-SRCS=	adler32.c compress.c crc32.c deflate.c gzclose.c gzlib.c gzread.c
-SRCS+=	gzwrite.c infback.c
-SRCS+=	inffast.c inflate.c inftrees.c trees.c uncompr.c zutil.c
+.PATH: ${ZLIBDIR}
 
-CFLAGS+=-I${CONTRIBDIR} -I${.CURDIR}
+SRCS=	adler32.c compress.c crc32.c deflate.c \
+	gzclose.c gzlib.c gzread.c gzwrite.c \
+	infback.c inffast.c inflate.c inftrees.c \
+	trees.c uncompr.c zutil.c
+
+CFLAGS+=-I${ZLIBDIR} -I${.CURDIR}
 CFLAGS+=-DHAVE_HIDDEN
 #CFLAGS+=-DZLIB_DEBUG
 
 INCS=		zconf.h zlib.h
 
-VERSION_DEF=	${.CURDIR}/Versions.def
-SYMBOL_MAPS=	${.CURDIR}/Symbol.map
 FILES=		zlib.pc
 FILESDIR=	${LIBDATADIR}/pkgconfig
+
+ZLIB_VERSION!=	sed -n '/define.*ZLIB_VERSION/{s,[^0-9.],,gp;q;}' \
+		${ZLIBDIR}/zlib.h
+
+zlib.pc: zlib.pc.in
+	sed -e 's,@prefix@,/usr,g ; \
+		s,@exec_prefix@,$${prefix},g ; \
+		s,@libdir@,${LIBDIR},g ; \
+		s,@sharedlibdir@,${SHLIBDIR},g ; \
+		s,@includedir@,${INCLUDEDIR},g ; \
+		s,@VERSION@,${ZLIB_VERSION},g ;' \
+		${.ALLSRC} > ${.TARGET}
+
+CLEANFILES+=	zlib.pc
 
 .include <bsd.lib.mk>

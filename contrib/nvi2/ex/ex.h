@@ -55,12 +55,12 @@ extern EXCMDLIST const cmds[];		/* Table of ex commands. */
  * at any time, and most of them won't work well if a file hasn't yet been read
  * in.  Historic vi generally took the easy way out and dropped core.
  */
-#define	NEEDFILE(sp, cmdp) {						\
+#define	NEEDFILE(sp, cmdp) do {						\
 	if ((sp)->ep == NULL) {						\
 		ex_wemsg(sp, (cmdp)->cmd->name, EXM_NOFILEYET);		\
 		return (1);						\
 	}								\
-}
+} while (0)
 
 /* Range structures for global and @ commands. */
 typedef struct _range RANGE;
@@ -99,15 +99,16 @@ struct _excmd {
 #define	AGV_GLOBAL	0x04		/* global command. */
 #define	AGV_V		0x08		/* v command. */
 #define	AGV_ALL		(AGV_AT | AGV_AT_NORANGE | AGV_GLOBAL | AGV_V)
-	u_int8_t  agv_flags;
+	u_int8_t  agv_flags : 4;
+	u_int8_t  trailing : 1;		/* Command had trailing | or \n. */
 
 	/* Clear the structure before each ex command. */
-#define	CLEAR_EX_CMD(cmdp) {						\
+#define	CLEAR_EX_CMD(cmdp) do {						\
 	u_int32_t L__f = F_ISSET(cmdp, E_PRESERVE);			\
 	memset(&((cmdp)->buffer), 0, ((char *)&(cmdp)->flags -		\
 	    (char *)&((cmdp)->buffer)) + sizeof((cmdp)->flags));	\
 	F_SET(cmdp, L__f);						\
-}
+} while (0)
 
 	CHAR_T	  buffer;		/* Command: named buffer. */
 	recno_t	  lineno;		/* Command: line number. */

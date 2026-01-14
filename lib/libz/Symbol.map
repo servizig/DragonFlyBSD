@@ -89,8 +89,8 @@ ZLIB_1.2.11 {
     uncompress2;
 };
 
-ZLIBprivate_1.0 {
-    deflate_copyright;
-    inflate_copyright;
-    z_errmsg;
+ZLIB_1.2.13 {
+    crc32_combine_gen;
+    crc32_combine_gen64;
+    crc32_combine_op;
 };

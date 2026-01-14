@@ -210,6 +210,7 @@
  * 500705 - Move us to utmpx only, delete utmp
  * 500706 - Switch to the now common three argument versions of the
  *	    timespecadd() and timespecsub() macros in <sys/time.h>
+ *	    Also: RTM_VERSION bump to 7; CMSG alignment raised from 4B to 8B
  * 500707 - libradius/libtacplus removal
  * 500708 - Handle SIOCSIFMTU directly in tap(4) to support MTU > 1500
  * 500709 - Implement lwp_getname() and signal safety
@@ -253,9 +254,18 @@
  * 600508 - add ND6_IFF_AUTO_LINKLOCAL and ND6_IFF_NO_DAD;
  *          change ip6.accept_rtadv and ip6.auto_linklocal behavior
  * 600509 - add futimesat() (legacy function), add HAVE_FUTIMESAT
+ * 600510 - add PROC_REAP_KILL to procctl(2)
+ * 600511 - remove <timers.h>
+ * 600512 - remove obsolete DSO_COMPATMBR from <sys/disk.h>
+ * 600513 - add F_MAXFD and support POSIX O_CLOFORK
+ * 600514 - libusb(3) added libusb_get_version(), libusb_get_port_number(),
+ *          and libusb_set_auto_detach_kernel_driver().
+ * 600515 - remove /dev/crypto pseudo-device / cryptodev(4)
+ * 600516 - remove in-kernel crypto(9) framework, aesni(4) and
+ *          /usr/include/crypto
  */
 #undef __DragonFly_version
-#define __DragonFly_version 600509	/* propagated to newvers */
+#define __DragonFly_version 600516	/* propagated to newvers */
 
 #include <sys/_null.h>
 

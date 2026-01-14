@@ -27,9 +27,8 @@
  * $FreeBSD: src/usr.bin/objformat/objformat.c,v 1.6 1998/10/24 02:01:30 jdp Exp $
  */
 
-#include <sys/param.h>
-
 #include <err.h>
+#include <limits.h> /* PATH_MAX */
 #include <objformat.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,11 +52,6 @@
 #define OBJFORMAT_PATH_DEFAULT ""
 #endif
 
-/* Macro for array size */
-#ifndef NELEM
-#define NELEM(ary)      (sizeof(ary) / sizeof((ary)[0]))
-#endif
-
 enum cmd_type { OBJFORMAT, COMPILER, BINUTILS, LINKER };
 
 struct command {
@@ -79,9 +73,9 @@ static struct command commands[] = {
 	{"as",			BINUTILS},
 	{"c++filt",		BINUTILS},
 	{"elfedit",		BINUTILS},
-	{"gprof",       	BINUTILS},
-	{"ld.bfd",       	BINUTILS},
-	{"ld.gold",       	BINUTILS},
+	{"gprof",		BINUTILS},
+	{"ld.bfd",		BINUTILS},
+	{"ld.gold",		BINUTILS},
 	{"nm",			BINUTILS},
 	{"objcopy",		BINUTILS},
 	{"objdump",		BINUTILS},
@@ -91,25 +85,26 @@ static struct command commands[] = {
 	{"strings",		BINUTILS},
 	{"strip",		BINUTILS},
 	{"objformat",		OBJFORMAT},
-	{"",			-1}
+	{NULL,			-1},
 };
 
 int
 main(int argc, char **argv)
 {
+	const char *base_path = "/usr/libexec";
 	char ld_def[] = LINKER_DEFAULT;
 	char ld_alt[] = LINKER_ALT;
 	struct command *cmds;
 	char objformat[32];
+	char newcmd[PATH_MAX];
 	char *path, *chunk;
-	char *cmd, *newcmd = NULL;
+	char *cmd;
 	char *ldcmd = ld_def;
 	const char *objformat_path;
 	const char *ccver;
 	const char *buver;
 	const char *ldver;
 	const char *env_value = NULL;
-	const char *base_path = NULL;
 	int use_objformat = 0;
 
 	if (getobjformat(objformat, sizeof objformat, &argc, argv) == -1)
@@ -124,47 +119,42 @@ main(int argc, char **argv)
 	else
 		cmd = argv[0];
 
-	for (cmds = commands; cmds < &commands[NELEM(commands) - 1]; ++cmds) {
+	for (cmds = commands; cmds->cmd != NULL; ++cmds) {
 		if (strcmp(cmd, cmds->cmd) == 0)
 			break;
 	}
 
-	if (cmds) {
-		switch (cmds->type) {
-		case COMPILER:
-			ccver = getenv("CCVER");
-			if ((ccver == NULL) || ccver[0] == 0)
-			    ccver = CCVER_DEFAULT;
-			base_path = "/usr/libexec";
-			use_objformat = 0;
-			env_value = ccver;
-			break;
-		case BINUTILS:
-			buver = getenv("BINUTILSVER");
-			if (buver == NULL)
-			    buver = BINUTILSVER_DEFAULT;
-			base_path = "/usr/libexec";
-			use_objformat = 1;
-			env_value = buver;
-			break;
-		case LINKER:
-			buver = getenv("BINUTILSVER");
-			if (buver == NULL)
-			    buver = BINUTILSVER_DEFAULT;
-			ldver = getenv("LDVER");
-			if ((ldver != NULL) && (strcmp(ldver, ld_alt) == 0))
-			    ldcmd = ld_alt;
-			base_path = "/usr/libexec";
-			use_objformat = 1;
-			env_value = buver;
-			cmd = ldcmd;
-			break;
-		case OBJFORMAT:
-			break;
-		default:
-			errx(1, "unknown command type");
-			break;
-		}
+	switch (cmds->type) {
+	case COMPILER:
+		ccver = getenv("CCVER");
+		if ((ccver == NULL) || ccver[0] == 0)
+			ccver = CCVER_DEFAULT;
+		use_objformat = 0;
+		env_value = ccver;
+		break;
+	case BINUTILS:
+		buver = getenv("BINUTILSVER");
+		if (buver == NULL)
+			buver = BINUTILSVER_DEFAULT;
+		use_objformat = 1;
+		env_value = buver;
+		break;
+	case LINKER:
+		buver = getenv("BINUTILSVER");
+		if (buver == NULL)
+			buver = BINUTILSVER_DEFAULT;
+		ldver = getenv("LDVER");
+		if ((ldver != NULL) && (strcmp(ldver, ld_alt) == 0))
+			ldcmd = ld_alt;
+		use_objformat = 1;
+		env_value = buver;
+		cmd = ldcmd;
+		break;
+	case OBJFORMAT:
+		break;
+	default:
+		errx(1, "unknown command type");
+		break;
 	}
 
 	/*
@@ -180,6 +170,9 @@ main(int argc, char **argv)
 		exit(0);
 	}
 
+	if (setenv("OBJFORMAT", objformat, 1) == -1)
+		err(1, "setenv: cannot set OBJFORMAT=%s", objformat);
+
 	/*
 	 * make buildworld glue and CCVER overrides.
 	 */
@@ -190,37 +183,28 @@ main(int argc, char **argv)
 again:
 	path = strdup(objformat_path);
 
-	if (setenv("OBJFORMAT", objformat, 1) == -1)
-		err(1, "setenv: cannot set OBJFORMAT=%s", objformat);
-
 	/*
 	 * objformat_path could be sequence of colon-separated paths.
 	 */
 	while ((chunk = strsep(&path, ":")) != NULL) {
-		if (newcmd != NULL) {
-			free(newcmd);
-			newcmd = NULL;
-		}
 		if (use_objformat) {
-			asprintf(&newcmd, "%s%s/%s/%s/%s",
+			snprintf(newcmd, sizeof(newcmd), "%s%s/%s/%s/%s",
 				chunk, base_path, env_value, objformat, cmd);
 		} else {
-			asprintf(&newcmd, "%s%s/%s/%s",
+			snprintf(newcmd, sizeof(newcmd), "%s%s/%s/%s",
 				chunk, base_path, env_value, cmd);
 		}
-		if (newcmd == NULL)
-			err(1, "cannot allocate memory");
 
 		argv[0] = newcmd;
 		execv(newcmd, argv);
 	}
 
 	/*
-	 * Fallback:  if we're searching for a compiler, but didn't
-	 * find any, try again using the custom compiler driver.
+	 * Fallback: if we're searching for a compiler, but didn't find any,
+	 * try again using the custom compiler driver to access the external
+	 * compilers defined by compilers.conf(5).
 	 */
-	if (cmds && cmds->type == COMPILER &&
-	    strcmp(env_value, "custom") != 0) {
+	if (cmds->type == COMPILER && strcmp(env_value, "custom") != 0) {
 		env_value = "custom";
 		goto again;
 	}

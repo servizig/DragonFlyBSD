@@ -112,11 +112,12 @@ usage:		ex_emsg(sp, cmdp->cmd->usage, EXM_USAGE);
 			*t = '\0';
 			break;
 		}
-		if (p[0] == '\\')
+		if (p[0] == '\\') {
 			if (p[1] == delim)
 				++p;
 			else if (p[1] == '\\')
 				*t++ = *p++;
+		}
 		*t++ = *p++;
 	}
 
@@ -262,7 +263,7 @@ ex_g_insdel(SCR *sp, lnop_t op, recno_t lno)
 	SLIST_FOREACH(ecp, sp->gp->ecq, q) {
 		if (!FL_ISSET(ecp->agv_flags, AGV_AT | AGV_GLOBAL | AGV_V))
 			continue;
-		TAILQ_FOREACH_MUTABLE(rp, ecp->rq, q, nrp) {
+		TAILQ_FOREACH_SAFE(rp, ecp->rq, q, nrp) {
 			/* If range less than the line, ignore it. */
 			if (rp->stop < lno)
 				continue;

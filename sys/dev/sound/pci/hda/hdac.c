@@ -77,35 +77,66 @@ static const struct {
 	char		quirks_off;
 } hdac_devices[] = {
 	{ HDA_INTEL_OAK,     "Intel Oaktrail",	0, 0 },
+	{ HDA_INTEL_CMLKLP,  "Intel Comet Lake-LP",	0, 0 },
+	{ HDA_INTEL_CMLKH,   "Intel Comet Lake-H",	0, 0 },
 	{ HDA_INTEL_BAY,     "Intel BayTrail",	0, 0 },
 	{ HDA_INTEL_HSW1,    "Intel Haswell",	0, 0 },
 	{ HDA_INTEL_HSW2,    "Intel Haswell",	0, 0 },
 	{ HDA_INTEL_HSW3,    "Intel Haswell",	0, 0 },
 	{ HDA_INTEL_BDW1,    "Intel Broadwell",	0, 0 },
+	{ HDA_INTEL_BDW2,    "Intel Broadwell",	0, 0 },
+	{ HDA_INTEL_BXTNT,   "Intel Broxton-T",	0, 0 },
 	{ HDA_INTEL_CPT,     "Intel Cougar Point",	0, 0 },
-	{ HDA_INTEL_PATSBURG,"Intel Patsburg",  0, 0 },
+	{ HDA_INTEL_PATSBURG,"Intel Patsburg",  	0, 0 },
 	{ HDA_INTEL_PPT1,    "Intel Panther Point",	0, 0 },
+	{ HDA_INTEL_BR,      "Intel Braswell",		0, 0 },
 	{ HDA_INTEL_LPT1,    "Intel Lynx Point",	0, 0 },
 	{ HDA_INTEL_LPT2,    "Intel Lynx Point",	0, 0 },
 	{ HDA_INTEL_WCPT,    "Intel Wildcat Point",	0, 0 },
-	{ HDA_INTEL_WELLS1,  "Intel Wellsburg",	0, 0 },
-	{ HDA_INTEL_WELLS2,  "Intel Wellsburg",	0, 0 },
+	{ HDA_INTEL_WELLS1,  "Intel Wellsburg",		0, 0 },
+	{ HDA_INTEL_WELLS2,  "Intel Wellsburg",		0, 0 },
 	{ HDA_INTEL_LPTLP1,  "Intel Lynx Point-LP",	0, 0 },
 	{ HDA_INTEL_LPTLP2,  "Intel Lynx Point-LP",	0, 0 },
-	{ HDA_INTEL_WCPTLP,  "Intel Wildcat Point-LP",	0, 0 },
 	{ HDA_INTEL_SRPTLP,  "Intel Sunrise Point-LP",	0, 0 },
-	{ HDA_INTEL_KBLKLP,  "Intel Kabylake-LP",	0, 0 },
+	{ HDA_INTEL_KBLKLP,  "Intel Kaby Lake-LP",	0, 0 },
 	{ HDA_INTEL_SRPT,    "Intel Sunrise Point",	0, 0 },
-	{ HDA_INTEL_KBLK,    "Intel Kabylake",	0, 0 },
-	{ HDA_INTEL_82801F,  "Intel 82801F",	0, 0 },
+	{ HDA_INTEL_KBLK,    "Intel Kaby Lake",		0, 0 },
+	{ HDA_INTEL_KBLKH,   "Intel Kaby Lake-H",	0, 0 },
+	{ HDA_INTEL_CFLK,    "Intel Coffee Lake",	0, 0 },
+	{ HDA_INTEL_CMLKS,   "Intel Comet Lake-S",	0, 0 },
+	{ HDA_INTEL_CNLK,    "Intel Cannon Lake",	0, 0 },
+	{ HDA_INTEL_ICLK,    "Intel Ice Lake",		0, 0 },
+	{ HDA_INTEL_CMLKLP,  "Intel Comet Lake-LP",	0, 0 },
+	{ HDA_INTEL_CMLKH,   "Intel Comet Lake-H",	0, 0 },
+	{ HDA_INTEL_TGLK,    "Intel Tiger Lake",	0, 0 },
+	{ HDA_INTEL_TGLKH,   "Intel Tiger Lake-H",	0, 0 },
+	{ HDA_INTEL_GMLK,    "Intel Gemini Lake",	0, 0 },
+	{ HDA_INTEL_ALLK,    "Intel Alder Lake",	0, 0 },
+	{ HDA_INTEL_ALLKM,   "Intel Alder Lake-M",	0, 0 },
+	{ HDA_INTEL_ALLKN,   "Intel Alder Lake-N",	0, 0 },
+	{ HDA_INTEL_ALLKP1,  "Intel Alder Lake-P",	0, 0 },
+	{ HDA_INTEL_ALLKP2,  "Intel Alder Lake-P",	0, 0 },
+	{ HDA_INTEL_ALLKPS,  "Intel Alder Lake-PS",	0, 0 },
+	{ HDA_INTEL_RPTLK1,  "Intel Raptor Lake-P",	0, 0 },
+	{ HDA_INTEL_RPTLK2,  "Intel Raptor Lake-P",	0, 0 },
+	{ HDA_INTEL_RPTLK3,  "Intel Raptor Lake-S",	0, 0 },
+	{ HDA_INTEL_MTL,     "Intel Meteor Lake-P",	0, 0 },
+	{ HDA_INTEL_ARLS,    "Intel Arrow Lake-S",	0, 0 },
+	{ HDA_INTEL_ARL,     "Intel Arrow Lake",	0, 0 },
+	{ HDA_INTEL_LNLP,    "Intel Lunar Lake-P",	0, 0 },
+	{ HDA_INTEL_82801F,  "Intel 82801F",		0, 0 },
 	{ HDA_INTEL_63XXESB, "Intel 631x/632xESB",	0, 0 },
 	{ HDA_INTEL_82801G,  "Intel 82801G",	0, 0 },
 	{ HDA_INTEL_82801H,  "Intel 82801H",	0, 0 },
 	{ HDA_INTEL_82801I,  "Intel 82801I",	0, 0 },
+	{ HDA_INTEL_JLK,     "Intel Jasper Lake",	0, 0 },
 	{ HDA_INTEL_82801JI, "Intel 82801JI",	0, 0 },
 	{ HDA_INTEL_82801JD, "Intel 82801JD",	0, 0 },
-	{ HDA_INTEL_PCH,     "Intel 5 Series/3400 Series",	0, 0 },
-	{ HDA_INTEL_PCH2,    "Intel 5 Series/3400 Series",	0, 0 },
+	{ HDA_INTEL_PCH,     "Intel Ibex Peak",	0, 0 },
+	{ HDA_INTEL_PCH2,    "Intel Ibex Peak",	0, 0 },
+	{ HDA_INTEL_ELLK,    "Intel Elkhart Lake",	0, 0 },
+	{ HDA_INTEL_JLK2,    "Intel Jasper Lake",	0, 0 },
+	{ HDA_INTEL_BXTNP,   "Intel Broxton-P",	0, 0 },
 	{ HDA_INTEL_SCH,     "Intel SCH",	0, 0 },
 	{ HDA_NVIDIA_MCP51,  "NVIDIA MCP51",	0, HDAC_QUIRK_MSI },
 	{ HDA_NVIDIA_MCP55,  "NVIDIA MCP55",	0, HDAC_QUIRK_MSI },
@@ -145,6 +176,7 @@ static const struct {
 	{ HDA_ATI_RS600,     "ATI RS600",	0, 0 },
 	{ HDA_ATI_RS690,     "ATI RS690",	0, 0 },
 	{ HDA_ATI_RS780,     "ATI RS780",	0, 0 },
+	{ HDA_ATI_RS880,     "ATI RS880",	0, 0 },
 	{ HDA_ATI_R600,      "ATI R600",	0, 0 },
 	{ HDA_ATI_RV610,     "ATI RV610",	0, 0 },
 	{ HDA_ATI_RV620,     "ATI RV620",	0, 0 },
@@ -163,17 +195,28 @@ static const struct {
 	{ HDA_ATI_RV940,     "ATI RV940",	0, 0 },
 	{ HDA_ATI_RV970,     "ATI RV970",	0, 0 },
 	{ HDA_ATI_R1000,     "ATI R1000",	0, 0 },
+	{ HDA_ATI_OLAND,     "ATI Oland",	0, 0 },
+	{ HDA_ATI_KABINI,    "ATI Kabini",      0, 0 },
+	{ HDA_ATI_TRINITY,   "ATI Trinity",	0, 0 },
+	{ HDA_AMD_X370,      "AMD X370",	0, 0 },
+	{ HDA_AMD_X570,      "AMD X570",	0, 0 },
+	{ HDA_AMD_STONEY,    "AMD Stoney",	0, 0 },
+	{ HDA_AMD_RAVEN,     "AMD Raven",	0, 0 },
 	{ HDA_AMD_HUDSON2,   "AMD Hudson-2",	0, 0 },
 	{ HDA_RDC_M3010,     "RDC M3010",	0, 0 },
 	{ HDA_VIA_VT82XX,    "VIA VT8251/8237A",0, 0 },
-	{ HDA_SIS_966,       "SiS 966",		0, 0 },
+	{ HDA_VMWARE,        "VMware",		0, 0 },
+	{ HDA_SIS_966,       "SiS 966/968",		0, 0 },
 	{ HDA_ULI_M5461,     "ULI M5461",	0, 0 },
+	{ HDA_CREATIVE_SB1570,	"Creative SB Audigy FX", 0, HDAC_QUIRK_64BIT },
 	/* Unknown */
 	{ HDA_INTEL_ALL,  "Intel",		0, 0 },
 	{ HDA_NVIDIA_ALL, "NVIDIA",		0, 0 },
 	{ HDA_ATI_ALL,    "ATI",		0, 0 },
 	{ HDA_AMD_ALL,    "AMD",		0, 0 },
+	{ HDA_CREATIVE_ALL,    "Creative",	0, 0 },
 	{ HDA_VIA_ALL,    "VIA",		0, 0 },
+	{ HDA_VMWARE_ALL, "VMware",		0, 0 },
 	{ HDA_SIS_ALL,    "SiS",		0, 0 },
 	{ HDA_ULI_ALL,    "ULI",		0, 0 },
 };
@@ -187,6 +230,7 @@ static const struct {
 } hdac_pcie_snoop[] = {
 	{  INTEL_VENDORID, 0x00, 0x00, 0x00 },
 	{    ATI_VENDORID, 0x42, 0xf8, 0x02 },
+	{    AMD_VENDORID, 0x42, 0xf8, 0x02 },
 	{ NVIDIA_VENDORID, 0x4e, 0xf0, 0x0f },
 };
 #endif
@@ -197,6 +241,7 @@ TASKQUEUE_DEFINE_THREAD(hdac);
  * Function prototypes
  ****************************************************************************/
 static void	hdac_intr_handler(void *);
+static void	hdac_one_intr(struct hdac_softc *sc, uint32_t intsts);
 static int	hdac_reset(struct hdac_softc *, int);
 static int	hdac_get_capabilities(struct hdac_softc *);
 static void	hdac_dma_cb(void *, bus_dma_segment_t *, int, int);
@@ -294,20 +339,35 @@ static void
 hdac_intr_handler(void *context)
 {
 	struct hdac_softc *sc;
-	device_t dev;
 	uint32_t intsts;
-	uint8_t rirbsts;
-	int i;
 
 	sc = (struct hdac_softc *)context;
-	hdac_lock(sc);
 
-	/* Do we have anything to do? */
+	/*
+	 * Loop until HDAC_INTSTS_GIS gets clear.
+	 * It is plausible that hardware interrupts a host only when GIS goes
+	 * from zero to one.  GIS is formed by OR-ing multiple hardware
+	 * statuses, so it's possible that a previously cleared status gets set
+	 * again while another status has not been cleared yet.  Thus, there
+	 * will be no new interrupt as GIS always stayed set.  If we don't
+	 * re-examine GIS then we can leave it set and never get an interrupt
+	 * again.
+	 */
+	hdac_lock(sc);
 	intsts = HDAC_READ_4(&sc->mem, HDAC_INTSTS);
-	if ((intsts & HDAC_INTSTS_GIS) == 0) {
-		hdac_unlock(sc);
-		return;
+	while (intsts != 0xffffffff && (intsts & HDAC_INTSTS_GIS) != 0) {
+		hdac_one_intr(sc, intsts);
+		intsts = HDAC_READ_4(&sc->mem, HDAC_INTSTS);
 	}
+	hdac_unlock(sc);
+}
+
+static void
+hdac_one_intr(struct hdac_softc *sc, uint32_t intsts)
+{
+	device_t dev;
+	uint8_t rirbsts;
+	int i;
 
 	/* Was this a controller interrupt? */
 	if (intsts & HDAC_INTSTS_CIS) {
@@ -335,9 +395,7 @@ hdac_intr_handler(void *context)
 			}
 		}
 	}
-
 	HDAC_WRITE_4(&sc->mem, HDAC_INTSTS, intsts);
-	hdac_unlock(sc);
 }
 
 static void
@@ -1225,9 +1283,6 @@ hdac_attach(device_t dev)
 	result = hdac_mem_alloc(sc);
 	if (result != 0)
 		goto hdac_attach_fail;
-	result = hdac_irq_alloc(sc);
-	if (result != 0)
-		goto hdac_attach_fail;
 
 	hdac_reset(sc, 1);
 
@@ -1297,6 +1352,10 @@ hdac_attach(device_t dev)
 	/* Initialize the CORB and RIRB */
 	hdac_corb_init(sc);
 	hdac_rirb_init(sc);
+
+	result = hdac_irq_alloc(sc);
+	if (result != 0)
+		goto hdac_attach_fail;
 
 	/* Defer remaining of initialization until interrupts are enabled */
 	sc->intrhook.ich_func = hdac_attach2;

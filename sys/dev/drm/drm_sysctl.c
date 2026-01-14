@@ -35,6 +35,9 @@
 #include <drm/drmP.h>
 #include "drm_legacy.h"
 
+extern unsigned int drm_timestamp_precision;
+extern int drm_vblank_offdelay;
+
 SYSCTL_NODE(_hw, OID_AUTO, dri, CTLFLAG_RD, 0, "DRI Graphics");
 SYSCTL_INT(_hw_dri, OID_AUTO, debug, CTLFLAG_RW, &drm_debug, 0,
 	    "Enable debugging output");

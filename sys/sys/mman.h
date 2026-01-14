@@ -94,8 +94,8 @@ typedef	__size_t	size_t;
 /*
  * Mapping type
  *
- * NOTE! MAP_VPAGETABLE is no longer supported and will generate a mmap()
- *	 error.
+ * NOTE! MAP_VPAGETABLE is used by vkernels for software page tables.
+ *
  */
 #define	MAP_FILE	0x0000		/* map from file (default) */
 #define	MAP_ANON	0x1000		/* allocated from memory, swap space */
@@ -108,6 +108,7 @@ typedef	__size_t	size_t;
 #define	MAP_TRYFIXED	0x00010000 /* attempt hint address, even within heap */
 #define	MAP_NOCORE	0x00020000 /* dont include these pages in a coredump */
 #define	MAP_SIZEALIGN	0x00040000 /* size is also an alignment requirement */
+#define	MAP_32BIT	0x00080000 /* allocate from 32-bit addr space only */
 #endif /* __BSD_VISIBLE */
 
 #if __POSIX_VISIBLE >= 199309

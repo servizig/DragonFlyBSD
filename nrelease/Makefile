@@ -26,6 +26,9 @@ MTREE_FSCHG=	-i
 # Current version in format: <tag>[<n>.g<commit>]
 # e.g., "v6.4.0", "v6.5.0.816.g708615"
 GITREV!=	sh ${SRCDIR}/tools/gitrev.sh
+.if empty(GITREV)
+.error Git failed to determine the current revision.
+.endif
 
 # The label/name of the disklabel64(5) slice in the ".img" file.  This is
 # used to identify the USB device with DragonFly installation image, avoiding
@@ -52,7 +55,14 @@ DPORTS_EXTRA_PACKAGES?=
 
 # dports packages to be built and installed on the release ISO
 #
-DPORTS_PACKAGES?=	security/ca_root_nss \
+# NOTE:	Since 2025Q1, if the 'ports-mgmt/pkg' package is installed as a
+#	dependency of another package, it will be marked as 'automatic'
+#	and will be removed by a later 'pkg autoremove', which would cause
+#	the nrelease build to fail.  Therefore, explicitly install it to
+#	fix the issue.
+#
+DPORTS_PACKAGES?=	ports-mgmt/pkg \
+			security/ca_root_nss \
 			devel/git-lite \
 			dns/bind-tools \
 			net/isc-dhcp44-server \
@@ -389,11 +399,9 @@ mkimg:
 	cp ${ISOROOT}/boot/boot1.efi ${IMGMNT}/EFI/BOOT/BOOTX64.EFI
 	umount ${IMGMNT}
 	@echo "STEP: write standard disklabel"
-	disklabel -w -r `cat ${ISODIR}/vn.which`s2 auto
+	disklabel -w -r `cat ${ISODIR}/vn.which`s2 auto ${LABEL}
 	@echo "STEP: read disklabel back"
 	disklabel -r `cat ${ISODIR}/vn.which`s2 > ${IMGFILE}.label
-	@echo "STEP: set disklabel name"
-	echo "label: ${LABEL}" >> ${IMGFILE}.label
 	@echo "STEP: add slice partition"
 	echo "a: * * 4.2BSD" >> ${IMGFILE}.label;
 	@echo "STEP: write modified disklabel back"

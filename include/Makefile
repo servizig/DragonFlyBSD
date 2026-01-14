@@ -24,9 +24,7 @@ INCS=	a.out.h alloca.h ar.h assert.h bitstring.h byteswap.h \
 	stdalign.h stdarg.h stdbool.h \
 	stddef.h stdint.h stdio.h stdlib.h stdnoreturn.h \
 	string.h stringlist.h strings.h sysexits.h \
-	tar.h termios.h time.h \
-	timeconv.h \
-	timers.h ttyent.h \
+	tar.h termios.h time.h timeconv.h ttyent.h \
 	uchar.h unistd.h ulimit.h utime.h utmpx.h \
 	uuid.h vis.h \
 	wchar.h wctype.h wordexp.h xlocale.h
@@ -152,7 +150,7 @@ INCSLINKS+=	ieeefp.h ${INCLUDEDIR}/floatingpoint.h
 # architecture does not need to enhance.
 
 mtree_setup:
-.for i in ${LDIRS} ${LSYMSUBDIRS} machine cpu crypto dev/acpica
+.for i in ${LDIRS} ${LSYMSUBDIRS} machine cpu dev/acpica
 	if [ -h ${DESTDIR}/usr/include/$i ]; then \
 		rm -f ${DESTDIR}/usr/include/$i; \
 	fi
@@ -166,11 +164,6 @@ copies:		mtree_setup
 		${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 $i/*.h \
 		${DESTDIR}/usr/include/$i
 .endfor
-	cd ${.CURDIR}/../sys; \
-		${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 crypto/rijndael/rijndael.h \
-		${DESTDIR}/usr/include/crypto; \
-		${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 opencrypto/*.h \
-		${DESTDIR}/usr/include/crypto
 	cd ${.CURDIR}/../sys/dev/acpica; \
 		${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 acpiio.h \
 		${DESTDIR}/usr/include/dev/acpica
@@ -238,8 +231,6 @@ symlinks:	mtree_setup
 	rm -rf ${DESTDIR}/usr/include/$i
 	${LN} -s ../../sys/$i ${DESTDIR}/usr/include/$i
 .endfor
-	rm -rf ${DESTDIR}/usr/include/crypto
-	${LN} -s ../../sys/opencrypto ${DESTDIR}/usr/include/crypto
 .for i in ${LSYMSUBDIRS}
 	rm -rf ${DESTDIR}/usr/include/$i
 	${LN} -s ${i:C;[^/]+/?;../;g}../sys/$i ${DESTDIR}/usr/include/$i

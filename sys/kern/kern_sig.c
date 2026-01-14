@@ -96,16 +96,6 @@ SYSCTL_INT(_kern, KERN_LOGSIGEXIT, logsigexit, CTLFLAG_RW,
     "Log processes quitting on abnormal signals to syslog(3)");
 
 /*
- * Can process p send the signal sig to process q?  Only processes within
- * the current reaper or children of the current reaper can be signaled.
- * Normally the reaper itself cannot be signalled, unless initok is set.
- */
-#define	CANSIGNAL(q, sig, initok)				\
-	((!p_trespass(curproc->p_ucred, (q)->p_ucred) &&	\
-	reaper_sigtest(curproc, q, initok)) ||			\
-	((sig) == SIGCONT && (q)->p_session == curproc->p_session))
-
-/*
  * Policy -- Can real uid ruid with ucred uc send a signal to process q?
  */
 #define	CANSIGIO(ruid, uc, q) \
@@ -1883,7 +1873,7 @@ kern_sigtimedwait(sigset_t waitset, siginfo_t *info, struct timespec *timeout)
 			SIGFILLSET(lp->lwp_sigmask);
 			SIGDELSET(lp->lwp_sigmask, sig);
 			SIG_CANTMASK(lp->lwp_sigmask);
-			sig = issignal(lp, 1, 0);
+			sig = issignal(lp, 1, NULL);
 			/*
 			 * It may be a STOP signal, in the case, issignal
 			 * returns 0, because we may stop there, and new
