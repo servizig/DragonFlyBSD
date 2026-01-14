@@ -2997,6 +2997,13 @@ ptrace_single_step(struct lwp *lp)
 }
 
 int
+ptrace_clear_step(struct lwp *lp)
+{
+	lp->lwp_md.md_regs->tf_rflags &= ~PSL_T;
+	return (0);
+}
+
+int
 fill_regs(struct lwp *lp, struct reg *regs)
 {
 	struct trapframe *tp;
