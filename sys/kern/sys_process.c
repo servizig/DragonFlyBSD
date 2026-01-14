@@ -433,6 +433,14 @@ ptrace_req_generic(int req, struct proc *p, struct lwp *lp, void *user_addr,
 		data = SIGKILL;
 		goto sendsig;	/* in PT_CONTINUE below */
 
+	case PT_SETSTEP:
+		error = ptrace_single_step (lp);
+		break;
+
+	case PT_CLEARSTEP:
+		error = ptrace_clear_step (lp);
+		break;
+
 	case PT_STEP:
 	case PT_CONTINUE:
 	case PT_DETACH:

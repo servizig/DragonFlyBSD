@@ -52,20 +52,6 @@
 #define         PT_DETACH       11  /* stop tracing a process */
 #define         PT_IO           12  /* do I/O to/from stopped process. */
 
-#define	PT_TRACE_ME	0	/* child declares it's being traced */
-#define	PT_READ_I	1	/* read word in child's I space */
-#define	PT_READ_D	2	/* read word in child's D space */
-/* was	PT_READ_U	3	 * read word in child's user structure */
-#define	PT_WRITE_I	4	/* write word in child's I space */
-#define	PT_WRITE_D	5	/* write word in child's D space */
-/* was	PT_WRITE_U	6	 * write word in child's user structure */
-#define	PT_CONTINUE	7	/* continue the child */
-#define	PT_KILL		8	/* kill the child process */
-#define	PT_STEP		9	/* single step the child */
-
-#define	PT_ATTACH	10	/* trace some running process */
-#define	PT_DETACH	11	/* stop tracing a process */
-#define	PT_IO		12	/* do I/O to/from stopped process. */
 #define         PT_GETNUMLWPS   13  /* number of user threads */
 #define         PT_GETLWPLIST   14  /* array of user thread ids */
 #define         PT_GETNEXTEVENT 15  /* wait for next event */
@@ -74,6 +60,8 @@
 #define         PT_LWPINFO      18  /* get information about lwp */
 #define         PT_LWPEVENT     19
 #define         PT_WAIT         20
+#define		PT_SETSTEP	21
+#define		PT_CLEARSTEP	22
 
 /* Don't forget to update PT_LASTGENERIC */
 
@@ -132,7 +120,7 @@ struct ptrace_event {
 #endif
 
 #define PT_FIRSTGENERIC PT_TRACE_ME
-#define PT_LASTGENERIC  PT_WAIT
+#define PT_LASTGENERIC  PT_CLEARSTEP
 
 struct proc;
 struct lwp;
@@ -140,6 +128,7 @@ struct lwp;
 void	proc_reparent (struct proc *child, struct proc *newparent);
 int	ptrace_set_pc (struct lwp *p, unsigned long addr);
 int	ptrace_single_step (struct lwp *lp);
+int	ptrace_clear_step (struct lwp *lp);
 int	kern_ptrace (int req, ptrace_ptid_t pid, void *addr,
 		int data, int *res);
 
