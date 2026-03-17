@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -28,27 +30,25 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * @(#)reverse.c	8.1 (Berkeley) 6/6/93
- * $FreeBSD: src/usr.bin/tail/reverse.c,v 1.9.2.3 2001/12/19 20:29:31 iedowse Exp $
  */
 
 #include <sys/param.h>
+#include <sys/queue.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 
-#include <limits.h>
+#include <err.h>
 #include <errno.h>
-#include <unistd.h>
-#include <stdint.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <err.h>
+#include <unistd.h>
+
 #include "extern.h"
 
-static void r_buf(FILE *);
-static void r_reg(FILE *, enum STYLE, off_t, struct stat *);
+static void r_buf(FILE *, const char *);
+static void r_reg(FILE *, const char *, enum STYLE, off_t, struct stat *);
 
 /*
  * reverse -- display input in reverse order by line.
@@ -69,34 +69,36 @@ static void r_reg(FILE *, enum STYLE, off_t, struct stat *);
  *	NOREG	cyclically read input into a linked list of buffers
  */
 void
-reverse(FILE *fp, enum STYLE style, off_t off, struct stat *sbp)
+reverse(FILE *fp, const char *fn, enum STYLE style, off_t off,
+	struct stat *sbp)
 {
 	if (style != REVERSE && off == 0)
 		return;
 
-	if (S_ISREG(sbp->st_mode))
-		r_reg(fp, style, off, sbp);
-	else
-		switch(style) {
+	if (S_ISREG(sbp->st_mode)) {
+		r_reg(fp, fn, style, off, sbp);
+	} else {
+		switch (style) {
 		case FBYTES:
 		case RBYTES:
-			display_bytes(fp, off);
+			display_bytes(fp, fn, off);
 			break;
 		case FLINES:
 		case RLINES:
-			display_lines(fp, off);
+			display_lines(fp, fn, off);
 			break;
 		case REVERSE:
-			r_buf(fp);
+			r_buf(fp, fn);
 			break;
 		}
+	}
 }
 
 /*
  * r_reg -- display a regular file in reverse order by line.
  */
 static void
-r_reg(FILE *fp, enum STYLE style, off_t off, struct stat *sbp)
+r_reg(FILE *fp, const char *fn, enum STYLE style, off_t off, struct stat *sbp)
 {
 	struct mapinfo map;
 	off_t curoff, size, lineend;
@@ -108,6 +110,7 @@ r_reg(FILE *fp, enum STYLE style, off_t off, struct stat *sbp)
 	map.start = NULL;
 	map.mapoff = map.maxoff = size;
 	map.fd = fileno(fp);
+	map.maplen = 0;
 
 	/*
 	 * Last char is special, ignore whether newline or not. Note that
@@ -117,9 +120,9 @@ r_reg(FILE *fp, enum STYLE style, off_t off, struct stat *sbp)
 	lineend = size;
 	while (curoff >= 0) {
 		if (curoff < map.mapoff ||
-		    curoff >= (intmax_t)(map.mapoff + map.maplen)) {
+		    curoff >= map.mapoff + (off_t)map.maplen) {
 			if (maparound(&map, curoff) != 0) {
-				ierr();
+				ierr(fn);
 				return;
 			}
 		}
@@ -136,7 +139,7 @@ r_reg(FILE *fp, enum STYLE style, off_t off, struct stat *sbp)
 
 		/* Print the line and update offsets. */
 		if (mapprint(&map, curoff + 1, lineend - curoff - 1) != 0) {
-			ierr();
+			ierr(fn);
 			return;
 		}
 		lineend = curoff + 1;
@@ -152,19 +155,19 @@ r_reg(FILE *fp, enum STYLE style, off_t off, struct stat *sbp)
 		}
 	}
 	if (curoff < 0 && mapprint(&map, 0, lineend) != 0) {
-		ierr();
+		ierr(fn);
 		return;
 	}
 	if (map.start != NULL && munmap(map.start, map.maplen))
-		ierr();
+		ierr(fn);
 }
 
-typedef struct bf {
-	struct bf *next;
-	struct bf *prev;
-	int len;
-	char *l;
-} BF;
+#define BSZ	(128 * 1024)
+struct bfelem {
+	TAILQ_ENTRY(bfelem) entries;
+	size_t len;
+	char l[BSZ];
+};
 
 /*
  * r_buf -- display a non-regular file in reverse order by line.
@@ -177,60 +180,46 @@ typedef struct bf {
  * user warned).
  */
 static void
-r_buf(FILE *fp)
+r_buf(FILE *fp, const char *fn)
 {
-	BF *mark, *tl = NULL, *tr = NULL;
-	int ch = 0, len, llen;
+	struct bfelem *tl, *first = NULL;
+	size_t llen;
 	char *p;
-	off_t enomem;
+	off_t enomem = 0;
+	TAILQ_HEAD(bfhead, bfelem) head;
 
-#define	BSZ	(128 * 1024)
-	for (mark = NULL, enomem = 0;;) {
+	TAILQ_INIT(&head);
+
+	while (!feof(fp)) {
+		size_t len;
+
 		/*
 		 * Allocate a new block and link it into place in a doubly
 		 * linked list.  If out of memory, toss the LRU block and
 		 * keep going.
 		 */
-		if (enomem || (tl = malloc(sizeof(BF))) == NULL ||
-		    (tl->l = malloc(BSZ)) == NULL) {
-			if (!mark)
-				err(1, "malloc");
-			tl = enomem ? tl->next : mark;
-			enomem += tl->len;
-		} else if (mark) {
-			tl->next = mark;
-			tl->prev = mark->prev;
-			mark->prev->next = tl;
-			mark->prev = tl;
-		} else {
-			mark = tl;
-			mark->next = mark->prev = mark;
+		while ((tl = malloc(sizeof(*tl))) == NULL) {
+			first = TAILQ_FIRST(&head);
+			if (TAILQ_EMPTY(&head))
+				err(1, "failed to allocate memory");
+			enomem += first->len;
+			TAILQ_REMOVE(&head, first, entries);
+			free(first);
 		}
+		TAILQ_INSERT_TAIL(&head, tl, entries);
 
 		/* Fill the block with input data. */
-		for (p = tl->l, len = 0;
-		    len < BSZ && (ch = getc(fp)) != EOF; ++len)
-			*p++ = ch;
-
-		if (ferror(fp)) {
-			ierr();
-			return;
-		}
-
-		/*
-		 * If no input data for this block and we tossed some data,
-		 * recover it.
-		 */
-		if (!len) {
-			if (enomem)
-				enomem -= tl->len;
-			tl = tl->prev;
-			break;
+		len = 0;
+		while ((!feof(fp)) && len < BSZ) {
+			p = tl->l + len;
+			len += fread(p, 1, BSZ - len, fp);
+			if (ferror(fp)) {
+				ierr(fn);
+				return;
+			}
 		}
 
 		tl->len = len;
-		if (ch == EOF)
-			break;
 	}
 
 	if (enomem) {
@@ -239,37 +228,49 @@ r_buf(FILE *fp)
 	}
 
 	/*
-	 * Step through the blocks in the reverse order read.  The last char
-	 * is special, ignore whether newline or not.
+	 * Now print the lines in reverse order
+	 * Outline:
+	 *    Scan backward for "\n",
+	 *    print forward to the end of the buffers
+	 *    free any buffers that start after the "\n" just found
+	 *    Loop
 	 */
-	for (mark = tl;;) {
-		for (p = tl->l + (len = tl->len) - 1, llen = 0; len--;
-		    --p, ++llen)
-			if (*p == '\n') {
-				if (llen) {
+	tl = TAILQ_LAST(&head, bfhead);
+	first = TAILQ_FIRST(&head);
+	while (tl != NULL) {
+		struct bfelem *temp, *tr;
+		int start;
+
+		for (p = tl->l + tl->len - 1, llen = 0;
+		     p >= tl->l;
+		     --p, ++llen)
+		{
+			start = (tl == first && p == tl->l);
+			if ((*p == '\n') || start) {
+				if (llen > 0 && start && *p != '\n') {
+					WR(p, llen + 1);
+				} else if (llen > 0) {
 					WR(p + 1, llen);
-					llen = 0;
+					if (start && *p == '\n')
+						WR(p, 1);
 				}
-				if (tl == mark)
-					continue;
-				for (tr = tl->next; tr->len; tr = tr->next) {
-					WR(tr->l, tr->len);
-					tr->len = 0;
-					if (tr == mark)
-						break;
+				tr = TAILQ_NEXT(tl, entries);
+				llen = 0;
+				if (tr != NULL) {
+					TAILQ_FOREACH_FROM_MUTABLE(tr, &head,
+					    entries, temp) {
+						if (tr->len > 0)
+							WR(&tr->l, tr->len);
+						TAILQ_REMOVE(&head, tr,
+						    entries);
+						free(tr);
+					}
 				}
 			}
+		}
 		tl->len = llen;
-		if ((tl = tl->prev) == mark)
-			break;
+		tl = TAILQ_PREV(tl, bfhead, entries);
 	}
-	tl = tl->next;
-	if (tl->len) {
-		WR(tl->l, tl->len);
-		tl->len = 0;
-	}
-	while ((tl = tl->next)->len) {
-		WR(tl->l, tl->len);
-		tl->len = 0;
-	}
+	TAILQ_REMOVE(&head, first, entries);
+	free(first);
 }

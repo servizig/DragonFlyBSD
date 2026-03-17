@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -28,25 +30,23 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * @(#)misc.c	8.1 (Berkeley) 6/6/93
- * $FreeBSD: src/usr.bin/tail/misc.c,v 1.4.8.2 2001/04/18 09:32:08 dwmalone Exp $
  */
 
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+
+#include <err.h>
 #include <errno.h>
-#include <unistd.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <err.h>
+#include <unistd.h>
+
 #include "extern.h"
 
 void
-ierr(void)
+ierr(const char *fname)
 {
 	warn("%s", fname);
 	rval = 1;
@@ -69,7 +69,7 @@ mapprint(struct mapinfo *mip, off_t startoff, off_t len)
 
 	while (len > 0) {
 		if (startoff < mip->mapoff ||
-		    startoff >= (intmax_t)(mip->mapoff + mip->maplen)) {
+		    startoff >= mip->mapoff + (off_t)mip->maplen) {
 			if (maparound(mip, startoff) != 0)
 				return (1);
 		}
@@ -97,7 +97,7 @@ maparound(struct mapinfo *mip, off_t offset)
 
 	mip->mapoff = rounddown2(offset, (off_t)TAILMAPLEN);
 	mip->maplen = TAILMAPLEN;
-	if (mip->maplen > (uintmax_t)(mip->maxoff - mip->mapoff))
+	if ((off_t)mip->maplen > mip->maxoff - mip->mapoff)
 		mip->maplen = mip->maxoff - mip->mapoff;
 	if (mip->maplen <= 0)
 		abort();
@@ -106,4 +106,18 @@ maparound(struct mapinfo *mip, off_t offset)
 		return (1);
 
 	return (0);
+}
+
+/*
+ * Print the file name without stdio buffering.
+ */
+void
+printfn(const char *fn, int print_nl)
+{
+
+	if (print_nl)
+		WR("\n", 1);
+	WR("==> ", 4);
+	WR(fn, strlen(fn));
+	WR(" <==\n", 5);
 }

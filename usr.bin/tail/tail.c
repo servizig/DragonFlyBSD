@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -28,44 +30,37 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * @(#)tail.c	8.1 (Berkeley) 6/6/93
- * $FreeBSD: src/usr.bin/tail/tail.c,v 1.6.2.2 2001/12/19 20:29:31 iedowse Exp $
  */
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <err.h>
 #include <errno.h>
-#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <err.h>
+#include <unistd.h>
+
 #include "extern.h"
 
 int Fflag, fflag, qflag, rflag, vflag, rval, no_files;
-const char *fname;
-
-#ifndef BOOTSTRAPPING
-file_info_t *files;
-#endif
 
 static void obsolete(char **);
 static void usage(void) __dead2;
 static void getarg(int, enum STYLE, enum STYLE, enum STYLE *, int *, off_t *);
 
 int
-main(int argc, char **argv)
+main(int argc, char *argv[])
 {
 	const char *optstring;
 	struct stat sb;
+	const char *fn;
 	FILE *fp;
-	off_t off = 0;
+	off_t off;
 	enum STYLE style;
-	int style_set;
-	int i, ch;
+	int ch, first, style_set;
 #ifndef BOOTSTRAPPING
-	file_info_t *file;
+	file_info_t file, *filep, *files;
 #endif
 
 	if (strcmp(getprogname(), "tac") == 0) {
@@ -80,10 +75,13 @@ main(int argc, char **argv)
 
 	obsolete(argv);
 	style_set = 0;
+	off = 0;
 	while ((ch = getopt(argc, argv, optstring)) != -1) {
-		switch(ch) {
+		switch (ch) {
 		case 'F':	/* -F is superset of (and implies) -f */
-#ifndef BOOTSTRAPPING
+#ifdef BOOTSTRAPPING
+			errx(-1, "follow support disabled");
+#else
 			Fflag = fflag = 1;
 #endif
 			break;
@@ -94,7 +92,9 @@ main(int argc, char **argv)
 			getarg(1, FBYTES, RBYTES, &style, &style_set, &off);
 			break;
 		case 'f':
-#ifndef BOOTSTRAPPING
+#ifdef BOOTSTRAPPING
+			errx(-1, "follow support disabled");
+#else
 			fflag = 1;
 #endif
 			break;
@@ -112,6 +112,7 @@ main(int argc, char **argv)
 			vflag = 1;
 			qflag = 0;
 			break;
+		case '?':
 		default:
 			usage();
 		}
@@ -148,52 +149,56 @@ main(int argc, char **argv)
 		}
 	}
 
-#ifndef BOOTSTRAPPING
 	if (*argv && fflag) {
+#ifdef BOOTSTRAPPING
+		errx(-1, "follow support disabled");
+#else
 		files = malloc(no_files * sizeof(struct file_info));
 		if (files == NULL)
-			err(1, "Couldn't malloc space for files descriptors.");
+			err(1, "failed to allocate memory for file descriptors");
 
-		for (file = files; (fname = *argv++) != NULL; file++) {
-			file->file_name = strdup(fname);
-			if (! file->file_name)
-				errx(1, "Couldn't alloc space for file name.");
-			file->fp = fopen(file->file_name, "r");
-			if (file->fp == NULL ||
-			    fstat(fileno(file->fp), &file->st) == -1) {
-				file->fp = NULL;
-				ierr();
+		for (filep = files; (fn = *argv++) != NULL; filep++) {
+			filep->file_name = fn;
+			filep->fp = fopen(filep->file_name, "r");
+			if (filep->fp == NULL ||
+			    fstat(fileno(filep->fp), &filep->st) == -1) {
+				if (filep->fp != NULL) {
+					fclose(filep->fp);
+					filep->fp = NULL;
+				}
+				if (!Fflag || errno != ENOENT)
+					ierr(filep->file_name);
 			}
 		}
 		follow(files, style, off);
-		for (i = 0, file = files; i < no_files; i++, file++)
-			free(file->file_name);
 		free(files);
-	} else
 #endif
-	if (*argv) {
-		for (i = 0; (fname = *argv++) != NULL; ++i) {
-			if ((fp = fopen(fname, "r")) == NULL ||
-			    fstat(fileno(fp), &sb)) {
-				ierr();
+	} else if (*argv) {
+		first = 1;
+		while ((fn = *argv++) != NULL) {
+			if ((fp = fopen(fn, "r")) == NULL ||
+			    fstat(fileno(fp), &sb) == -1) {
+				if (fp != NULL)
+					fclose(fp);
+				ierr(fn);
 				continue;
 			}
-			if (vflag || argc > 1) {
-				showfilename(i, fname);
-				(void)fflush(stdout);
+			if (vflag || (!qflag && argc > 1)) {
+				printfn(fn, !first);
+				first = 0;
 			}
 
 			if (rflag)
-				reverse(fp, style, off, &sb);
+				reverse(fp, fn, style, off, &sb);
 			else
-				forward(fp, style, off, &sb);
-			(void)fclose(fp);
+				forward(fp, fn, style, off, &sb);
+			fclose(fp);
 		}
 	} else {
-		fname = "stdin";
+		fn = "stdin";
 
 		if (fstat(fileno(stdin), &sb)) {
-			ierr();
+			ierr(fn);
 			exit(1);
 		}
 
@@ -201,16 +206,26 @@ main(int argc, char **argv)
 		 * Determine if input is a pipe.  4.4BSD will set the SOCKET
 		 * bit in the st_mode field for pipes.  Fix this then.
 		 */
-		if (lseek(fileno(stdin), (off_t)0, SEEK_CUR) == -1 &&
+		if (lseek(fileno(stdin), 0, SEEK_CUR) == -1 &&
 		    errno == ESPIPE) {
 			errno = 0;
 			fflag = 0;		/* POSIX.2 requires this. */
 		}
 
-		if (rflag)
-			reverse(stdin, style, off, &sb);
-		else
-			forward(stdin, style, off, &sb);
+		if (rflag) {
+			reverse(stdin, fn, style, off, &sb);
+		} else if (fflag) {
+#ifdef BOOTSTRAPPING
+			errx(-1, "follow support disabled");
+#else
+			file.file_name = fn;
+			file.fp = stdin;
+			file.st = sb;
+			follow(&file, style, off);
+#endif
+		} else {
+			forward(stdin, fn, style, off, &sb);
+		}
 	}
 	exit(rval);
 }
@@ -262,7 +277,7 @@ getarg(int units, enum STYLE forward_style, enum STYLE backward_style,
  * the option argument for a -b, -c or -n option gets converted.
  */
 static void
-obsolete(char **argv)
+obsolete(char *argv[])
 {
 	char *ap, *p, *t;
 	size_t len;
@@ -276,7 +291,7 @@ obsolete(char **argv)
 		} else if (ap[1] == '-')
 			return;
 
-		switch(*++ap) {
+		switch (*++ap) {
 		/* Old-style option. */
 		case '0': case '1': case '2': case '3': case '4':
 		case '5': case '6': case '7': case '8': case '9':
@@ -284,7 +299,7 @@ obsolete(char **argv)
 			/* Malloc space for dash, new option and argument. */
 			len = strlen(*argv);
 			if ((start = p = malloc(len + 3)) == NULL)
-				err(1, "malloc");
+				err(1, "failed to allocate memory");
 			*p++ = '-';
 
 			/*
@@ -297,7 +312,7 @@ obsolete(char **argv)
 				*p++ = *t;
 				*t-- = '\0';
 			}
-			switch(*t) {
+			switch (*t) {
 			case 'b':
 				*p++ = 'b';
 				*t = '\0';
@@ -317,7 +332,7 @@ obsolete(char **argv)
 				errx(1, "illegal option -- %s", *argv);
 			}
 			*p++ = *argv[0];
-			(void)strcpy(p, ap);
+			strcpy(p, ap);
 			*argv = start;
 			continue;
 
