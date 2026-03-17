@@ -433,6 +433,7 @@ MLINKS+=bktr.4 brooktree.4
 MLINKS+=bnx.4 if_bnx.4
 MLINKS+=bridge.4 if_bridge.4
 MLINKS+=bwn.4 if_bwn.4
+MLINKS+=carp.4 if_carp.4
 MLINKS+=cdce.4 if_cdce.4
 MLINKS+=cue.4 if_cue.4
 MLINKS+=dc.4 if_dc.4
