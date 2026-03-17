@@ -45,9 +45,12 @@ interface for the purpose of providing fault-tolerance and high-speed links.
 .Pp
 A
 .Nm
-interface can be created using the
+interface can be created at runtime using the
 .Ic ifconfig lagg Ns Ar N Ic create
-command.
+command, or by configuring it via the
+.Va cloned_interfaces
+variable in
+.Xr rc.conf 5 .
 It can use different link aggregation protocols specified
 using the
 .Ic laggproto Ar proto
@@ -119,18 +122,6 @@ disabling the
 .Nm
 interface itself.
 .El
-.Pp
-Each
-.Nm
-interface is created at runtime using interface cloning.
-This is
-most easily done with the
-.Xr ifconfig 8
-.Cm create
-command or using the
-.Va cloned_interfaces
-variable in
-.Xr rc.conf 5 .
 .Pp
 The MTU of the first interface to be added is used as the lagg MTU.
 All additional interfaces are required to have exactly the same value.
