@@ -16,7 +16,7 @@
 .\"
 .\" $FreeBSD: head/share/man/man4/lagg.4 243091 2012-11-15 16:54:14Z joel $
 .\"
-.Dd February 23, 2012
+.Dd March 17, 2026
 .Dt LAGG 4
 .Os
 .Sh NAME
@@ -156,15 +156,17 @@ between wired and wireless networks using two network devices.
 Whenever the wired master interface is unplugged, the wireless failover
 device will be used:
 .Bd -literal -offset indent
-# ifconfig em0 up
-# ifconfig ath0 ether 00:11:22:33:44:55
+# ifconfig em0 ether 00:11:22:33:44:55 up
 # ifconfig create wlan0 wlandev ath0 ssid my_net up
 # ifconfig lagg0 laggproto failover laggport em0 laggport wlan0 \e
 	192.168.1.1 netmask 255.255.255.0
 .Ed
 .Pp
-(Note the mac address of the wireless device is forced to match the wired
-device as a workaround.)
+(Note the MAC address of the wired device is forced to match that of the
+wireless device,
+.Dq 00:11:22:33:44:55
+in this example, because some common wireless devices do not support to
+change the MAC address.)
 .Sh SEE ALSO
 .Xr ifmedia 4 ,
 .Xr ng_one2many 4 ,
