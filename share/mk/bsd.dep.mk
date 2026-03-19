@@ -155,10 +155,11 @@ _ALL_DEPENDS=${__FLAGS_FILES:N*.[csS]:N*.cc:N*.C:N*.cpp:N*.cxx:N*.m}
 	rm -f ${.TARGET}
 .if ${${_FG}_FLAGS_FILES:M*.[csS]} != ""
 	${_MKDEPENV} CC=${MKDEPCC} ${MKDEPCMD} -f ${.TARGET} -a ${MKDEP} \
-	    ${${_FG}_FLAGS} \
+	    ${${_FG}_FLAGS:M-I*} \
 	    ${CFLAGS:M--sysroot=*} \
 	    ${CFLAGS:M-nostdinc*} ${CFLAGS:M-[BID]*} \
 	    ${CFLAGS:M-std=*} \
+	    ${${_FG}_FLAGS:N-I*} \
 	    ${.ALLSRC:M*.[csS]}
 .endif
 .if ${${_FG}_FLAGS_FILES:M*.cc} != "" || \
@@ -166,17 +167,19 @@ _ALL_DEPENDS=${__FLAGS_FILES:N*.[csS]:N*.cc:N*.C:N*.cpp:N*.cxx:N*.m}
     ${${_FG}_FLAGS_FILES:M*.cpp} != "" || \
     ${${_FG}_FLAGS_FILES:M*.cxx} != ""
 	${_MKDEPENV} CC=${CXX} ${MKDEPCMD} -f ${.TARGET} -a ${MKDEP} \
-	    ${${_FG}_FLAGS} \
+	    ${${_FG}_FLAGS:M-I*} \
 	    ${CXXFLAGS:M--sysroot=*} \
 	    ${CXXFLAGS:M-nostdinc*} ${CXXFLAGS:M-[BID]*} \
 	    ${CXXFLAGS:M-std=*} \
+	    ${${_FG}_FLAGS:N-I*} \
 	    ${.ALLSRC:M*.cc} ${.ALLSRC:M*.C} ${.ALLSRC:M*.cpp} ${.ALLSRC:M*.cxx}
 .endif
 .if ${${_FG}_FLAGS_FILES:M*.m} != ""
 	${MKDEPCMD} -f ${.TARGET} -a ${MKDEP} \
-	    ${${_FG}_FLAGS} \
+	    ${${_FG}_FLAGS:M-I*} \
 	    ${OBJCFLAGS:M-nostdinc*} ${OBJCFLAGS:M-[BID]*} \
 	    ${OBJCFLAGS:M-Wno-import*} \
+	    ${${_FG}_FLAGS:N-I*} \
 	    ${.ALLSRC:M*.m}
 .endif
 	# In case that the custom ${MKDEPCMD} does not create the depend file

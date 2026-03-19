@@ -211,35 +211,44 @@ MACHINE_PLATFORM!=/sbin/sysctl -n hw.platform
 	chmod a+x ${.TARGET}
 
 .c:
-	${CC} ${_${.IMPSRC:T}_FLAGS} ${CFLAGS} ${LDFLAGS} ${.IMPSRC} ${LDLIBS} -o ${.TARGET}
+	${CC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${CFLAGS} ${_${.IMPSRC:T}_FLAGS:N-I*} \
+	    ${LDFLAGS} ${.IMPSRC} ${LDLIBS} -o ${.TARGET}
 
 .c.o:
-	${CC} ${_${.IMPSRC:T}_FLAGS} ${CFLAGS} -c ${.IMPSRC}
+	${CC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${CFLAGS} ${_${.IMPSRC:T}_FLAGS:N-I*} \
+	    -c ${.IMPSRC}
 
 .cc .cpp .cxx .C:
-	${CXX} ${_${.IMPSRC:T}_FLAGS} ${CXXFLAGS} ${LDFLAGS} ${.IMPSRC} ${LDLIBS} -o ${.TARGET}
+	${CXX} ${_${.IMPSRC:T}_FLAGS:M-I*} ${CXXFLAGS} ${_${.IMPSRC:T}_FLAGS:N-I*} \
+	    ${LDFLAGS} ${.IMPSRC} ${LDLIBS} -o ${.TARGET}
 
 .cc.o .cpp.o .cxx.o .C.o:
-	${CXX} ${_${.IMPSRC:T}_FLAGS} ${CXXFLAGS} -c ${.IMPSRC}
+	${CXX} ${_${.IMPSRC:T}_FLAGS:M-I*} ${CXXFLAGS} ${_${.IMPSRC:T}_FLAGS:N-I*} \
+	    -c ${.IMPSRC}
 
 .m.o:
-	${OBJC} ${_${.IMPSRC:T}_FLAGS} ${OBJCFLAGS} -c ${.IMPSRC}
+	${OBJC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${OBJCFLAGS} \
+	    ${_${.IMPSRC:T}_FLAGS:N-I*} -c ${.IMPSRC}
 
 .p.o:
-	${PC} ${_${.IMPSRC:T}_FLAGS} ${PFLAGS} -c ${.IMPSRC}
+	${PC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${PFLAGS} ${_${.IMPSRC:T}_FLAGS:N-I*} \
+	    -c ${.IMPSRC}
 
 .e .r .F .f:
-	${FC} ${_${.IMPSRC:T}_FLAGS} ${RFLAGS} ${EFLAGS} ${FFLAGS} ${LDFLAGS} \
-	    ${.IMPSRC} ${LDLIBS} -o ${.TARGET}
+	${FC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${RFLAGS} ${EFLAGS} ${FFLAGS} \
+	    ${_${.IMPSRC:T}_FLAGS:N-I*} ${LDFLAGS} ${.IMPSRC} ${LDLIBS} \
+	    -o ${.TARGET}
 
 .e.o .r.o .F.o .f.o:
-	${FC} ${_${.IMPSRC:T}_FLAGS} ${RFLAGS} ${EFLAGS} ${FFLAGS} -c ${.IMPSRC}
+	${FC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${RFLAGS} ${EFLAGS} ${FFLAGS} \
+	    ${_${.IMPSRC:T}_FLAGS:N-I*} -c ${.IMPSRC}
 
 .S.o:
-	${CC} ${_${.IMPSRC:T}_FLAGS} ${CFLAGS} -c ${.IMPSRC}
+	${CC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${CFLAGS} ${_${.IMPSRC:T}_FLAGS:N-I*} \
+	    -c ${.IMPSRC}
 
 .s.o:
-	${AS} ${_${.IMPSRC:T}_FLAGS} ${AFLAGS} -o ${.TARGET} ${.IMPSRC}
+	${AS} ${AFLAGS} ${_${.IMPSRC:T}_FLAGS} -o ${.TARGET} ${.IMPSRC}
 
 # XXX not -j safe
 .y.o:
@@ -255,10 +264,12 @@ MACHINE_PLATFORM!=/sbin/sysctl -n hw.platform
 # .no == native object file, for helper code when cross building.
 #
 .c.no:
-	${NXCC} ${_${.IMPSRC:T}_FLAGS} ${NXCFLAGS:N-flto} -c ${.IMPSRC} -o ${.TARGET}
+	${NXCC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${NXCFLAGS:N-flto} \
+	    ${_${.IMPSRC:T}_FLAGS:N-I*} -c ${.IMPSRC} -o ${.TARGET}
 
 .cc.no .C.no .cpp.no .cxx.no:
-	${NXCXX} ${_${.IMPSRC:T}_FLAGS} ${NXCXXFLAGS:N-flto} -c ${.IMPSRC} -o ${.TARGET}
+	${NXCXX} ${_${.IMPSRC:T}_FLAGS:M-I*} ${NXCXXFLAGS:N-flto} \
+	    ${_${.IMPSRC:T}_FLAGS:N-I*} -c ${.IMPSRC} -o ${.TARGET}
 
 .y.no:
 	${YACC} ${YFLAGS} ${.IMPSRC}
@@ -271,7 +282,8 @@ MACHINE_PLATFORM!=/sbin/sysctl -n hw.platform
 	rm -f ${.TARGET}.c
 
 .no.nx .c.nx:
-	${NXCC} ${_${.IMPSRC:T}_FLAGS} ${NXCFLAGS} ${NXLDFLAGS} ${.IMPSRC} \
+	${NXCC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${NXCFLAGS} \
+	    ${_${.IMPSRC:T}_FLAGS:N-I*} ${NXLDFLAGS} ${.IMPSRC} \
 	    ${NXLDLIBS} -o ${.TARGET}
 
 # XXX not -j safe
@@ -283,11 +295,14 @@ MACHINE_PLATFORM!=/sbin/sysctl -n hw.platform
 	${LEX} -t ${LFLAGS} ${.IMPSRC} > ${.TARGET}
 
 .s.out .c.out .o.out:
-	${CC} ${_${.IMPSRC:T}_FLAGS} ${CFLAGS} ${LDFLAGS} ${.IMPSRC} ${LDLIBS} -o ${.TARGET}
+	${CC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${CFLAGS} \
+	    ${_${.IMPSRC:T}_FLAGS:N-I*} ${LDFLAGS} ${.IMPSRC} ${LDLIBS} \
+	    -o ${.TARGET}
 
 .f.out .F.out .r.out .e.out:
-	${FC} ${_${.IMPSRC:T}_FLAGS} ${EFLAGS} ${RFLAGS} ${FFLAGS} ${LDFLAGS} \
-	    ${.IMPSRC} ${LDLIBS} -o ${.TARGET}
+	${FC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${EFLAGS} ${RFLAGS} ${FFLAGS} \
+	    ${_${.IMPSRC:T}_FLAGS:N-I*} ${LDFLAGS} ${.IMPSRC} ${LDLIBS} \
+	    -o ${.TARGET}
 	rm -f ${.PREFIX}.o
 
 # XXX not -j safe

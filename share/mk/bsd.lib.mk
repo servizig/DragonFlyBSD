@@ -62,62 +62,76 @@ PO_CFLAGS=${CFLAGS:N-ffunction-sections}
 PO_CXXFLAGS=${CXXFLAGS:N-ffunction-sections}
 
 .c.o:
-	${CC} ${_${.IMPSRC:T}_FLAGS} ${STATIC_CFLAGS} ${CFLAGS} -c ${.IMPSRC} -o ${.TARGET}
+	${CC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${STATIC_CFLAGS} ${CFLAGS} \
+	    ${_${.IMPSRC:T}_FLAGS:N-I*} -c ${.IMPSRC} -o ${.TARGET}
 
 .c.po:
-	${CC} ${_${.IMPSRC:T}_FLAGS} ${PO_FLAG} ${STATIC_CFLAGS} ${PO_CFLAGS} -c ${.IMPSRC} -o ${.TARGET}
+	${CC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${PO_FLAG} ${STATIC_CFLAGS} \
+	    ${PO_CFLAGS} ${_${.IMPSRC:T}_FLAGS:N-I*} -c ${.IMPSRC} -o ${.TARGET}
 
 .c.So:
-	${CC} ${_${.IMPSRC:T}_FLAGS} ${PICFLAG} -DPIC ${SHARED_CFLAGS} ${CFLAGS} -c ${.IMPSRC} -o ${.TARGET}
+	${CC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${PICFLAG} -DPIC ${SHARED_CFLAGS} \
+	    ${CFLAGS} ${_${.IMPSRC:T}_FLAGS:N-I*} -c ${.IMPSRC} -o ${.TARGET}
 
 .cc.o .C.o .cpp.o .cxx.o:
-	${CXX} ${_${.IMPSRC:T}_FLAGS} ${STATIC_CXXFLAGS} ${CXXFLAGS} -c ${.IMPSRC} -o ${.TARGET}
+	${CXX} ${_${.IMPSRC:T}_FLAGS:M-I*} ${STATIC_CXXFLAGS} ${CXXFLAGS} \
+	    ${_${.IMPSRC:T}_FLAGS:N-I*} -c ${.IMPSRC} -o ${.TARGET}
 
 .cc.po .C.po .cpp.po .cxx.po:
-	${CXX} ${_${.IMPSRC:T}_FLAGS} ${PO_FLAG} ${STATIC_CXXFLAGS} ${PO_CXXFLAGS} -c ${.IMPSRC} -o ${.TARGET}
+	${CXX} ${_${.IMPSRC:T}_FLAGS:M-I*} ${PO_FLAG} ${STATIC_CXXFLAGS} \
+	    ${PO_CXXFLAGS} ${_${.IMPSRC:T}_FLAGS:N-I*} -c ${.IMPSRC} -o ${.TARGET}
 
 .cc.So .C.So .cpp.So .cxx.So:
-	${CXX} ${_${.IMPSRC:T}_FLAGS} ${PICFLAG} -DPIC ${SHARED_CXXFLAGS} ${CXXFLAGS} -c ${.IMPSRC} -o ${.TARGET}
+	${CXX} ${_${.IMPSRC:T}_FLAGS:M-I*} ${PICFLAG} -DPIC ${SHARED_CXXFLAGS} \
+	    ${CXXFLAGS} ${_${.IMPSRC:T}_FLAGS:N-I*} -c ${.IMPSRC} -o ${.TARGET}
 
 .f.o:
-	${FC} ${_${.IMPSRC:T}_FLAGS} ${FFLAGS} -o ${.TARGET} -c ${.IMPSRC}
+	${FC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${FFLAGS} ${_${.IMPSRC:T}_FLAGS:N-I*} \
+	    -o ${.TARGET} -c ${.IMPSRC}
 
 .f.po:
-	${FC} ${_${.IMPSRC:T}_FLAGS} ${PO_FLAG} ${FFLAGS} -o ${.TARGET} -c ${.IMPSRC}
+	${FC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${PO_FLAG} ${FFLAGS} \
+	    ${_${.IMPSRC:T}_FLAGS:N-I*} -o ${.TARGET} -c ${.IMPSRC}
 
 .f.So:
-	${FC} ${_${.IMPSRC:T}_FLAGS} ${PICFLAG} -DPIC ${FFLAGS} -o ${.TARGET} -c ${.IMPSRC}
+	${FC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${PICFLAG} -DPIC ${FFLAGS} \
+	    ${_${.IMPSRC:T}_FLAGS:N-I*} -o ${.TARGET} -c ${.IMPSRC}
 
 .m.o:
-	${OBJC} ${_${.IMPSRC:T}_FLAGS} ${OBJCFLAGS} -c ${.IMPSRC} -o ${.TARGET}
+	${OBJC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${OBJCFLAGS} \
+	    ${_${.IMPSRC:T}_FLAGS:N-I*} -c ${.IMPSRC} -o ${.TARGET}
 
 .m.po:
-	${OBJC} ${_${.IMPSRC:T}_FLAGS} ${OBJCFLAGS} ${PO_FLAG} -c ${.IMPSRC} -o ${.TARGET}
+	${OBJC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${OBJCFLAGS} ${PO_FLAG} \
+	    ${_${.IMPSRC:T}_FLAGS:N-I*} -c ${.IMPSRC} -o ${.TARGET}
 
 .m.So:
-	${OBJC} ${_${.IMPSRC:T}_FLAGS} ${PICFLAG} -DPIC ${OBJCFLAGS} -c ${.IMPSRC} -o ${.TARGET}
+	${OBJC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${PICFLAG} -DPIC ${OBJCFLAGS} \
+	    ${_${.IMPSRC:T}_FLAGS:N-I*} -c ${.IMPSRC} -o ${.TARGET}
 
 .s.o:
-	${CC} ${_${.IMPSRC:T}_FLAGS} -x assembler-with-cpp ${CFLAGS} -c \
-	    ${.IMPSRC} -o ${.TARGET}
+	${CC} ${_${.IMPSRC:T}_FLAGS:M-I*} -x assembler-with-cpp \
+	    ${CFLAGS} ${_${.IMPSRC:T}_FLAGS:N-I*} -c ${.IMPSRC} -o ${.TARGET}
 
 .s.po:
-	${CC} ${_${.IMPSRC:T}_FLAGS} -x assembler-with-cpp -DPROF ${CFLAGS} -c \
-	    ${.IMPSRC} -o ${.TARGET}
+	${CC} ${_${.IMPSRC:T}_FLAGS:M-I*} -x assembler-with-cpp -DPROF \
+	    ${CFLAGS} ${_${.IMPSRC:T}_FLAGS:N-I*} -c ${.IMPSRC} -o ${.TARGET}
 
 .s.So:
-	${CC} ${_${.IMPSRC:T}_FLAGS} -x assembler-with-cpp ${PICFLAG} -DPIC ${CFLAGS} \
-	    -c ${.IMPSRC} -o ${.TARGET}
+	${CC} ${_${.IMPSRC:T}_FLAGS:M-I*} -x assembler-with-cpp ${PICFLAG} -DPIC \
+	    ${CFLAGS} ${_${.IMPSRC:T}_FLAGS:N-I*} -c ${.IMPSRC} -o ${.TARGET}
 
 .S.o:
-	${CC} ${_${.IMPSRC:T}_FLAGS} ${CFLAGS} -c ${.IMPSRC} -o ${.TARGET}
+	${CC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${CFLAGS} \
+	    ${_${.IMPSRC:T}_FLAGS:N-I*} -c ${.IMPSRC} -o ${.TARGET}
 
 .S.po:
-	${CC} ${_${.IMPSRC:T}_FLAGS} -DPROF ${CFLAGS} -c ${.IMPSRC} -o ${.TARGET}
+	${CC} ${_${.IMPSRC:T}_FLAGS:M-I*} -DPROF ${CFLAGS} \
+	    ${_${.IMPSRC:T}_FLAGS:N-I*} -c ${.IMPSRC} -o ${.TARGET}
 
 .S.So:
-	${CC} ${_${.IMPSRC:T}_FLAGS} ${PICFLAG} -DPIC ${CFLAGS} -c ${.IMPSRC} \
-	    -o ${.TARGET}
+	${CC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${PICFLAG} -DPIC ${CFLAGS} \
+	    ${_${.IMPSRC:T}_FLAGS:N-I*} -c ${.IMPSRC} -o ${.TARGET}
 
 all: objwarn
 
