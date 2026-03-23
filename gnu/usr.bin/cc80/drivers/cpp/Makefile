@@ -12,10 +12,7 @@ CFLAGS+=	-DCONFIGURE_SPECS="\"\"" \
 		-DACCEL_DIR_SUFFIX="\"\"" \
 		-DDEFAULT_REAL_TARGET_MACHINE="\"${target_machine}\""
 
-DOC_Release=	cpp.1 #${GCCDIR}/gcc/doc/cpp.1
-DOC_Snapshot=	cpp.1
-
-${MFILE}: ${DOC_${GCCRELEASE}}
+${MFILE}: ${GCCDIR}/gcc/doc/cpp.1
 	cp ${.ALLSRC} ${.TARGET}
 
 CLEANFILES+=	${MFILE}

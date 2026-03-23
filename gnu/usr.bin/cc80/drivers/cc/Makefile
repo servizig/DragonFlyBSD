@@ -13,7 +13,7 @@ CFLAGS+=	-DCONFIGURE_SPECS="\"\"" \
 		-DACCEL_DIR_SUFFIX="\"\"" \
 		-DDEFAULT_REAL_TARGET_MACHINE="\"${target_machine}\""
 
-${MFILE}: gcc.1
+${MFILE}: ${GCCDIR}/gcc/doc/gcc.1
 	cp ${.ALLSRC} ${.TARGET}
 
 CLEANFILES+=	${MFILE}
