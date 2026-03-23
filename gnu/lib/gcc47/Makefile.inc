@@ -22,8 +22,6 @@ TARGET_DEBUGLIBDIR=	${LIBDIR}/${CCVER}/debug
 TARGET_PROFLIBDIR=	${LIBDIR}/${CCVER}/profile
 TARGET_SHLIBDIR=	${LIBDIR}/${CCVER}
 
-LIBSUPCPP=		${.OBJDIR}/../libsupc++/libsupc++.a
-
 # for now do not let the use of -flto
 .if ${CFLAGS:M-flto}
 CFLAGS+=	-fno-lto
