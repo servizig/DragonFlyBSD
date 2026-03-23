@@ -28,6 +28,7 @@ CFLAGS+=	-fno-lto
 LDFLAGS+=	-flto
 .endif
 
+.if !defined(GCC_NO_INC)
 CFLAGS+=	-I${CCDIR}/cc_prep
 CFLAGS+=	-I${CCDIR}/cc_prep/config
 CFLAGS+=	-I${OCCDIR}/cc_prep
@@ -37,6 +38,7 @@ CFLAGS+=	-I${GCCDIR}/gcc
 CFLAGS+=	-I${GCCDIR}/gcc/config
 CFLAGS+=	-I${GCCDIR}/gcc/config/${GCC_CPU}
 CFLAGS+=	-I${CCDIR}/../gmp
+.endif
 
 # only gcc 4.8 and later has support for -Og
 .if defined(WORLD_CCOPTLEVEL) && ${WORLD_CCOPTLEVEL:Mg} && ${CCVER:Mgcc47}
