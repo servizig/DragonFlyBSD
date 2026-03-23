@@ -1,8 +1,11 @@
+GCC_NO_PATH=	yes
+LOCAL_CONFIG=	yes
+.include "../Makefile.inc"
+.PATH: ${GCCDIR}/libiberty
+
 LIB=		iberty
-INTERNALLIB=	YES
-CFLAGS+=	-I${.CURDIR}
+
 GOOD_CONFIG=	${.CURDIR}/../../support-libs/libiberty/config.h
-CLEANFILES=	config.h
 
 SRCS=	concat.c cp-demangle.c cp-demint.c cplus-dem.c dyn-string.c \
 	fibheap.c fopen_unlocked.c getpwd.c getruntime.c hashtab.c hex.c \
@@ -18,5 +21,6 @@ config.h: ${GOOD_CONFIG}
 beforedepend: config.h
 afterdepend: libiberty.na
 
+CLEANFILES=	config.h
+
 .include <bsd.hostlib.mk>
-.PATH:	${GCCDIR}/libiberty

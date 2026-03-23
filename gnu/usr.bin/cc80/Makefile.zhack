@@ -1,3 +1,6 @@
+# zrj's hack
+#
+
 .if defined(NO_CROSSTOOLS) && defined(BOOTSTRAPPING)
 
 SCRIPTS=	${GENTOOLS}

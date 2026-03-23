@@ -2,8 +2,8 @@
 .include "../../../Makefile.buo"
 .include "../../../Makefile.cco"
 
-# liblto_plugin.so needs to linked to a PIC version of libiberty
-# A special tailed version of libiberty has been created for this purpose
+# liblto_plugin.so needs to linked to a PIC version of libiberty.
+# A special tailored version of libiberty has been created for this purpose.
 
 GCC_NO_LIBS=	# defined
 .include "Makefile.headers"

@@ -179,7 +179,7 @@ generic-match.c: genmatch.nx match.pd cfn-operators.pd generic-match-head.c _MIC
 	> ${.TARGET}.tmp
 genmatch.c hash-table.c: gtype-desc.h
 
-pass-instances.def: ${GCCDIR}/gcc/passes.def $(PASSES_EXTRA)
+pass-instances.def: ${GCCDIR}/gcc/passes.def ${PASSES_EXTRA}
 	/usr/bin/awk -f ${GCCDIR}/gcc/gen-pass-instances.awk \
 		${.ALLSRC} > ${.TARGET}
 
@@ -225,10 +225,8 @@ dossier:
 	mkdir -p common c-family
 
 .if defined(LIBGCC_ONLY)
-GENLIBGCC=	${GENTOOLS:Mgenconstants*} ${GENTOOLS:Mgenmodes*} \
-		${GENTOOLS:Mgcov-iov*} \
-		${GENFILES:Minsn-constants.h} ${GENFILES:Minsn-modes.h} \
-		${GENFILES:Mgcov-iov.h}
+GENLIBGCC=	genconstants.nx genmodes.nx gcov-iov.nx \
+		insn-constants.h insn-modes.h gcov-iov.h
 genfiles: dossier ${GENLIBGCC}
 .else
 genfiles: dossier ${GENTOOLS} ${GENFILES}
