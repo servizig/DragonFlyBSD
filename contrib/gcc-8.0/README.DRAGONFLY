@@ -38,3 +38,4 @@ The following files have been patched (* planned)
   libstdc++-v3/include/c_global/cstdio	remove throw() decorations
   libstdc++-v3/include/c_global/cstdlib	remove throw() decorations
   libstdc++-v3/include/c_global/cwchar	remove throw() decorations
+  libstdc++-v3/config/locale/dragonfly/codecvt_members.cc	fix codecvt::do_length
