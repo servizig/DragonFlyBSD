@@ -522,8 +522,6 @@
             cd9660
             ..
         ..
-        mfs
-        ..
         msdosfs
         ..
         nfs
