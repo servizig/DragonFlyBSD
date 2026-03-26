@@ -9,16 +9,13 @@ CCDIR=		${.CURDIR}${RELUP}/../../../usr.bin/cc${GCCSHORTVER}
 
 CCVER=gcc${GCCSHORTVER}
 
-TRAMPSIZE=	24
-
 TARGETDIR=		${LIBDIR}/gcc${GCCSHORTVER}
 TARGET_LIBDIR=		${TARGETDIR}
 TARGET_DEBUGLIBDIR=	${TARGETDIR}/debug
 TARGET_PROFLIBDIR=	${TARGETDIR}/profile
 TARGET_SHLIBDIR=	${TARGETDIR}
 
-LIBSUPCPP=		${.OBJDIR}/../libsupc++/libsupc++.a
-
+.if !defined(GCC_NO_INC)
 CFLAGS+=	-I${CCDIR}/cc_prep
 CFLAGS+=	-I${CCDIR}/cc_prep/config
 CFLAGS+=	-I${OCCDIR}/cc_prep
@@ -28,5 +25,6 @@ CFLAGS+=	-I${GCCDIR}/gcc
 CFLAGS+=	-I${GCCDIR}/gcc/config
 CFLAGS+=	-I${GCCDIR}/gcc/config/i386
 CFLAGS+=	-I${CCDIR}/../gmp
+.endif
 
 .endif

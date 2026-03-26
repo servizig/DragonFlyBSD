@@ -2,32 +2,20 @@
 
 COMPVERSION=	gcc120
 
-lang_tree_files+=	cp/cp-tree.def
-lang_tree_files+=	objc/objc-tree.def
+srcdir=		${GCCDIR}/gcc
 
-optionsfiles+=		${GCCDIR}/gcc/lto/lang.opt
-optionsfiles+=		${GCCDIR}/gcc/c-family/c.opt
-optionsfiles+=		${GCCDIR}/gcc/common.opt
-optionsfiles+=		${GCCDIR}/gcc/params.opt
-optionsfiles+=		${GCCDIR}/gcc/analyzer/analyzer.opt
-optionsfiles+=		${GCCDIR}/gcc/config/fused-madd.opt
-optionsfiles+=		${GCCDIR}/gcc/config/i386/i386.opt
-optionsfiles+=		${GCCDIR}/gcc/config/rpath.opt
-optionsfiles+=		${GCCDIR}/gcc/config/dragonfly.opt
-
+# header_name values for generating 'options.cc' and 'options-save.cc'.
+# from gcc-build/gcc/Makefile
 header_name=		config.h system.h coretypes.h options.h tm.h
 header_name_save=	config.h system.h coretypes.h tm.h
 
-LANG_SPECS_FILES=	cp/lang-specs.h \
+# derived from gcc-build/gcc/Makefile
+lang_specs_files=	cp/lang-specs.h \
 			lto/lang-specs.h
+lang_tree_files=	cp/cp-tree.def
 
-# Object files for gcc driver.
-GCC_SRCS = gcc.cc gcc-main.cc ggc-none.cc
-EXTRA_GCC_SRCS = driver-i386.cc
-
-# this is directly from GCC's Makefile, beware evil
-# gtype-desc.h will generate wrong if language order changed
-GTFILES = $(CPP_ID_DATA_H) $(srcdir)/input.h $(srcdir)/coretypes.h \
+# This is directly from gcc-build/gcc/Makefile; beware evil.
+GTFILES = $(CPPLIB_H) $(srcdir)/input.h $(srcdir)/coretypes.h \
   $(host_xm_file_list) \
   $(tm_file_list) $(HASHTAB_H) $(SPLAY_TREE_H) $(srcdir)/bitmap.h \
   $(srcdir)/wide-int.h $(srcdir)/alias.h \
@@ -108,13 +96,12 @@ GTFILES = $(CPP_ID_DATA_H) $(srcdir)/input.h $(srcdir)/coretypes.h \
   $(srcdir)/omp-general.h
 
 # Arch specific
-GTFILES_ARCH+= \
-	$(srcdir)/config/i386/i386-builtins.cc \
-	$(srcdir)/config/i386/i386-expand.cc \
-	$(srcdir)/config/i386/i386-options.cc
+GTFILES_ARCH= \
+  $(srcdir)/config/i386/i386-builtins.cc \
+  $(srcdir)/config/i386/i386-expand.cc \
+  $(srcdir)/config/i386/i386-options.cc
 
-# C
-GTFILES_C+= \
+GTFILES_C= \
   [c] \
   $(srcdir)/c/c-lang.cc \
   $(srcdir)/c/c-tree.h \
@@ -183,11 +170,45 @@ GTFILES_LTO= \
   $(srcdir)/lto/lto-dump.cc
 
 # Careful! Order matters, should be sorted.
+# gtype-desc.h will generate wrong if language order changed
 GTFILES+= ${GTFILES_ARCH} ${GTFILES_C} ${GTFILES_CPP} ${GTFILES_LTO}
 
-# verbatim from gcc/Makefile
+# derived from gcc-build/gcc/Makefile
+lang_opt_files=		${GCCDIR}/gcc/lto/lang.opt \
+			${GCCDIR}/gcc/c-family/c.opt \
+			${GCCDIR}/gcc/common.opt \
+			${GCCDIR}/gcc/params.opt \
+			${GCCDIR}/gcc/analyzer/analyzer.opt
+extra_opt_files=	$(srcdir)/config/fused-madd.opt \
+			$(srcdir)/config/i386/i386.opt \
+			$(srcdir)/config/rpath.opt \
+			$(srcdir)/config/dragonfly.opt
+
+# verbatim from gcc-build/gcc/Makefile
+# {{{
+
+# Object files for gcc many-languages driver.
+GCC_OBJS = gcc.o gcc-main.o ggc-none.o
+
+# List of extra object files that should be compiled and linked with
+# the gcc driver.
+EXTRA_GCC_OBJS =driver-i386.o
+
+# List of extra object files that should be compiled and linked with
+# compiler proper (cc1, cc1obj, cc1plus).
+EXTRA_OBJS =  x86-tune-sched.o x86-tune-sched-bd.o x86-tune-sched-atom.o x86-tune-sched-core.o i386-options.o i386-builtins.o i386-expand.o i386-features.o
+
+# All option source files
+ALL_OPT_FILES=$(lang_opt_files) $(extra_opt_files)
+
+# Target specific, C specific object file
+C_TARGET_OBJS=i386-c.o default-c.o
+
+# Target specific, C++ specific object file
+CXX_TARGET_OBJS=i386-c.o default-c.o
+
 # Language-specific object files shared by all C-family front ends.
-C_COMMON_OBJS= c-family/c-common.o c-family/c-cppbuiltin.o c-family/c-dump.o \
+C_COMMON_OBJS = c-family/c-common.o c-family/c-cppbuiltin.o c-family/c-dump.o \
   c-family/c-format.o c-family/c-gimplify.o c-family/c-indentation.o \
   c-family/c-lex.o c-family/c-omp.o c-family/c-opts.o c-family/c-pch.o \
   c-family/c-ppoutput.o c-family/c-pragma.o c-family/c-pretty-print.o \
@@ -195,29 +216,28 @@ C_COMMON_OBJS= c-family/c-common.o c-family/c-cppbuiltin.o c-family/c-dump.o \
   c-family/c-ubsan.o c-family/known-headers.o \
   c-family/c-attribs.o c-family/c-warn.o c-family/c-spellcheck.o
 
-C_COMMON_SRCS=
+# }}}
 
-C_TARGET_OBJS=i386-c.o default-c.o
+# verbatim from gcc/c/Make-lang.in
+# {{{
 
-CXX_TARGET_OBJS=i386-c.o default-c.o
-
-# verbatim from c/Make-lang.in
-# Language-specific object files for C
+# Language-specific object files for C and Objective C.
 C_AND_OBJC_OBJS = attribs.o c/c-errors.o c/c-decl.o c/c-typeck.o \
   c/c-convert.o c/c-aux-info.o c/c-objc-common.o c/c-parser.o \
   c/c-fold.o c/gimple-parser.o \
   $(C_COMMON_OBJS) $(C_TARGET_OBJS)
 
-# Language-specific object files for C.
-C_OBJS = c/c-lang.o c-family/stub-objc.o $(C_AND_OBJC_OBJS)
+# }}}
+
+# verbatim from gcc/cp/Make-lang.in
+# {{{
 
 # Shared with C front end:
 CXX_C_OBJS = attribs.o incpath.o \
 	$(C_COMMON_OBJS) $(CXX_TARGET_OBJS)
 
-# verbatim from cp/Make-lang.in
-# Language-specific object files for c++.
-CXX_OBJS = \
+# Language-specific object files for C++ and Objective C++.
+CXX_AND_OBJCXX_OBJS = \
 	cp/call.o cp/class.o cp/constexpr.o cp/constraint.o \
 	cp/coroutines.o cp/cp-gimplify.o \
 	cp/cp-objcp-common.o cp/cp-ubsan.o \
@@ -235,4 +255,4 @@ CXX_OBJS = \
 	cp/tree.o cp/typeck.o cp/typeck2.o \
 	cp/vtable-class-hierarchy.o $(CXX_C_OBJS)
 
-CXX_COMMON_SRCS= ${C_COMMON_SRCS}
+# }}}

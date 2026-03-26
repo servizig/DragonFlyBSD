@@ -1,5 +1,3 @@
-# Despite the .c extension, these files and headers must be built by c++
-
 GCC_NO_LIBS=	yes
 TOP_PREFIX=	../../
 
@@ -7,10 +5,9 @@ TOP_PREFIX=	../../
 .include "../../../Makefile.langs"
 
 LIB=		guts-common
-INTERNALLIB=
+INTERNALLIB=	yes
 
-GUTS_COMMONO=	${C_COMMON_OBJS:T} main.o
-OBJS=		${GUTS_COMMONO}
-SRCS=		${C_COMMON_SRCS}
+SRCS=		${C_COMMON_OBJS:T:.o=.cc}
+SRCS+=		main.cc
 
 .include <bsd.lib.mk>

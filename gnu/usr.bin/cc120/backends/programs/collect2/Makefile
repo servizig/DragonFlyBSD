@@ -1,26 +1,19 @@
-# If we defined SRCS, the mkdep fails because it evaluates files with .c
-# extension with cc instead of c++ (go figure).  To avoid that, we need
-# to define OBJS directly
-
-GCC_LANG_DIR=	gcc
 TOP_PREFIX=	../../
 
 .include "../../../Makefile.inc"
-.include "../../../Makefile.langs"
 
 PROG_CXX=	collect2
 NOMAN=		yes
 
-###CFLAGS+=	-static-libstdc++
+## LDFLAGS+=	-static-libstdc++
 
-# verbatim from gcc/Makefile.in
-COLLECT_OBJS=	collect2.o vec.o ggc-none.o \
-		collect-utils.o file-find.o hash-table.o
-# only when CROSS_AIX_SUPPORT
-#COLLECT_OBJS+=	collect2-aix.o
+# from gcc/Makefile.in
+# - excluded 'collect-aix.o' (effective when CROSS_AIX_SUPPORT)
+# - excluded 'selftest.o' (effective when CHECKING_P)
+COLLECT2_OBJS = collect2.o vec.o ggc-none.o \
+  collect-utils.o file-find.o hash-table.o
 
-OBJS=		${COLLECT_OBJS:T}
-SRCS=
+SRCS=		${COLLECT2_OBJS:T:.o=.cc}
 LIBS=		${LIBCOMMON} ${LIBCPP} ${LIBBACKTRACE} ${LIBIBERTY} \
 		${LIBDECNUMBER}
 LDADD=		${LIBS}

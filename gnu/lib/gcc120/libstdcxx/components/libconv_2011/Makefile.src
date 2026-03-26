@@ -1,5 +1,7 @@
-# verbatim from libstdc++/src/c++11/Makefile.in
+# verbatim from libstdc++-v3/src/c++11/Makefile.am
 
+# Source files linked in via configuration/make substitution for a
+# particular host.
 host_sources = \
 	ctype_configure_char.cc \
 	ctype_members.cc
@@ -8,13 +10,12 @@ cxx11_abi_sources = \
 	cow-locale_init.cc \
 	cow-shim_facets.cc \
 	cxx11-hash_tr1.cc \
+	cxx11-ios_failure.cc \
 	cxx11-shim_facets.cc \
 	cxx11-stdexcept.cc
 
-# PR libstdc++/85222 needs intermediate manipulation
-#cxx11_abi_sources+=	cxx11-ios_failure.cc
-
 sources = \
+	assert_fail.cc \
 	chrono.cc \
 	codecvt.cc \
 	condition_variable.cc \
@@ -70,3 +71,15 @@ inst_sources = \
 	wstring-io-inst.cc
 
 libc__11convenience_la_SOURCES = $(sources) $(inst_sources)
+
+# from gcc-build/{target}/libstdc++-v3/src/c++11/Makefile
+CCTYPE_CC = config/locale/dragonfly/ctype_members.cc
+OS_INC_SRCDIR = config/os/bsd/dragonfly
+
+# generated sources
+#
+GENFILES+=	ctype_configure_char.cc ctype_members.cc
+ctype_configure_char.cc: ${SRCDIR}/$(OS_INC_SRCDIR)/ctype_configure_char.cc
+	cp ${.ALLSRC} ${.TARGET}
+ctype_members.cc: ${SRCDIR}/$(CCTYPE_CC)
+	cp ${.ALLSRC} ${.TARGET}

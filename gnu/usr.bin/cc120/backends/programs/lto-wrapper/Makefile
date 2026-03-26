@@ -1,7 +1,3 @@
-# If we defined SRCS, the mkdep fails because it evaluates files with .c
-# extension with cc instead of c++ (go figure).  To avoid that, we need
-# to define OBJS directly
-
 TOP_PREFIX=	../../
 
 .include "../../../Makefile.inc"
@@ -9,10 +5,10 @@ TOP_PREFIX=	../../
 PROG_CXX=	lto-wrapper
 NOMAN=		yes
 
-SRCS=
-OBJS=		lto-wrapper.o \
-		collect-utils.o \
-		ggc-none.o
+# verbatim from gcc/Makefile.in
+LTO_WRAPPER_OBJS = lto-wrapper.o collect-utils.o ggc-none.o
+
+SRCS=		${LTO_WRAPPER_OBJS:.o=.cc}
 
 GUTS=		../../guts/guts-common/libguts-common.a \
 		../../guts/guts-target/libguts-target.a

@@ -3,34 +3,41 @@ GCC_NO_LIBS=	yes
 LOCAL_CONFIG=	yes
 .include "../Makefile.inc"
 .PATH: ${GCCDIR}/libbacktrace
-.PATH: ${GCCDIR}/libgcc
 
 LIB=		backtrace
 INTERNALLIB=	YES
 
 CFLAGS+=	-I${GCCDIR}/libbacktrace
+## CFLAGS+=	-funwind-tables -frandom-seed=${.IMPSRC}
 
-SRCS=			 \
-		dwarf.c \
-		fileline.c \
-		posix.c \
-		print.c \
-		sort.c \
-		state.c \
-		backtrace.c \
-		simple.c \
-		elf.c \
-		mmapio.c \
-		mmap.c
+# From gcc-build/libbacktrace/Makefile
+BACKTRACE_FILE = backtrace.lo simple.lo
+FORMAT_FILE = elf.lo
+VIEW_FILE = mmapio.lo
+ALLOC_FILE = mmap.lo
+# From libbacktrace/Makefile.am
+libbacktrace_la_LIBADD = \
+	$(BACKTRACE_FILE) \
+	$(FORMAT_FILE) \
+	$(VIEW_FILE) \
+	$(ALLOC_FILE)
+libbacktrace_la_SOURCES = \
+	backtrace.h \
+	atomic.c \
+	dwarf.c \
+	fileline.c \
+	internal.h \
+	posix.c \
+	print.c \
+	sort.c \
+	state.c
 
-# only when ! HAVE_ATOMIC_FUNCTIONS
-#SRCS=		atomic.c
-
-backtrace.o:	unwind.h
+SRCS=	${libbacktrace_la_LIBADD:.lo=.c}
+SRCS+=	${libbacktrace_la_SOURCES:M*.c}
 
 beforedepend:	unwind.h
 
-unwind.h: unwind-generic.h
+unwind.h: ${GCCDIR}/libgcc/unwind-generic.h
 	cp ${.ALLSRC} ${.TARGET}
 
 CLEANFILES=	unwind.h

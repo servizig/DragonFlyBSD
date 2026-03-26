@@ -1,26 +1,26 @@
-# Despite the .c extension, these files and headers must be built by c++
-
-GCC_NO_LIBS=	yes
 GCC_LANG_DIR=	gcc/cp
+GCC_NO_LIBS=	yes
 TOP_PREFIX=	../../
 
 .include "../../../Makefile.inc"
 .include "../../../Makefile.langs"
 
-CFLAGS+=	-DTARGET_MACHINE=\"${target_machine}\" -DHOST_MACHINE=\"${target_machine}\"
 LIB=		guts-cxx
-INTERNALLIB=
+INTERNALLIB=	yes
 
-# note C_TARGET_OBJS == CXX_TARGET_OBJS
-.for object in ${CXX_OBJS}
-. if ! ${C_COMMON_OBJS:M${object}}
-.  if ! ${C_TARGET_OBJS:M${object}}
-GUTS_CXXO+=	${object:T}
-.  endif
+excluded=	${C_COMMON_OBJS} ${CXX_TARGET_OBJS}
+.for object in ${CXX_AND_OBJCXX_OBJS}
+. if ! ${excluded:M${object}}
+GUTS_OBJS+=	${object}
 . endif
 .endfor
 
-OBJS=		${GUTS_CXXO}
-SRCS=		${CXX_COMMON_SRCS}
+SRCS=		${GUTS_OBJS:T:.o=.cc}
+
+# derived from gcc/cp/Make-lang.in
+FLAGS_GROUPS=		machine
+machine_FLAGS_FILES=	module.cc
+machine_FLAGS=		-DTARGET_MACHINE=\"${target_machine}\" \
+			-DHOST_MACHINE=\"${target_machine}\"
 
 .include <bsd.lib.mk>

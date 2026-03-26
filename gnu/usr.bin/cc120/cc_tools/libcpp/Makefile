@@ -1,6 +1,3 @@
-# Despite the source files ending in ".c", the c++ compiler needs to build
-# everything.  We have to roll our own targets to properly support this.
-
 GCC_NO_PATH=	yes
 LOCAL_CONFIG=	yes
 .include "../Makefile.inc"
@@ -8,21 +5,22 @@ LOCAL_CONFIG=	yes
 
 LIB=		cpp
 
-CFLAGS+=	-I${.CURDIR}
 CFLAGS+=	-Duchar="unsigned char"
 CXXFLAGS+=	${NOEXCEPTION_FLAGS}
 GOOD_CONFIG=	${.CURDIR}/../../support-libs/libcpp/config.h
 
 CFLAGS+=	-DBOOTSTRAPPING
 
-# From libcpp/Makefile.in (libcpp_a_SOURCES)
-SRCS= \
-	charset.cc directives.cc errors.cc \
+# From libcpp/Makefile.in
+libcpp_a_SOURCES = charset.cc directives.cc errors.cc \
 	expr.cc files.cc identifiers.cc init.cc lex.cc line-map.cc macro.cc \
 	mkdeps.cc pch.cc symtab.cc traditional.cc
 
+SRCS=	${libcpp_a_SOURCES}
+
+# Unused as NLS is disabled.
 localedir.h:
-	touch $@
+	touch ${.TARGET}
 
 config.h: ${GOOD_CONFIG}
 	cp ${.ALLSRC} .
@@ -32,4 +30,4 @@ afterdepend: libcpp.na
 
 CLEANFILES=	localedir.h config.h
 
-.include "../../Makefile.intcxx_lib"
+.include <bsd.hostlib.mk>

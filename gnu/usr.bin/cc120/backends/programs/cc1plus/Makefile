@@ -1,21 +1,22 @@
-# If we defined SRCS, the mkdep fails because it evaluates files with .c
-# extension with cc instead of c++ (go figure).  To avoid that, we need
-# to define OBJS directly
-
 GCC_LANG_DIR=	gcc/cp
 TOP_PREFIX=	../../
 
 .include "../../../Makefile.inc"
-.include "../../../Makefile.langs"
 
 PROG_CXX=	cc1plus
 NOMAN=		yes
 NOSHARED?=	yes
 
-CXX_OBJS=	cp/cp-lang.o cp/stub-objc.o
-CXXXX_OBJS=	${CXX_OBJS:T}
-OBJS=		${CXXXX_OBJS} cc1plus-checksum.o
-SRCS=
+# Language-specific object files for C++.
+# Derived from gcc/cp/Make-lang.in, removed $(CXX_AND_OBJCXX_OBJS) since
+# they're provided by ${GUTS}.
+CXX_OBJS = cp/cp-lang.o c-family/stub-objc.o # $(CXX_AND_OBJCXX_OBJS)
+
+SRCS=		${CXX_OBJS:T:.o=.cc}
+# Skip calling 'mkdep' on the to-be-generated 'cc1plus-checksum.cc'.
+.if !make(depend)
+SRCS+=		cc1plus-checksum.cc
+.endif
 
 GUTS=		../../guts/guts-cxx/libguts-cxx.a \
 		../../guts/guts-common/libguts-common.a \
@@ -30,10 +31,10 @@ DPADD=		${GUTS} ${BACKEND} ${LIBS} ${BACKENDLIBS}
 checksum-options:
 	echo "${LD} ${LDFLAGS}" > ${.TARGET}
 
-cc1plus-checksum.cc: ${CXXXX_OBJS} ${GUTS} ${BACKEND} checksum-options
-	${TOOLDIR}/genchecksum.nx ${CXXXX_OBJS} ${GUTS} ${BACKEND} \
+cc1plus-checksum.cc: ${CXX_OBJS:T} ${GUTS} ${BACKEND} checksum-options
+	${TOOLDIR}/genchecksum.nx ${CXX_OBJS:T} ${GUTS} ${BACKEND} \
 	    checksum-options > ${.TARGET}
 
-CLEANFILES=	cc1plus-checksum.* checksum-options
+CLEANFILES=	cc1plus-checksum.cc checksum-options
 
 .include <bsd.prog.mk>

@@ -1,82 +1,42 @@
-# verbatim from libstdc++/include/Makefile.in
-# Info also from libstdc++/libsupc++/Makefile.in
+glibcxx_srcdir=	${SRCDIR}
 
-COMPATIBILITY_H = config/abi/compatibility.h
-CLOCALE_CC = config/locale/dragonfly/c_locale.cc
-CLOCALE_H = config/locale/dragonfly/c_locale.h
-CLOCALE_INTERNAL_H = config/locale/generic/c++locale_internal.h
-CMESSAGES_CC = config/locale/generic/messages_members.cc
-CMESSAGES_H = config/locale/generic/messages_members.h
-CMONEY_CC = config/locale/dragonfly/monetary_members.cc
-CNUMERIC_CC = config/locale/dragonfly/numeric_members.cc
-ATOMIC_WORD_SRCDIR = config/cpu/generic
+sup_builddir=		.
+bits_sup_builddir=	bits
+ext_compat_builddir=	ext
+experimental_filesystem_builddir=	experimental
+experimental_bits_filesystem_builddir=	experimental/bits
+
+# from gcc-build/{target}/libstdc++-v3/include/Makefile
 ABI_TWEAKS_SRCDIR = config/cpu/generic
+ALLOCATOR_H = config/allocator/new_allocator_base.h
+ATOMIC_WORD_SRCDIR = config/cpu/generic
+BASIC_FILE_H = config/io/basic_file_stdio.h
+C_INCLUDE_DIR = ${glibcxx_srcdir}/include/c_global
+CLOCALE_H = config/locale/dragonfly/c_locale.h
+CMESSAGES_H = config/locale/generic/messages_members.h
 CPU_DEFINES_SRCDIR = config/cpu/generic
-ERROR_CONSTANTS_SRCDIR = config/os/generic
 CPU_OPT_BITS_RANDOM = config/cpu/i486/opt/bits/opt_random.h
 CPU_OPT_EXT_RANDOM = config/cpu/i486/opt/ext/opt_random.h
+CSTDIO_H = config/io/c_io_stdio.h
+CTIME_H = config/locale/dragonfly/time_members.h
+ERROR_CONSTANTS_SRCDIR = config/os/generic
+OS_INC_SRCDIR = config/os/bsd/dragonfly
 
-std_srcdir = ${glibcxx_srcdir}/include/std
-bits_srcdir = ${glibcxx_srcdir}/include/bits
-bits_sup_srcdir = ${glibcxx_srcdir}/libsupc++
-pstl_srcdir = ${glibcxx_srcdir}/include/pstl
-backward_srcdir = ${glibcxx_srcdir}/include/backward
-pb_srcdir = ${glibcxx_srcdir}/include/ext/pb_ds
-ext_srcdir = ${glibcxx_srcdir}/include/ext
-tr1_srcdir = ${glibcxx_srcdir}/include/tr1
-tr2_srcdir = ${glibcxx_srcdir}/include/tr2
-decimal_srcdir = ${glibcxx_srcdir}/include/decimal
-c_base_srcdir = ${glibcxx_srcdir}/include/c_global
-c_compatibility_srcdir = ${glibcxx_srcdir}/include/c_compatibility
-debug_srcdir = ${glibcxx_srcdir}/include/debug
-parallel_srcdir = ${glibcxx_srcdir}/include/parallel
-host_srcdir = ${glibcxx_srcdir}/config/os/bsd/dragonfly
-experimental_srcdir = ${glibcxx_srcdir}/include/experimental
-experimental_bits_srcdir = ${glibcxx_srcdir}/include/experimental/bits
-
-std_builddir = .
-bits_builddir = ./bits
-pstl_builddir = ./pstl
-backward_builddir = ./backward
-pb_builddir = ./ext/pb_ds
-ext_builddir = ./ext
-tr1_builddir = ./tr1
-tr2_builddir = ./tr2
-decimal_builddir = ./decimal
-c_base_builddir = .
-c_compatibility_builddir = .
-debug_builddir = ./debug
-parallel_builddir = ./parallel
-experimental_builddir = ./experimental
-ext_host_builddir = ./ext
-
-##### HEAD: Not from Makefile.in #####
-bits_sup_builddir = bits
-ext_compat_builddir = ext
-host_builddir = bits
-supc_builddir = .
-host_headers_extra = \
-	c++config.h \
-	${glibcxx_srcdir}/config/allocator/new_allocator_base.h \
-	${glibcxx_srcdir}/config/io/basic_file_stdio.h \
-	${glibcxx_srcdir}/config/io/c_io_stdio.h \
-	${glibcxx_srcdir}/config/locale/dragonfly/c_locale.h \
-	${glibcxx_srcdir}/config/locale/generic/messages_members.h \
-	${glibcxx_srcdir}/config/locale/dragonfly/time_members.h \
-	${glibcxx_srcdir}/${CPU_OPT_BITS_RANDOM} \
-	gthr.h \
-	gthr-default.h \
-	gthr-posix.h \
-	gthr-single.h
-supc_headers = \
+# derived from libstdc++-v3/libsupc++/Makefile.am (std_HEADERS)
+sup_headers = \
 	${glibcxx_srcdir}/libsupc++/compare \
 	${glibcxx_srcdir}/libsupc++/cxxabi.h \
 	${glibcxx_srcdir}/libsupc++/exception \
 	${glibcxx_srcdir}/libsupc++/initializer_list \
 	${glibcxx_srcdir}/libsupc++/new \
 	${glibcxx_srcdir}/libsupc++/typeinfo
-##### TAIL: Not from Makefile.in #####
 
+# verbatim from libstdc++-v3/include/Makefile.am
+# {{{
+
+# Standard C++ includes.
+std_srcdir = ${glibcxx_srcdir}/include/std
+std_builddir = .
 std_headers = \
 	${std_srcdir}/algorithm \
 	${std_srcdir}/any \
@@ -152,6 +112,8 @@ std_headers = \
 	${std_srcdir}/vector \
 	${std_srcdir}/version
 
+bits_srcdir = ${glibcxx_srcdir}/include/bits
+bits_builddir = ./bits
 bits_headers = \
 	${bits_srcdir}/algorithmfwd.h \
 	${bits_srcdir}/align.h \
@@ -298,6 +260,10 @@ bits_headers = \
 	${bits_srcdir}/valarray_after.h \
 	${bits_srcdir}/vector.tcc
 
+bits_host_headers = \
+	${glibcxx_srcdir}/${CPU_OPT_BITS_RANDOM}
+
+bits_sup_srcdir = ${glibcxx_srcdir}/libsupc++
 bits_sup_headers = \
 	${bits_sup_srcdir}/atomic_lockfree_defines.h \
 	${bits_sup_srcdir}/cxxabi_forced.h \
@@ -309,6 +275,8 @@ bits_sup_headers = \
 	${bits_sup_srcdir}/nested_exception.h
 
 # C++17 Parallel Algorithm Includes.
+pstl_srcdir = ${glibcxx_srcdir}/include/pstl
+pstl_builddir = ./pstl
 pstl_headers = \
 	${pstl_srcdir}/algorithm_fwd.h \
 	${pstl_srcdir}/algorithm_impl.h \
@@ -333,6 +301,8 @@ pstl_headers = \
 	${pstl_srcdir}/unseq_backend_simd.h \
 	${pstl_srcdir}/utils.h
 
+backward_srcdir = ${glibcxx_srcdir}/include/backward
+backward_builddir = ./backward
 backward_headers = \
 	${backward_srcdir}/auto_ptr.h \
 	${backward_srcdir}/backward_warning.h \
@@ -342,6 +312,9 @@ backward_headers = \
 	${backward_srcdir}/hash_fun.h \
 	${backward_srcdir}/hashtable.h \
 	${backward_srcdir}/strstream
+
+pb_srcdir = ${glibcxx_srcdir}/include/ext/pb_ds
+pb_builddir = ./ext/pb_ds
 
 pb_subdirs = \
 	${pb_builddir}/detail \
@@ -369,11 +342,6 @@ pb_subdirs = \
 	${pb_builddir}/detail/rb_tree_map_ \
 	${pb_builddir}/detail/list_update_policy
 
-
-# The ability for make and the underlying host to deal with this
-# unwieldy list as one entire entity is not a sure thing, and may
-# cause build errors. Thus, split one list into many smaller
-# mini-lists, with the maximum size per mini-list of no more than 42.
 pb_headers1 = \
 	${pb_srcdir}/assoc_container.hpp \
 	${pb_srcdir}/exception.hpp \
@@ -631,6 +599,8 @@ pb_headers7 = \
 	${pb_srcdir}/detail/unordered_iterator/iterator.hpp \
 	${pb_srcdir}/detail/unordered_iterator/point_iterator.hpp
 
+ext_srcdir = ${glibcxx_srcdir}/include/ext
+ext_builddir = ./ext
 ext_headers = \
 	${ext_srcdir}/algorithm \
 	${ext_srcdir}/aligned_buffer.h \
@@ -682,6 +652,8 @@ ext_compat_headers = \
 ext_host_headers = \
 	${glibcxx_srcdir}/${CPU_OPT_EXT_RANDOM}
 
+tr1_srcdir = ${glibcxx_srcdir}/include/tr1
+tr1_builddir = ./tr1
 tr1_headers = \
 	${tr1_srcdir}/array \
 	${tr1_srcdir}/bessel_function.tcc \
@@ -746,6 +718,8 @@ tr1_headers = \
 	${tr1_srcdir}/wchar.h \
 	${tr1_srcdir}/wctype.h
 
+tr2_srcdir = ${glibcxx_srcdir}/include/tr2
+tr2_builddir = ./tr2
 tr2_headers = \
 	${tr2_srcdir}/bool_set \
 	${tr2_srcdir}/bool_set.tcc \
@@ -754,11 +728,15 @@ tr2_headers = \
 	${tr2_srcdir}/ratio \
 	${tr2_srcdir}/type_traits
 
+decimal_srcdir = ${glibcxx_srcdir}/include/decimal
+decimal_builddir = ./decimal
 decimal_headers = \
 	${decimal_srcdir}/decimal \
 	${decimal_srcdir}/decimal.h
 
 # Post-C++11 TS's
+experimental_srcdir = ${glibcxx_srcdir}/include/experimental
+experimental_builddir = ./experimental
 experimental_headers = \
 	${experimental_srcdir}/algorithm \
 	${experimental_srcdir}/any \
@@ -800,6 +778,8 @@ experimental_headers = \
 	${experimental_srcdir}/vector \
 	${experimental_filesystem_headers}
 
+experimental_bits_srcdir = ${glibcxx_srcdir}/include/experimental/bits
+experimental_bits_builddir = ./experimental/bits
 experimental_bits_headers = \
 	${experimental_bits_srcdir}/lfts_config.h \
 	${experimental_bits_srcdir}/net.h \
@@ -819,10 +799,18 @@ experimental_bits_headers = \
 	${experimental_bits_srcdir}/string_view.tcc \
 	${experimental_bits_filesystem_headers}
 
-experimental_filesystem_headers =
+# ENABLE_FILESYSTEM_TS
+experimental_filesystem_headers = \
+	${experimental_srcdir}/filesystem
+experimental_bits_filesystem_headers = \
+	${experimental_bits_srcdir}/fs_dir.h \
+	${experimental_bits_srcdir}/fs_fwd.h \
+	${experimental_bits_srcdir}/fs_ops.h \
+	${experimental_bits_srcdir}/fs_path.h
 
-experimental_bits_filesystem_headers =
-
+# This is the common subset of C++ files that all three "C" header models use.
+c_base_srcdir = $(C_INCLUDE_DIR)
+c_base_builddir = .
 c_base_headers = \
 	${c_base_srcdir}/cassert \
 	${c_base_srcdir}/ccomplex \
@@ -851,11 +839,22 @@ c_base_headers = \
 	${c_base_srcdir}/cwchar \
 	${c_base_srcdir}/cwctype
 
+# "C" compatibility headers.
+c_compatibility_srcdir = ${glibcxx_srcdir}/include/c_compatibility
+c_compatibility_builddir = .
+
+# GLIBCXX_C_HEADERS_C_GLOBAL
 c_compatibility_headers = \
 	${c_compatibility_srcdir}/complex.h \
 	${c_compatibility_srcdir}/fenv.h \
-	${c_compatibility_srcdir}/tgmath.h
+	${c_compatibility_srcdir}/tgmath.h \
+	${c_compatibility_srcdir}/math.h \
+	${c_compatibility_srcdir}/stdatomic.h \
+	${c_compatibility_srcdir}/stdlib.h
 
+# Debug mode headers
+debug_srcdir = ${glibcxx_srcdir}/include/debug
+debug_builddir = ./debug
 debug_headers = \
 	${debug_srcdir}/assertions.h \
 	${debug_srcdir}/bitset \
@@ -890,6 +889,9 @@ debug_headers = \
 	${debug_srcdir}/unordered_set \
 	${debug_srcdir}/vector
 
+# Parallel mode headers
+parallel_srcdir = ${glibcxx_srcdir}/include/parallel
+parallel_builddir = ./parallel
 parallel_headers = \
 	${parallel_srcdir}/algo.h \
 	${parallel_srcdir}/algobase.h \
@@ -935,6 +937,7 @@ parallel_headers = \
 	${parallel_srcdir}/unique_copy.h \
 	${parallel_srcdir}/workstealing.h
 
+host_srcdir = ${glibcxx_srcdir}/$(OS_INC_SRCDIR)
 host_headers = \
 	${host_srcdir}/ctype_base.h \
 	${host_srcdir}/ctype_inline.h \
@@ -946,3 +949,113 @@ host_headers = \
 	${glibcxx_srcdir}/include/precompiled/stdc++.h \
 	${glibcxx_srcdir}/include/precompiled/stdtr1c++.h \
 	${glibcxx_srcdir}/include/precompiled/extc++.h
+
+# These host_headers_extra files are all built with ad hoc naming rules.
+host_headers_extra = \
+	${host_builddir}/basic_file.h \
+	${host_builddir}/c++config.h \
+	${host_builddir}/c++allocator.h \
+	${host_builddir}/c++io.h \
+	${host_builddir}/c++locale.h \
+	${host_builddir}/messages_members.h \
+	${host_builddir}/time_members.h
+
+thread_host_headers = \
+	${host_builddir}/gthr.h \
+	${host_builddir}/gthr-single.h \
+	${host_builddir}/gthr-posix.h \
+	${host_builddir}/gthr-default.h
+
+# }}}
+
+# Generate the host headers in the 'bits' subdirectory so they can be directly
+# used by the convenience libraries (e.g., libconv_2017).
+host_builddir=	bits
+
+# derived from libstdc++-v3/include/Makefile.am
+#
+
+GENFILES+=	${host_headers_extra}
+${host_builddir}/basic_file.h: ${glibcxx_srcdir}/${BASIC_FILE_H}
+	cp ${.ALLSRC} ${.TARGET}
+${host_builddir}/c++allocator.h: ${glibcxx_srcdir}/${ALLOCATOR_H}
+	cp ${.ALLSRC} ${.TARGET}
+${host_builddir}/c++io.h: ${glibcxx_srcdir}/${CSTDIO_H}
+	cp ${.ALLSRC} ${.TARGET}
+${host_builddir}/c++locale.h: ${glibcxx_srcdir}/${CLOCALE_H}
+	cp ${.ALLSRC} ${.TARGET}
+${host_builddir}/messages_members.h: ${glibcxx_srcdir}/${CMESSAGES_H}
+	cp ${.ALLSRC} ${.TARGET}
+${host_builddir}/time_members.h: ${glibcxx_srcdir}/${CTIME_H}
+	cp ${.ALLSRC} ${.TARGET}
+# {{{
+release=	${GCCMAJORVER}
+ns_version=	0
+visibility=	1
+externtemplate=	1
+dualabi=	1
+cxx11abi=	1
+allocatornew=	1
+float128=	define _GLIBCXX_USE_FLOAT128 1
+S1='s,define __GLIBCXX__,define __GLIBCXX__ ${GCCSHORTDATE},'
+S2='s,define _GLIBCXX_RELEASE,define _GLIBCXX_RELEASE ${release},'
+S3='s,define _GLIBCXX_INLINE_VERSION, define _GLIBCXX_INLINE_VERSION ${ns_version},'
+S4='s,define _GLIBCXX_HAVE_ATTRIBUTE_VISIBILITY, define _GLIBCXX_HAVE_ATTRIBUTE_VISIBILITY ${visibility},'
+S5='s,define _GLIBCXX_EXTERN_TEMPLATE$$, define _GLIBCXX_EXTERN_TEMPLATE ${externtemplate},'
+S6='s,define _GLIBCXX_USE_DUAL_ABI, define _GLIBCXX_USE_DUAL_ABI ${dualabi},'
+S7='s,define _GLIBCXX_USE_CXX11_ABI, define _GLIBCXX_USE_CXX11_ABI ${cxx11abi},'
+S8='s,define _GLIBCXX_USE_ALLOCATOR_NEW, define _GLIBCXX_USE_ALLOCATOR_NEW ${allocatornew},'
+S9='s,define _GLIBCXX_USE_FLOAT128,${float128},'
+ldbl_compat='s,g,g,'
+ldbl_alt128_compat='s,g,g,'
+verbose_assert='s,^\#undef _GLIBCXX_VERBOSE_ASSERT$$,\#define _GLIBCXX_VERBOSE_ASSERT 1,'
+${host_builddir}/c++config.h: config.h
+	sed -e ${S1} -e ${S2} -e ${S3} -e ${S4} -e ${S5} \
+	    -e ${S6} -e ${S7} -e ${S8} -e ${S9} \
+	    -e ${ldbl_compat} \
+	    -e ${ldbl_alt128_compat} \
+	    -e ${verbose_assert} \
+	    < ${glibcxx_srcdir}/include/bits/c++config > ${.TARGET}
+	sed -e 's/HAVE_/_GLIBCXX_HAVE_/g' \
+	    -e 's/PACKAGE/_GLIBCXX_PACKAGE/g' \
+	    -e 's/VERSION/_GLIBCXX_VERSION/g' \
+	    -e 's/WORDS_/_GLIBCXX_WORDS_/g' \
+	    -e 's/LT_OBJDIR/_GLIBCXX_LT_OBJDIR/g' \
+	    -e 's/STDC_HEADERS/_GLIBCXX_STDC_HEADERS/g' \
+	    -e 's/_DARWIN_USE_64_BIT_INODE/_GLIBCXX_DARWIN_USE_64_BIT_INODE/g' \
+	    -e 's/_FILE_OFFSET_BITS/_GLIBCXX_FILE_OFFSET_BITS/g' \
+	    -e 's/_LARGE_FILES/_GLIBCXX_LARGE_FILES/g' \
+	    -e 's/ICONV_CONST/_GLIBCXX_ICONV_CONST/g' \
+	    -e '/[	 ]_GLIBCXX_LONG_DOUBLE_COMPAT[	 ]/d' \
+	    -e '/[	 ]_GLIBCXX_LONG_DOUBLE_ALT128_COMPAT[	 ]/d' \
+	    < ${.ALLSRC} >> ${.TARGET}
+	echo "" >> ${.TARGET}
+	echo "#endif // _GLIBCXX_CXX_CONFIG_H" >> ${.TARGET}
+# }}}
+
+GENFILES+=	${thread_host_headers}
+uppercase=	[ABCDEFGHIJKLMNOPQRSTUVWXYZ_]
+${host_builddir}/gthr.h: ${GCCDIR}/libgcc/gthr.h
+	sed -e '/^#pragma/b' \
+	    -e '/^#/s/\(${uppercase}${uppercase}*\)/_GLIBCXX_\1/g' \
+	    -e 's/_GLIBCXX_SUPPORTS_WEAK/__GXX_WEAK__/g' \
+	    -e 's/_GLIBCXX___MINGW32_GLIBCXX___/__MINGW32__/g' \
+	    -e 's,^#include "\(.*\)",#include <bits/\1>,g' \
+	    < ${.ALLSRC} > ${.TARGET}
+${host_builddir}/gthr-single.h: ${GCCDIR}/libgcc/gthr-single.h
+	sed -e 's/\(UNUSED\)/_GLIBCXX_\1/g' \
+	    -e 's/\(GCC${uppercase}*_H\)/_GLIBCXX_\1/g' \
+	    < ${.ALLSRC} > ${.TARGET}
+${host_builddir}/gthr-posix.h: ${GCCDIR}/libgcc/gthr-posix.h
+	sed -e 's/\(UNUSED\)/_GLIBCXX_\1/g' \
+	    -e 's/\(GCC${uppercase}*_H\)/_GLIBCXX_\1/g' \
+	    -e 's/SUPPORTS_WEAK/__GXX_WEAK__/g' \
+	    -e 's/\(${uppercase}*USE_WEAK\)/_GLIBCXX_\1/g' \
+	    < ${.ALLSRC} > ${.TARGET}
+${host_builddir}/gthr-default.h: ${GCCDIR}/libgcc/gthr-posix.h
+	sed -e 's/\(UNUSED\)/_GLIBCXX_\1/g' \
+	    -e 's/\(GCC${uppercase}*_H\)/_GLIBCXX_\1/g' \
+	    -e 's/SUPPORTS_WEAK/__GXX_WEAK__/g' \
+	    -e 's/\(${uppercase}*USE_WEAK\)/_GLIBCXX_\1/g' \
+	    -e 's,^#include "\(.*\)",#include <bits/\1>,g' \
+	    < ${.ALLSRC} > ${.TARGET}

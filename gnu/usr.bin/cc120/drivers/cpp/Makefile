@@ -6,16 +6,14 @@ PROG_CXX=	cpp
 MFILE=		cpp${MANPAGEVER}.1
 MAN=		${MFILE}
 
-SRCS=		${GCC_SRCS} cppspec.cc ${EXTRA_GCC_SRCS}
+objs=		${GCC_OBJS} cppspec.o ${EXTRA_GCC_OBJS}
+SRCS=		${objs:.o=.cc}
 
 CFLAGS+=	-DCONFIGURE_SPECS="\"\"" \
 		-DACCEL_DIR_SUFFIX="\"\"" \
 		-DDEFAULT_REAL_TARGET_MACHINE="\"${target_machine}\""
 
-DOC_Release=	${GCCDIR}/gcc/doc/cpp.1
-DOC_Snapshot=	${GCCDIR}/gcc/doc/cpp.1
-
-${MFILE}: ${DOC_${GCCRELEASE}}
+${MFILE}: ${GCCDIR}/gcc/doc/cpp.1
 	cp ${.ALLSRC} ${.TARGET}
 
 CLEANFILES+=	${MFILE}

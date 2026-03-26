@@ -1,19 +1,15 @@
 RELUP=	/../..
-.include "../../../Makefile.inc"
+.include "../../Makefile.inc"
 SRCDIR=	${GCCDIR}/libstdc++-v3
 .include "Makefile.src"
 
 LIB=			cxx11convenience
 INTERNALLIB=		yes
 INTERNALLIBPROF=	yes
+# build the PIC archive for libstdc++.so
 INSTALL_PIC_ARCHIVE=	yes
 
-.PATH:	${SRCDIR}
-.PATH:	${SRCDIR}/src
 .PATH:	${SRCDIR}/src/c++11
-.PATH:  ${SRCDIR}/config/os/bsd/dragonfly
-.PATH:	${SRCDIR}/config/locale/dragonfly
-.PATH:	${SRCDIR}/config/locale/generic
 
 # for now do not let the use of -flto (-Wodr...)
 .if ${CFLAGS:M-flto}
@@ -21,53 +17,67 @@ CFLAGS+=	-fno-lto
 LDFLAGS+=	-flto
 .endif
 
-CFLAGS+=	-I${.OBJDIR}
-CXXFLAGS+=	-std=gnu++11 -fdiagnostics-show-location=once
-CXXFLAGS+=	-ffunction-sections -fdata-sections
+CFLAGS+=		-I${.OBJDIR}/../../headers
+CFLAGS+=		-I${SRCDIR}/include \
+			-I${SRCDIR}/include/std \
+			-I${SRCDIR}/include/c_global \
+			-I${SRCDIR}/libsupc++
+CXXFLAGS+=		-std=gnu++11 -nostdinc++
+CXXFLAGS+=		-fdiagnostics-show-location=once
+CXXFLAGS+=		-ffunction-sections -fdata-sections
 SHARED_CXXFLAGS=	-D_GLIBCXX_SHARED
 
-SRCS=	${libc__11convenience_la_SOURCES}
-INTHD=	${SRCDIR}/config/locale/generic/c++locale_internal.h
-GENHD=	cxxabi_forced.h ${INTHD:T}
+SRCS=		${libc__11convenience_la_SOURCES}
 
-FLAG_GROUPS=		implicit explicit
-implicit_FLAGS=		-fimplicit-templates
+SRCS:=		${SRCS:Ncxx11-ios_failure.cc}
+OBJS+=		cxx11-ios_failure.o	# custom rules below
+CLEANFILES+=	cxx11-ios_failure.*.s*
+
+FLAGS_GROUPS=		default implicit char8 supcxx
+default_FLAGS=		-fno-implicit-templates
+implicit_FLAGS=		${default_FLAGS} -fimplicit-templates
 implicit_FLAGS_FILES=	hashtable_c++0x.cc
-explicit_FLAGS=		-fno-implicit-templates
-explicit_FLAGS_FILES=	${SRCS:Nhashtable_c++0x.cc}
+char8_FLAGS=		${default_FLAGS} -fchar8_t
+char8_FLAGS_FILES=	codecvt.cc limits.cc
+supcxx_FLAGS=		${default_FLAGS} -I${SRCDIR}/libsupc++
+supcxx_FLAGS_FILES=	thread.cc
 
-# PR libstdc++/85222 needs intermediate manipulation
-OBJS+=	cxx11-ios_failure_sed.o
-S1DUAL=	'/^_*_ZTISt13__ios_failure:/,/_ZTVN10__cxxabiv120__si_class_type_infoE/s/_ZTVN10__cxxabiv120__si_class_type_infoE/_ZTVSt19__iosfail_type_info/'
-IOSTMP=	ios_static.s ios_static.tmp ios_po.s ios_po.tmp ios_sh.s ios_sh.tmp
+REFERENCED_FILES=	${implicit_FLAGS_FILES} \
+			${char8_FLAGS_FILES} \
+			${supcxx_FLAGS_FILES}
 
-cxx11-ios_failure_sed.o: cxx11-ios_failure.cc
-	${CXX} ${explicit_FLAGS} ${STATIC_CXXFLAGS} ${CXXFLAGS} -S -o ios_static.tmp ${.ALLSRC}
-	sed -e ${S1DUAL} < ios_static.tmp > ios_static.s
-	${CXX} ${explicit_FLAGS} ${STATIC_CXXFLAGS} ${CXXFLAGS} -g0 -c ios_static.s -o ${.TARGET}
+.for F in ${SRCS}
+. if ! ${REFERENCED_FILES:M${F}}
+default_FLAGS_FILES+=	${F}
+. endif
+.endfor
 
-cxx11-ios_failure_sed.po: cxx11-ios_failure.cc
-	${CXX} ${explicit_FLAGS} ${PO_FLAG} ${STATIC_CXXFLAGS} ${PO_CXXFLAGS} -S -o ios_po.tmp ${.ALLSRC}
-	sed -e ${S1DUAL} < ios_po.tmp > ios_po.s
-	${CXX} ${explicit_FLAGS} ${PO_FLAG} ${STATIC_CXXFLAGS} ${PO_CXXFLAGS} -g0 -c ios_po.s -o ${.TARGET}
+# Derived from libstdc++-v3/src/c++11/Makefile.am:
+# Rewrite the type info for __ios_failure.
+rewrite_ios_failure_typeinfo = sed -e '/^_*_ZTISt13__ios_failure:/,/_ZTVN10__cxxabiv120__si_class_type_infoE/s/_ZTVN10__cxxabiv120__si_class_type_infoE/_ZTVSt19__iosfail_type_info/'
 
-cxx11-ios_failure_sed.So: cxx11-ios_failure.cc
-	${CXX} ${explicit_FLAGS} ${PICFLAG} -DPIC ${SHARED_CXXFLAGS} ${CXXFLAGS} -S -o ios_sh.tmp ${.ALLSRC}
-	sed -e ${S1DUAL} < ios_sh.tmp > ios_sh.s
-	${CXX} ${explicit_FLAGS} ${PICFLAG} -DPIC ${SHARED_CXXFLAGS} ${CXXFLAGS} -g0 -c ios_sh.s -o ${.TARGET}
+cxx11-ios_failure.o: cxx11-ios_failure.cc
+	${CXX} ${STATIC_CXXFLAGS} ${CXXFLAGS} ${default_FLAGS} \
+		-gno-as-loc-support -S -o ${.TARGET}.s.tmp ${.ALLSRC}
+	${rewrite_ios_failure_typeinfo} < ${.TARGET}.s.tmp > ${.TARGET}.s
+	${CXX} ${STATIC_CXXFLAGS} ${CXXFLAGS} ${default_FLAGS} \
+		-g0 -c ${.TARGET}.s -o ${.TARGET}
 
-cxxabi_forced.h: ${SRCDIR}/libsupc++/cxxabi_forced.h
-	cp ${.ALLSRC} ${.TARGET}
+cxx11-ios_failure.po: cxx11-ios_failure.cc
+	${CXX} ${PO_FLAG} ${STATIC_CXXFLAGS} ${PO_CXXFLAGS} ${default_FLAGS} \
+		-gno-as-loc-support -S -o ${.TARGET}.s.tmp ${.ALLSRC}
+	${rewrite_ios_failure_typeinfo} < ${.TARGET}.s.tmp > ${.TARGET}.s
+	${CXX} ${PO_FLAG} ${STATIC_CXXFLAGS} ${PO_CXXFLAGS} ${default_FLAGS} \
+		-g0 -c ${.TARGET}.s -o ${.TARGET}
 
-${INTHD:T}: copybits ${INTHD}
-	cp ${INTHD} bits/${.TARGET}
+cxx11-ios_failure.So: cxx11-ios_failure.cc
+	${CXX} ${PICFLAG} -DPIC ${SHARED_CXXFLAGS} ${CXXFLAGS} ${default_FLAGS} \
+		-gno-as-loc-support -S -o ${.TARGET}.s.tmp ${.ALLSRC}
+	${rewrite_ios_failure_typeinfo} < ${.TARGET}.s.tmp > ${.TARGET}.s
+	${CXX} ${PICFLAG} -DPIC ${SHARED_CXXFLAGS} ${CXXFLAGS} ${default_FLAGS} \
+		-g0 -c ${.TARGET}.s -o ${.TARGET}
 
-copybits:
-	mkdir -p bits
-
-CLEANDIRS=	bits
-CLEANFILES=	${GENHD} ${IOSTMP}
-
-beforedepend:	${GENHD}
+CLEANFILES+=	${GENFILES}
+beforedepend:	${GENFILES}
 
 .include <bsd.lib.mk>

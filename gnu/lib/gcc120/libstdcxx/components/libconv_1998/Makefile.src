@@ -1,4 +1,4 @@
-# verbatim from libstdc++/src/c++98/Makefile.in
+# verbatim from libstdc++-v3/src/c++98/Makefile.am
 
 cow_string_host_sources = \
 	collate_members_cow.cc \
@@ -6,9 +6,10 @@ cow_string_host_sources = \
 	monetary_members_cow.cc \
 	numeric_members_cow.cc
 
+# Source files linked in via configuration/make substitution for a
+# particular host.
 host_sources = \
 	$(cow_string_host_sources) \
-	atomicity.cc \
 	codecvt_members.cc \
 	collate_members.cc \
 	messages_members.cc \
@@ -16,6 +17,8 @@ host_sources = \
 	numeric_members.cc \
 	time_members.cc
 
+# Source files linked in via configuration/make substitution for a
+# particular host, but with ad hoc naming rules.
 host_sources_extra = \
 	basic_file.cc c++locale.cc \
 	${inst_sources} ${parallel_sources}
@@ -23,6 +26,7 @@ host_sources_extra = \
 cxx11_abi_sources = \
 	cow-istream-string.cc
 
+# XTEMPLATE_FLAGS = -fno-implicit-templates
 inst_sources = \
 	allocator-inst.cc \
 	concept-inst.cc \
@@ -31,6 +35,7 @@ inst_sources = \
 
 parallel_sources = parallel_settings.cc
 
+# Sources present in the src directory, always present.
 sources = \
 	bitmap_allocator.cc \
 	pool_allocator.cc \
@@ -66,3 +71,30 @@ sources = \
 	${host_sources_extra}
 
 libc__98convenience_la_SOURCES = $(sources)
+
+# from gcc-build/{target}/libstdc++-v3/src/c++98/Makefile
+BASIC_FILE_CC = config/io/basic_file_stdio.cc
+CLOCALE_CC = config/locale/dragonfly/c_locale.cc
+CCODECVT_CC = config/locale/dragonfly/codecvt_members.cc
+CCOLLATE_CC = config/locale/dragonfly/collate_members.cc
+CCTYPE_CC = config/locale/dragonfly/ctype_members.cc
+CMONEY_CC = config/locale/dragonfly/monetary_members.cc
+CNUMERIC_CC = config/locale/dragonfly/numeric_members.cc
+CTIME_CC = config/locale/dragonfly/time_members.cc
+CMESSAGES_CC = config/locale/generic/messages_members.cc
+
+# generated sources
+#
+GENFILES+=	basic_file.cc
+basic_file.cc: ${SRCDIR}/${BASIC_FILE_CC}
+	cp ${.ALLSRC} ${.TARGET}
+
+GENFILES+=	c++locale.cc
+c++locale.cc: ${SRCDIR}/${CLOCALE_CC}
+	cp ${.ALLSRC} ${.TARGET}
+
+GENFILES+=	${host_sources}
+.for F in ${host_sources}
+${F}: ${SRCDIR}/${C${F:C/_members(_cow)?.cc//:S/monetary/money/:tu}_CC}
+	cp ${.ALLSRC} ${.TARGET}
+.endfor

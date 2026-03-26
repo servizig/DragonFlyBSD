@@ -1,0 +1,8 @@
+# verbatim from libstdc++-v3/src/c++20/Makefile.am
+
+inst_sources = \
+	sstream-inst.cc
+
+sources = # empty
+
+libc__20convenience_la_SOURCES = $(sources) $(inst_sources)

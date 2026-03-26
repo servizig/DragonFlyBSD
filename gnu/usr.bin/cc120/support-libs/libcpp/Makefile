@@ -14,15 +14,18 @@ CXXFLAGS+=	${NOEXCEPTION_FLAGS}
 CFLAGS+=	-DBOOTSTRAPPING
 .endif
 
-# From libcpp/Makefile.in (libcpp_a_OBJS)
-OBJS= charset.o directives.o errors.o \
-	expr.o files.o identifiers.o init.o lex.o line-map.o macro.o \
-	mkdeps.o pch.o symtab.o traditional.o
+# From libcpp/Makefile.in
+libcpp_a_SOURCES = charset.cc directives.cc errors.cc \
+	expr.cc files.cc identifiers.cc init.cc lex.cc line-map.cc macro.cc \
+	mkdeps.cc pch.cc symtab.cc traditional.cc
 
-${OBJS}: localedir.h
+SRCS=	${libcpp_a_SOURCES}
+
+# generated
+SRCS+= localedir.h
 
 localedir.h:
-	touch $@
+	touch ${.TARGET}
 
 CLEANFILES=	localedir.h
 

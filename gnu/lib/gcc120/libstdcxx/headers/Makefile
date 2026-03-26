@@ -1,118 +1,74 @@
 RELUP=	/..
-.include "../../Makefile.inc"
+.include "../Makefile.inc"
 SRCDIR=	${GCCDIR}/libstdc++-v3
 .include "Makefile.headers"
 
 .PATH:	${SRCDIR}
 
-# These sections are detailed in Makefile.headers
-# parallel section is empty, skip it
-# make buildincludes, make installincludes before make depend
-glibcxx_srcdir=	${SRCDIR}
-HSECT=	std bits bits_sup backward pstl ext ext_compat tr1 tr2 decimal \
-	c_base c_compatibility debug host supc \
-	parallel experimental ext_host
-PBSECT=	1 2 3 4 5 6 7
 HD=	${INCLUDEDIR}/c++/${GCCPOINTVER}
 
+# These sections are detailed in Makefile.headers.
+HSECT=	std bits pstl backward ext ext_compat tr1 tr2 decimal \
+	experimental experimental_bits \
+	experimental_filesystem experimental_bits_filesystem \
+	c_base c_compatibility debug parallel
+HSECT+=	sup bits_sup
+.for i in 1 2 3 4 5 6 7
+PBHDRS+=${pb_headers${i}}
+.endfor
+
+# The libstdc++ components and products have been updated to use '-nostdinc++'
+# and thus don't require these headers be installed before building them, so
+# use FILESGROUPS instead of INCSGROUPS to skip running "buildincludes" and
+# "installincludes" before "depend".
+
 .for i in ${HSECT}
-INCSGROUPS+=		${i}_headers
+FILESGROUPS+=		${i}_headers
 ${i}_headersDIR=	${HD}/${${i}_builddir}
 .endfor
 
-PATHGROUP=
-.for i in ${PBSECT}
-.  for k in ${pb_headers${i}}
-.    if ${PATHGROUP:M${k:H:T}} == ""
-PATHGROUP+=${k:H:T}
-PATH_${k:H:T}=${k:H:T}
-.    endif
-PBG_${k:H:T}+=${k}
-.  endfor
+.for i in ${pb_builddir} ${pb_subdirs}
+FILESGROUPS+=		_${i}_headers
+_${i}_headersDIR=	${HD}/${i}
+. for f in ${PBHDRS}
+.  if ${i:S/${pb_builddir}//} == ${f:H:S/${pb_srcdir}//}
+_${i}_headers+=		${f}
+.  endif
+. endfor
 .endfor
 
-INCSGROUPS+=		PBG_pb_ds
-PBG_pb_dsDIR=		${HD}/${pb_builddir}
+.for h in bits_host_headers host_headers host_headers_extra thread_host_headers
+FILESGROUPS+=		${h}
+${h}DIR=		${HD}/bits
+.endfor
+FILESGROUPS+=		ext_host_headers
+ext_host_headersDIR=	${HD}/ext
 
-INCSGROUPS+=		PBG_detail
-PBG_detailDIR=		${HD}/${pb_builddir}/detail
-
-.for k in ${PATHGROUP:Npb_ds:Ndetail}
-INCSGROUPS+=		PBG_${k}
-PBG_${k}DIR=		${HD}/${pb_builddir}/detail/${PATH_${k}}
+# Copy the ${host_headers} and ${bits_host_headers} to 'bits' directory as
+# they are required by the generated ${host_headers_extra} and the
+# convenience libraries.
+# Also copy the ${bits_sup_headers} to 'bits' directory as they are required
+# by the ${sup_headers}.
+copy_headers: mkdirs
+.for f in ${host_headers} ${bits_host_headers} ${bits_sup_headers}
+copy_headers: bits/${f:T}
+bits/${f:T}: ${f}
+	cp ${.ALLSRC} ${.TARGET}
 .endfor
 
-INCSGROUPS+=		experimental_bits_headers
-experimental_bits_headersDIR=	${HD}/experimental/bits
+# This header is not installed, it's only used to build libstdc++ itself.
+GENFILES+=	bits/largefile-config.h
+bits/largefile-config.h: config.h
+	-grep 'define _DARWIN_USE_64_BIT_INODE' ${.ALLSRC}	>  ${.TARGET}
+	-grep 'define _FILE_OFFSET_BITS' ${.ALLSRC}		>> ${.TARGET}
+	-grep 'define _LARGE_FILES' ${.ALLSRC}			>> ${.TARGET}
 
-INCSGROUPS+=		host_headers_extra
-host_headers_extraDIR=	${HD}/bits
-host_headers_extraNAME_basic_file_stdio.h=	basic_file.h
-host_headers_extraNAME_c_locale.h=		c++locale.h
-host_headers_extraNAME_c_io_stdio.h+=		c++io.h
-host_headers_extraNAME_new_allocator_base.h=	c++allocator.h
+CLEANDIRS+=	bits
+mkdirs:
+	mkdir -p bits
 
-cxxabi_forced.h: ${SRCDIR}/libsupc++/cxxabi_forced.h
-	cp ${.ALLSRC} ${.TARGET}
+CLEANFILES+=	${GENFILES}
 
-gthr.h: ${GCCDIR}/libgcc/gthr.h
-	sed -e '/^#pragma/b' \
-	    -e '/^#/s/\([ABCDEFGHIJKLMNOPQRSTUVWXYZ_][ABCDEFGHIJKLMNOPQRSTUVWXYZ_]*\)/_GLIBCXX_\1/g' \
-	    -e 's/_GLIBCXX_SUPPORTS_WEAK/__GXX_WEAK__/g' \
-	    -e 's/_GLIBCXX___MINGW32_GLIBCXX___/__MINGW32__/g' \
-	    -e 's,^#include "\(.*\)",#include <bits/\1>,g' \
-	    < ${GCCDIR}/libgcc/gthr.h > ${.TARGET}
-
-gthr-single.h: ${GCCDIR}/libgcc/gthr.h
-	sed -e 's/\(UNUSED\)/_GLIBCXX_\1/g' \
-	    -e 's/\(GCC[ABCDEFGHIJKLMNOPQRSTUVWXYZ_]*_H\)/_GLIBCXX_\1/g' \
-	    < ${GCCDIR}/libgcc/gthr-single.h > ${.TARGET}
-
-gthr-posix.h: ${GCCDIR}/libgcc/gthr-posix.h
-	sed -e 's/\(UNUSED\)/_GLIBCXX_\1/g' \
-	    -e 's/\(GCC[ABCDEFGHIJKLMNOPQRSTUVWXYZ_]*_H\)/_GLIBCXX_\1/g' \
-	    -e 's/SUPPORTS_WEAK/__GXX_WEAK__/g' \
-	    -e 's/\([ABCDEFGHIJKLMNOPQRSTUVWXYZ_]*USE_WEAK\)/_GLIBCXX_\1/g' \
-	    < ${GCCDIR}/libgcc/gthr-posix.h > ${.TARGET}
-
-gthr-default.h: gthr-posix.h
-	cp ${.ALLSRC} ${.TARGET}
-
-release=${GCCMAJORVER}
-ns_version=0
-visibility=1
-externtemplate=1
-dualabi=1
-cxx11abi=1
-allocatornew=1
-float128=define _GLIBCXX_USE_FLOAT128 1
-#float128=undef _GLIBCXX_USE_FLOAT128
-ldbl_compat='s,g,g,'
-S1='s,define __GLIBCXX__,define __GLIBCXX__ ${GCCSHORTDATE},'
-S2='s,define _GLIBCXX_RELEASE,define _GLIBCXX_RELEASE ${release},'
-S3='s,define _GLIBCXX_INLINE_VERSION, define _GLIBCXX_INLINE_VERSION ${ns_version},'
-S4='s,define _GLIBCXX_HAVE_ATTRIBUTE_VISIBILITY, define _GLIBCXX_HAVE_ATTRIBUTE_VISIBILITY ${visibility},'
-S5='s,define _GLIBCXX_EXTERN_TEMPLATE$$, define _GLIBCXX_EXTERN_TEMPLATE ${externtemplate},'
-S6='s,define _GLIBCXX_USE_DUAL_ABI, define _GLIBCXX_USE_DUAL_ABI ${dualabi},'
-S7='s,define _GLIBCXX_USE_CXX11_ABI, define _GLIBCXX_USE_CXX11_ABI ${cxx11abi},'
-S8='s,define _GLIBCXX_USE_ALLOCATOR_NEW, define _GLIBCXX_USE_ALLOCATOR_NEW ${allocatornew},'
-S9='s,define _GLIBCXX_USE_FLOAT128, ${float128},'
-S10='${ldbl_compat}'
-
-c++config.h: config.h
-	sed -e ${S1} -e ${S2} -e ${S3} -e ${S4} -e ${S5} -e ${S6} -e ${S7} -e ${S8} -e ${S9} -e ${S10} \
-	    < ${GCCDIR}/libstdc++-v3/include/bits/c++config > ${.TARGET}
-	sed -e 's/HAVE_/_GLIBCXX_HAVE_/g' \
-	    -e 's/PACKAGE/_GLIBCXX_PACKAGE/g' \
-	    -e 's/VERSION/_GLIBCXX_VERSION/g' \
-	    -e 's/WORDS_/_GLIBCXX_WORDS_/g' \
-	    -e 's/ICONV_CONST/_GLIBCXX_ICONV_CONST/g' \
-	    -e '/[	 ]_GLIBCXX_LONG_DOUBLE_COMPAT[	 ]/d' \
-	    < ${.ALLSRC} >> ${.TARGET}
-	echo "" >> ${.TARGET}
-	echo "#endif // _GLIBCXX_CXX_CONFIG_H" >> ${.TARGET}
-
-CLEANFILES=	gthr.h gthr-default.h gthr-single.h gthr-posix.h \
-		c++config.h cxxabi_forced.h
+depend all: mkdirs copy_headers ${GENFILES}
 
 .include <bsd.lib.mk>

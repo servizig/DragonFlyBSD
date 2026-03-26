@@ -6,9 +6,10 @@ GCC_LANG_DIR=	gcc/cp
 PROG_CXX=	c++
 LINKS=		${BINDIR}/c++ ${BINDIR}/g++
 LINKS+=		${BINDIR}/c++ ${BINDIR}/CC
-MAN=		# man pages installed by cc (MLINK)
+NOMAN=		# man pages installed by cc (MLINK)
 
-SRCS=		${GCC_SRCS} g++spec.cc ${EXTRA_GCC_SRCS}
+objs=		${GCC_OBJS} g++spec.o ${EXTRA_GCC_OBJS}
+SRCS=		${objs:.o=.cc}
 
 CFLAGS+=	-DCONFIGURE_SPECS="\"\"" \
 		-DACCEL_DIR_SUFFIX="\"\"" \

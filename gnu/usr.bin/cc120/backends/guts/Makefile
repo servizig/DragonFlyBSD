@@ -1,4 +1,4 @@
-SUBDIR_ORDERED=
+SUBDIR_ORDERED=		# maximum parallelism
 
 SUBDIR+=	guts-common
 SUBDIR+=	guts-c

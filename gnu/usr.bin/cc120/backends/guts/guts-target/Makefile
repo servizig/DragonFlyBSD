@@ -1,5 +1,3 @@
-# Despite the .c extension, these files and headers must be built by c++
-
 GCC_NO_LIBS=	yes
 TOP_PREFIX=	../../
 
@@ -7,10 +5,14 @@ TOP_PREFIX=	../../
 .include "../../../Makefile.langs"
 
 LIB=		guts-target
-INTERNALLIB=
+INTERNALLIB=	yes
 
-GUTS_TARGETO=	${C_TARGET_OBJS:T}
+# NOTE: ${C_TARGET_OBJS} == ${CXX_TARGET_OBJS}, so this library is used
+# by both guts-c and guts-cxx libraries.
+.if ${C_TARGET_OBJS:O} != ${CXX_TARGET_OBJS:O}
+.error unexpected C_TARGET_OBJS != CXX_TARGET_OBJS
+.endif
 
-OBJS=		${GUTS_TARGETO}
+SRCS=		${C_TARGET_OBJS:T:.o=.cc}
 
 .include <bsd.lib.mk>

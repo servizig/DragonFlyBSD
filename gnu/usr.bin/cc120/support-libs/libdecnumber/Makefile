@@ -13,6 +13,7 @@ INTERNALLIB=	YES
 CFLAGS+=	-fno-lto
 .endif
 
+# from libdecnumber/Makefile.in (libdecnumber_a_OBJS)
 SRCS=	decContext.c \
 	decNumber.c \
 	decimal32.c \

@@ -1,21 +1,19 @@
-CFLAGS+=	-I${.CURDIR}
-CFLAGS+=	-I${.OBJDIR}
+GCC_NO_PATH=	yes
+GCC_NO_LIBS=	yes
+LOCAL_CONFIG=	yes
 .include "../Makefile.inc"
-
 .PATH: ${GCCDIR}/libcody
-
-CFLAGS+=	-include config.h.in -DSRCDIR="\"${GCCDIR}\""
 
 LIB=		cody
 INTERNALLIB=	YES
-SHLIB_MAJOR=	0
 
-# From libcody Makefile (LIBCODY.O)
-SRCS= \
-	buffer.cc client.cc fatal.cc netclient.cc netserver.cc \
-	resolver.cc packet.cc server.cc
+CFLAGS+=	-DSRCDIR="\"${GCCDIR}\""
 
-INCS+=		cody.hh
-INCSDIR=	/usr/libdata/gcc${GCCSHORTVER}
+# From libcody/Makefile.in
+LIBCODY.O=	\
+	buffer.o client.o fatal.o netclient.o netserver.o \
+	resolver.o packet.o server.o
+
+SRCS=	${LIBCODY.O:.o=.cc}
 
 .include <bsd.lib.mk>

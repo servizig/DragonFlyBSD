@@ -1,11 +1,12 @@
 .include "../Makefile.inc"
 .PATH: ${GCCDIR}/libgcc
 
+# Options to use when compiling crtbegin/end.
+# from libgcc/Makefile.in and libgcc/config/i386/t-crtstuff
 .if ${CCVER:Mgcc*}
 CFLAGS+=	-finhibit-size-directive
 CFLAGS+=	-fno-toplevel-reorder
 .endif
-
 CFLAGS+=	-fno-inline
 CFLAGS+=	-fno-exceptions
 CFLAGS+=	-fno-zero-initialized-in-bss

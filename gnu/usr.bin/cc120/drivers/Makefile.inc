@@ -1,5 +1,5 @@
-.if !target(__<driver120.Makefile.inc>__)
-__<driver120.Makefile.inc>__:
+.if !target(__<drivers.Makefile.inc>__)
+__<drivers.Makefile.inc>__:
 
 TOP_PREFIX=	../
 

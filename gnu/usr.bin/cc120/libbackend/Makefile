@@ -1,22 +1,60 @@
 GCC_NO_LIBS=	yes
 LOCAL_CONFIG=	yes
 .include "../Makefile.inc"
-.PATH: $(srcdir)/config/i386
+.include "../Makefile.langs"
+.PATH: ${GCCDIR}/gcc/config/i386
 
-CFLAGS+=	-DTARGET_NAME=\"${target_machine}\" -DTARGET_MACHINE=\"${target_machine}\"
 # needed to compile hsa/brig bits
 CXXFLAGS+=	${NOEXCEPTION_FLAGS}
 
 LIB=		backend
 INTERNALLIB=	YES
 
-# almost verbatim from Makefile, objects from cc files have been pulled out
-# because the .o=.c is wrong for them
 host_hook_obj=host-default.o
-out_object_file=i386.o
-EXTRA_OBJS=	x86-tune-sched.o x86-tune-sched-bd.o \
-		x86-tune-sched-atom.o x86-tune-sched-core.o \
-		i386-options.o i386-builtins.o i386-expand.o i386-features.o
+out_object_file=${out_file:T:.cc=.o}
+
+# Analyzer object files
+# verbatim from gcc/Makefile.in
+ANALYZER_OBJS = \
+	analyzer/analysis-plan.o \
+	analyzer/analyzer.o \
+	analyzer/analyzer-logging.o \
+	analyzer/analyzer-pass.o \
+	analyzer/analyzer-selftests.o \
+	analyzer/bar-chart.o \
+	analyzer/call-info.o \
+	analyzer/call-string.o \
+	analyzer/checker-path.o \
+	analyzer/complexity.o \
+	analyzer/constraint-manager.o \
+	analyzer/diagnostic-manager.o \
+	analyzer/engine.o \
+	analyzer/feasible-graph.o \
+	analyzer/function-set.o \
+	analyzer/pending-diagnostic.o \
+	analyzer/program-point.o \
+	analyzer/program-state.o \
+	analyzer/region.o \
+	analyzer/region-model.o \
+	analyzer/region-model-asm.o \
+	analyzer/region-model-impl-calls.o \
+	analyzer/region-model-manager.o \
+	analyzer/region-model-reachability.o \
+	analyzer/sm.o \
+	analyzer/sm-file.o \
+	analyzer/sm-malloc.o \
+	analyzer/sm-pattern-test.o \
+	analyzer/sm-sensitive.o \
+	analyzer/sm-signal.o \
+	analyzer/sm-taint.o \
+	analyzer/state-purge.o \
+	analyzer/store.o \
+	analyzer/supergraph.o \
+	analyzer/svalue.o \
+	analyzer/trimmed-graph.o
+
+# Language-independent object files.
+# from gcc/Makefile.in (OBJS)
 BACKEND_OBJS= \
 	gimple-match.o \
 	generic-match.o \
@@ -107,6 +145,7 @@ BACKEND_OBJS= \
 	explow.o \
 	expmed.o \
 	expr.o \
+	fibonacci_heap.o \
 	file-prefix-map.o \
 	final.o \
 	fixed-value.o \
@@ -114,6 +153,7 @@ BACKEND_OBJS= \
 	fold-const-call.o \
 	function.o \
 	function-abi.o \
+	function-tests.o \
 	fwprop.o \
 	gcc-rich-location.o \
 	gcse.o \
@@ -166,6 +206,8 @@ BACKEND_OBJS= \
 	graphite.o \
 	gtype-desc.o \
 	haifa-sched.o \
+	hash-map-tests.o \
+	hash-set-tests.o \
 	hw-doloop.o \
 	hwint.o \
 	ifcvt.o \
@@ -287,6 +329,7 @@ BACKEND_OBJS= \
 	rtl-ssa/changes.o \
 	rtl-ssa/functions.o \
 	rtl-ssa/insns.o \
+	rtl-tests.o \
 	rtl.o \
 	rtlhash.o \
 	rtlanal.o \
@@ -299,6 +342,8 @@ BACKEND_OBJS= \
 	sel-sched-ir.o \
 	sel-sched-dump.o \
 	sel-sched.o \
+	selftest-rtl.o \
+	selftest-run-tests.o \
 	sese.o \
 	shrink-wrap.o \
 	simplify-rtx.o \
@@ -418,6 +463,7 @@ BACKEND_OBJS= \
 	tree-vrp.o \
 	tree.o \
 	tristate.o \
+	typed-splay-tree.o \
 	valtrack.o \
 	value-pointer-equiv.o \
 	value-query.o \
@@ -436,15 +482,9 @@ BACKEND_OBJS= \
 	wide-int.o \
 	wide-int-print.o \
 	$(out_object_file) \
+	$(ANALYZER_OBJS) \
 	$(EXTRA_OBJS) \
 	$(host_hook_obj)
-
-.if ${CFLAGS:M-DTOOLCHAIN_CHECKING}
-BACKEND_OBJS+=	fibonacci_heap.o function-tests.o \
-		hash-map-tests.o hash-set-tests.o \
-		rtl-tests.o selftest-rtl.o \
-		selftest-run-tests.o typed-splay-tree.o
-.endif
 
 # only when HAVE_isl
 #BACKEND_OBJS+= \
@@ -463,95 +503,32 @@ BACKEND_OBJS+=	fibonacci_heap.o function-tests.o \
 #BACKEND_OBJS+= \
 	xcoffout.o
 
-OBJS=	${BACKEND_OBJS}
+SRCS=	${BACKEND_OBJS:.o=.cc}
 
-.if ${CFLAGS:M-DTOOLCHAIN_CHECKING}
-SRCS+=	unique-ptr-tests.cc
-.endif
+FLAGS_GROUPS=		tname tmachine warn
 
-# rtl-ssa
-RTL_SSA_SRCS= \
-	rtl-ssa/accesses.cc \
-	rtl-ssa/blocks.cc \
-	rtl-ssa/changes.cc \
-	rtl-ssa/functions.cc \
-	rtl-ssa/insns.cc
+tname_FLAGS_FILES=	toplev.cc optinfo-emit-json.cc
+tname_FLAGS=		-DTARGET_NAME=\"${target_machine}\"
 
-SRCS+= ${RTL_SSA_SRCS}
-${RTL_SSA_SRCS}: rtl_ssa_dir
+tmachine_FLAGS_FILES=	lto-streamer-in.cc
+tmachine_FLAGS=		-DTARGET_MACHINE=\"${target_machine}\"
 
-# Analzyer, called ANALYZER_OBJS in gcc
-ANALYZER_SRCS=	\
-	analyzer/analysis-plan.cc \
-	analyzer/analyzer.cc \
-	analyzer/analyzer-logging.cc \
-	analyzer/analyzer-pass.cc \
-	analyzer/analyzer-selftests.cc \
-	analyzer/bar-chart.cc \
-	analyzer/call-info.cc \
-	analyzer/call-string.cc \
-	analyzer/checker-path.cc \
-	analyzer/complexity.cc \
-	analyzer/constraint-manager.cc \
-	analyzer/diagnostic-manager.cc \
-	analyzer/engine.cc \
-	analyzer/feasible-graph.cc \
-	analyzer/function-set.cc \
-	analyzer/pending-diagnostic.cc \
-	analyzer/program-point.cc \
-	analyzer/program-state.cc \
-	analyzer/region.cc \
-	analyzer/region-model.cc \
-	analyzer/region-model-asm.cc \
-	analyzer/region-model-impl-calls.cc \
-	analyzer/region-model-manager.cc \
-	analyzer/region-model-reachability.cc \
-	analyzer/sm.cc \
-	analyzer/sm-file.cc \
-	analyzer/sm-malloc.cc \
-	analyzer/sm-pattern-test.cc \
-	analyzer/sm-sensitive.cc \
-	analyzer/sm-signal.cc \
-	analyzer/sm-taint.cc \
-	analyzer/state-purge.cc \
-	analyzer/store.cc \
-	analyzer/supergraph.cc \
-	analyzer/svalue.cc \
-	analyzer/trimmed-graph.cc
-
-SRCS+= ${ANALYZER_SRCS}
-
-${ANALYZER_SRCS}: analyzer_dir
-
-# for gimple-ssa-sprintf.c
-.if ${CCVER:Mgcc47}
-CXXFLAGS+=	-Wno-pragmas
-.endif
-
-# for tree-ssa-structalias.c, tree-vect-stmts.c, i386.c
-.if (${CCVER:Mgcc80} || ${CCVER:Mgcc1*0})
-CXXFLAGS+=	-Wno-narrowing
-CFLAGS+=	-Wno-narrowing
+warn_FLAGS_FILES=	i386.cc i386-options.cc i386-builtins.cc \
+			i386-expand.cc i386-features.cc \
+			fwprop.cc ipa-modref.cc \
+			tree-ssa-structalias.cc \
+			tree-vect-slp.cc tree-vect-stmts.cc \
+			${SRCS:Mrtl-ssa/*:T}
+.if (${CCVER:Mgcc80} || ${CCVER:Mgcc120})
+warn_FLAGS=	-Wno-narrowing
 .elif ${CCVER:Mclang*}
-CXXFLAGS+=	-Wno-c++11-narrowing
+warn_FLAGS=	-Wno-c++11-narrowing
 .endif
 
-.for cfile in ${BACKEND_OBJS}
-${cfile}: ${cfile:.o=.cc}
-	${CXX} ${STATIC_CXXFLAGS} ${CXXFLAGS} -c ${.IMPSRC} -o ${.TARGET}
-.endfor
+depend: mkdirs
+mkdirs:
+	mkdir -p analyzer rtl-ssa
 
-rtl_ssa_dir:
-	mkdir -p rtl-ssa
-
-analyzer_dir:
-	mkdir -p analyzer
-
-dfp.o: gstdint.h
-
-gstdint.h:
-	echo "#include <stdint.h>" > ${.TARGET}
-
-CLEANFILES=	gstdint.h
+CLEANDIRS=	analyzer rtl-ssa
 
 .include <bsd.lib.mk>

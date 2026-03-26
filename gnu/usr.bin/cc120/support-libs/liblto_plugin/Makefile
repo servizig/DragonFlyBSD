@@ -1,11 +1,5 @@
-# include helpers to decide if lto plugin needs to be installed and where
-.include "../../../Makefile.buo"
-.include "../../../Makefile.cco"
-
-# liblto_plugin.so needs to linked to a PIC version of libiberty
-# A special tailed version of libiberty has been created for this purpose
-
-GCC_NO_LIBS=	# defined
+GCC_NO_PATH=	yes
+GCC_NO_LIBS=	yes
 .include "../Makefile.inc"
 .PATH: ${GCCDIR}/lto-plugin
 
@@ -17,14 +11,23 @@ NOINSTALLLIB=	yes
 LIBMODE=	555
 
 # GCC driver looks for LTO plugin library in libexec, not lib
-TARGET_LIBDIR=		/usr/libexec/gcc120
-TARGET_SHLIBDIR=	/usr/libexec/gcc120
+TARGET_LIBDIR=		/usr/libexec/gcc${GCCSHORTVER}
+TARGET_SHLIBDIR=	${TARGET_LIBDIR}
 
 SRCS=		lto-plugin.c
-LDADD=		../libiberty_pic/libiberty_pic.a
+VERSION_MAP=	${GCCDIR}/lto-plugin/lto-plugin.map
 
+# liblto_plugin.so needs to be linked to a PIC version of libiberty.
+# A specially tailored version of libiberty has been created for this purpose.
+LIBIBERTY=	../libiberty_pic/libiberty_pic.a
+LDADD=		${LIBIBERTY}
+DPADD=		${LIBIBERTY}
+
+# include helpers to decide if lto plugin needs to be installed and where
+.include "../../../Makefile.buo"
+.include "../../../Makefile.cco"
 # SYMLINK lto plugin to primary/backup binutils bfd-plugin dirs
-.if ${CC_PRIMARY} == "gcc120" # we are default gcc compiler
+.if ${CC_PRIMARY} == "gcc${GCCSHORTVER}" # we are default gcc compiler
 LTOPLUGIN=	liblto_plugin.so
 .if exists(${DESTDIR}/usr/libexec/${BU_PRIMARY}/bfd-plugins)
 BFDPLUGINS=	/usr/libexec/${BU_PRIMARY}/bfd-plugins

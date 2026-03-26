@@ -1,5 +1,5 @@
 RELUP=	/..
-.include "../../Makefile.inc"
+.include "../Makefile.inc"
 SRCDIR=	${GCCDIR}/libstdc++-v3
 PREDIR=	${SRCDIR}/config/abi/pre
 .include "Makefile.src"
@@ -16,7 +16,12 @@ CFLAGS+=	-fno-lto
 LDFLAGS+=	-flto
 .endif
 
-CFLAGS+=	-I${.OBJDIR}
+CFLAGS+=	-I${.OBJDIR}/../headers
+CFLAGS+=	-I${SRCDIR}/include \
+		-I${SRCDIR}/include/std \
+		-I${SRCDIR}/include/c_global \
+		-I${SRCDIR}/libsupc++
+CXXFLAGS+=	-nostdinc++
 CXXFLAGS+=	-fno-implicit-templates
 CXXFLAGS+=	-fdiagnostics-show-location=once
 CXXFLAGS+=	-ffunction-sections -fdata-sections
@@ -27,20 +32,24 @@ FLAGS_GROUPS=		gnu11
 gnu11_FLAGS=		-std=gnu++11
 gnu11_FLAGS_FILES=	${cxx11_sources:S|++|xx|}
 
-CONVARCS=	../components/libconv_supc/libsupcxxconvenience.a
-CONVARCS+=	../components/libconv_1998/libcxx98convenience.a
-CONVARCS+=	../components/libconv_2011/libcxx11convenience.a
-LDADD=		-Wl,--whole-archive ${CONVARCS:.a=_pic.a} -lm
-LDADD+=		-Wl,--no-whole-archive
-ARADD=		${CONVARCS} ${LIBM}
+CONVARCS=	../components/libconv_supc/libsupcxxconvenience.a \
+		../components/libconv_1998/libcxx98convenience.a \
+		../components/libconv_2011/libcxx11convenience.a \
+		../components/libconv_2017/libcxx17convenience.a \
+		../components/libconv_2020/libcxx20convenience.a
+LDADD=		-Wl,--whole-archive ${CONVARCS:.a=_pic.a} -lm \
+		-Wl,--no-whole-archive
 
-# The AR script is a nice trick, but it *cannot* handle "++" on any line
+# The AR script is a nice trick, but it *cannot* handle "++" on any line.
 # To work around this incredible limitation, copy files with "++" in
-# their names to a new file name (transform ++ => xx)
+# their names to a new file name (transform ++ => xx).
 
 SRCS=		${libstdc___la_SOURCES:S|++|xx|}
+
 PROBLEMS=	${libstdc___la_SOURCES:M*++*}
 PROBLEMSXX=	${PROBLEMS:S|++|xx|}
+${PROBLEMSXX}: ${PROBLEMS}
+	cp ${SRCDIR}/src/c++11/${.TARGET:S|xx|++|} ${.TARGET}
 
 # Override bsd.lib.mk scripts
 libstdc++.a: ${SRCS:.cc=.o} script.ar
@@ -56,9 +65,6 @@ libstdc++_p.a: ${SRCS:.cc=.po} script_p.ar
 	${AR} -M < script_p.ar
 	mv libstdcxx_p.a ${.TARGET}
 	${RANLIB} ${.TARGET}
-
-${PROBLEMSXX}: ${PROBLEMS}
-	cp ${SRCDIR}/src/c++11/${.TARGET:S|xx|++|} ${.TARGET}
 
 gstdint.h:
 	@echo "#include <stdint.h>" > ${.TARGET}

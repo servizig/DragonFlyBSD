@@ -1,11 +1,13 @@
-# verbatim from libstdc++/libsupc++/Makefile.in
+# verbatim from libstdc++-v3/libsupc++/Makefile.am
 
 c_sources = \
 	cp-demangle.c
 
 sources = \
 	array_type_info.cc \
+	atexit_arm.cc \
 	atexit_thread.cc \
+	atomicity.cc \
 	bad_alloc.cc \
 	bad_array_length.cc \
 	bad_array_new.cc \
@@ -20,6 +22,7 @@ sources = \
 	del_opvnt.cc \
 	dyncast.cc \
 	eh_alloc.cc \
+	eh_arm.cc \
 	eh_aux_runtime.cc \
 	eh_call.cc \
 	eh_catch.cc \
@@ -66,9 +69,14 @@ sources = \
 	vmi_class_type_info.cc \
 	vterminate.cc
 
-# only when __arm__
-#sources+=	atexit_arm.cc eh_arm.cc
-
 vtv_sources=	# empty
 
 libsupc__convenience_la_SOURCES = $(sources) $(c_sources) $(vtv_sources)
+
+# from gcc-build/{target}/libstdc++-v3/libsupc++/Makefile
+ATOMICITY_SRCDIR = config/cpu/generic/atomicity_builtins
+
+# generated source
+GENFILES+=	atomicity.cc
+atomicity.cc: ${SRCDIR}/${ATOMICITY_SRCDIR}/atomicity.h
+	cp ${.ALLSRC} ${.TARGET}

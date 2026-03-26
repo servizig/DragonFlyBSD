@@ -3,28 +3,31 @@
 LIB=		common-target
 INTERNALLIB=	YES
 
-.PATH: $(srcdir)/common
-.PATH: $(srcdir)/common/config/i386
+.PATH: ${GCCDIR}/gcc/common
+.PATH: ${GCCDIR}/gcc/common/config/i386
 
-# Almost verbatim from Makefile
-OBJS-libcommon-target = ${common_out_object_file} prefix.o \
-	opts.o opts-common.o options.o vec.o hooks.o common-targhooks.o \
+common_out_object_file=	${common_out_file:T:.cc=.o}
+
+# Verbatim from gcc/Makefile.in, except that 'selftest.o' is moved under
+# -DTOOLCHAIN_CHECKING.
+OBJS-libcommon-target = $(common_out_object_file) prefix.o \
+	opts.o opts-common.o options.o vec.o hooks.o common/common-targhooks.o \
 	hash-table.o file-find.o spellcheck.o opt-suggestions.o
-
-common_out_object_file=	i386-common.o
 
 .if ${CFLAGS:M-DTOOLCHAIN_CHECKING}
 OBJS-libcommon-target+=	selftest.o
 .endif
 
-OBJS=		${OBJS-libcommon-target}
+SRCS=		${OBJS-libcommon-target:T:.o=.cc}
+
 CFLAGS+=	-DPREFIX=\"${TOOLS_PREFIX}/usr\"
 
-# for opts-common.c
-.if ${CCVER:Mgcc80} || ${CCVER:Mgcc120}
-CXXFLAGS+=	-Wno-narrowing
+FLAGS_GROUPS=		warn
+warn_FLAGS_FILES=	opts-common.cc options.cc
+.if (${CCVER:Mgcc80} || ${CCVER:Mgcc120})
+warn_FLAGS=	-Wno-narrowing
 .elif ${CCVER:Mclang*}
-CXXFLAGS+=	-Wno-c++11-narrowing
+warn_FLAGS=	-Wno-c++11-narrowing
 .endif
 
 .include <bsd.lib.mk>
