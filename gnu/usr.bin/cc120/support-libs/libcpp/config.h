@@ -5,7 +5,11 @@
 /* #undef AC_APPLE_UNIVERSAL_BUILD */
 
 /* Define to 1 if you want more run-time sanity checks. */
+#ifndef TOOLCHAIN_CHECKING
 #define CHECKING_P 0
+#else
+#define CHECKING_P 1
+#endif
 
 /* Define to one of `_getb67', `GETB67', `getb67' for Cray-2 and Cray-YMP
    systems. This function is required for `alloca.c' support on those systems.
@@ -173,7 +177,9 @@
 #define HAVE_GETC_UNLOCKED 1
 
 /* Define if you have the iconv() function. */
+#ifndef BOOTSTRAPPING
 #define HAVE_ICONV 1
+#endif
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #define HAVE_INTTYPES_H 1
