@@ -17,24 +17,6 @@
         debug
         ..
         gcc120
-            plugin
-                include
-                    ada
-                        gcc-interface
-                        ..
-                    ..
-                    objc
-                    ..
-                    c-family
-                    ..
-                    config
-                        i386
-                        ..
-                    ..
-                    cp
-                    ..
-                ..
-            ..
             profile
             ..
         ..
