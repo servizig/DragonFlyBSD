@@ -519,7 +519,7 @@ warn_FLAGS_FILES=	i386.cc i386-options.cc i386-builtins.cc \
 			tree-ssa-structalias.cc \
 			tree-vect-slp.cc tree-vect-stmts.cc \
 			${SRCS:Mrtl-ssa/*:T}
-.if (${CCVER:Mgcc80} || ${CCVER:Mgcc120})
+.if ${CCVER:Mgcc*} && ${CCVER:S/gcc//} >= 80
 warn_FLAGS=	-Wno-narrowing
 .elif ${CCVER:Mclang*}
 warn_FLAGS=	-Wno-c++11-narrowing

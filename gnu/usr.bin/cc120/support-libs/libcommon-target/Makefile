@@ -24,7 +24,7 @@ CFLAGS+=	-DPREFIX=\"${TOOLS_PREFIX}/usr\"
 
 FLAGS_GROUPS=		warn
 warn_FLAGS_FILES=	opts-common.cc options.cc
-.if (${CCVER:Mgcc80} || ${CCVER:Mgcc120})
+.if ${CCVER:Mgcc*} && ${CCVER:S/gcc//} >= 80
 warn_FLAGS=	-Wno-narrowing
 .elif ${CCVER:Mclang*}
 warn_FLAGS=	-Wno-c++11-narrowing

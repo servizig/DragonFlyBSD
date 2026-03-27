@@ -17,7 +17,7 @@ OBJS+=		${OBJS-libcommon}
 CFLAGS+=	-I${GCCDIR}/libbacktrace
 
 # for pretty-print.c
-.if ${CCVER:Mgcc80}
+.if ${CCVER:Mgcc*} && ${CCVER:S/gcc//} >= 80
 CXXFLAGS+=	-Wno-narrowing
 .elif ${CCVER:Mclang*}
 CXXFLAGS+=	-Wno-c++11-narrowing

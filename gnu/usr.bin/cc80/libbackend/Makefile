@@ -431,7 +431,7 @@ CXXFLAGS+=	-Wno-pragmas
 .endif
 
 # for tree-ssa-structalias.c, tree-vect-stmts.c
-.if ${CCVER:Mgcc80}
+.if ${CCVER:Mgcc*} && ${CCVER:S/gcc//} >= 80
 CXXFLAGS+=	-Wno-narrowing
 .elif ${CCVER:Mclang*}
 CXXFLAGS+=	-Wno-c++11-narrowing
