@@ -163,8 +163,8 @@ lib${LIB}_p.a: ${POBJS}
 . endif
 .endif
 
-.if !defined(INTERNALLIB) && defined(SHLIB_NAME) || \
-    defined(INSTALL_PIC_ARCHIVE) && defined(LIB) && !empty(LIB)
+.if (!defined(INTERNALLIB) && defined(SHLIB_NAME)) || \
+    (defined(INSTALL_PIC_ARCHIVE) && defined(LIB) && !empty(LIB))
 SOBJS+=		${OBJS:.o=.So}
 .endif
 
@@ -280,7 +280,7 @@ realinstall: _maninstall
 ${OBJS} ${STATICOBJS} ${POBJS}: ${SRCS:M*.h}
 .endif
 .if defined(SHLIB_NAME) || \
-    defined(INSTALL_PIC_ARCHIVE) && defined(LIB) && !empty(LIB)
+    (defined(INSTALL_PIC_ARCHIVE) && defined(LIB) && !empty(LIB))
 ${SOBJS}: ${SRCS:M*.h}
 .endif
 .endif
@@ -294,7 +294,7 @@ clean:
 	rm -f a.out ${OBJS} ${OBJS:S/$/.tmp/} ${STATICOBJS}
 .endif
 .if defined(SHLIB_NAME) || \
-    defined(INSTALL_PIC_ARCHIVE) && defined(LIB) && !empty(LIB)
+    (defined(INSTALL_PIC_ARCHIVE) && defined(LIB) && !empty(LIB))
 	rm -f ${SOBJS} ${SOBJS:.So=.so} ${SOBJS:S/$/.tmp/}
 .endif
 .if !defined(INTERNALLIB) || defined(INTERNALLIBPROF)
