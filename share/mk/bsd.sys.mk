@@ -142,13 +142,13 @@ CFLAGS		+=	-fno-common
 _cnowarnflags	+=	-Wno-cast-function-type
 .endif
 .if defined(NO_WARRAY_BOUNDS)
-_cnowarnflags	+=      -Wno-array-bounds
+_cnowarnflags	+=	-Wno-array-bounds
 .endif
 .if defined(NO_STRICT_OVERFLOW)
 CFLAGS		+=	-fno-strict-overflow
 .endif
 .if defined(NO_STRICT_ALIASING)
-CFLAGS		+=      -fno-strict-aliasing
+CFLAGS		+=	-fno-strict-aliasing
 .endif
 
 
@@ -159,6 +159,7 @@ CWARNFLAGS	+=	${_cnowarnflags}
 
 # Allow user-specified additional warning flags
 CFLAGS		+=	${CWARNFLAGS}
+
 
 # Tell bmake not to mistake standard targets for things to be searched for
 # or expect to ever be up-to-date
