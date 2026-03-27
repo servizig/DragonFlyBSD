@@ -27,7 +27,8 @@ CFLAGS+=	-mno-bmi -mno-bmi2
 CFLAGS+=	-mno-xop -mno-lwp -mno-lzcnt -mno-tbm
 .endif
 
-.if ${CCVER:Mgcc8*}
+# Retpoline spectre protection
+.if ${CCVER:S/gcc//} >= 80
 CFLAGS+=	-mindirect-branch=thunk-inline
 .endif
 .endif
