@@ -34,6 +34,8 @@
 #include "opt_inet.h"
 #include "opt_ifpoll.h"
 
+#include "use_loop.h"
+
 #include <sys/param.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
