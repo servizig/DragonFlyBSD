@@ -696,7 +696,7 @@ ptrace_req_generic(int req, struct proc *p, struct lwp *lp, void *user_addr,
 		if (!error)
 			*res = nthreads;
 		break;
-	case PT_GETNEXTEVENT:
+	case PT_GETEVENT:
 		error = getnextevent(p, lp, user_addr, data, &r.event);
 		break;
 	case PT_WAIT:

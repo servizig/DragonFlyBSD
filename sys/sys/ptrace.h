@@ -54,7 +54,7 @@
 
 #define         PT_GETNUMLWPS   13  /* number of user threads */
 #define         PT_GETLWPLIST   14  /* array of user thread ids */
-#define         PT_GETNEXTEVENT 15  /* wait for next event */
+#define         PT_GETEVENT 	15  /* wait for next event */
 #define         PT_SUSPEND      16  /* stop single thread */
 #define         PT_RESUME       17  /* continure single thread */
 #define         PT_LWPINFO      18  /* get information about lwp */
@@ -62,6 +62,7 @@
 #define         PT_WAIT         20
 #define		PT_SETSTEP	21
 #define		PT_CLEARSTEP	22
+#define		PT_PEEKEVENT	23
 
 /* Don't forget to update PT_LASTGENERIC */
 
