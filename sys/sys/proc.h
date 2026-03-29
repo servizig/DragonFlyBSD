@@ -411,9 +411,11 @@ struct	proc {
 #define	LWP_MP_ULOAD	0x0000008 /* uload accounting for current cpu */
 #define	LWP_MP_RRFORCE	0x0000010 /* forced resched due to rrcount */
 #define LWP_MP_VNLRU	0x0000020 /* check excessive vnode allocations (lwpuserret()) */
-#define LWP_MP_SUSPEND	0x0000040 /* suspended by ptrace/gdb */
-#define LWP_MP_CREATED	0x0000080
-#define LWP_MP_EXITED	0x0000100
+// TODO: fill in the hole
+#define LWP_MP_SUSPEND	0x0000100 /* suspended by ptrace/gdb */
+#define LWP_MP_CREATED	0x0000200
+#define LWP_MP_EXITED	0x0000400
+#define LWP_MP_SIGNALED 0x0000800
 
 #define LWP_MP_URETMASK	(LWP_MP_WEXIT | LWP_MP_VNLRU)
 

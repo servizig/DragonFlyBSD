@@ -73,6 +73,8 @@
 
 struct ptrace_lwpinfo {
 	lwpid_t lwpid;
+	int signo;
+	int code;
 };
 
 struct ptrace_io_desc {
@@ -83,11 +85,11 @@ struct ptrace_io_desc {
 };
 
 enum ptrace_stat {
-	PT_NONE          = 0, /* Nothing happened */
-	PT_PROC_ZOMB     = 1, /* Traced process exiting */
-	PT_LWP_SIGNAL    = 2, /* Thread signal pending */
-	PT_LWP_CREATED   = 4, /* Thread created */
-	PT_LWP_EXITED    = 8, /* Thread exited */
+	PT_NONE          = 0x00, /* Nothing happened */
+	PT_PROC_ZOMB     = 0x01, /* Traced process exiting */
+	PT_LWP_SIGNAL    = 0x02, /* Thread signal pending */
+	PT_LWP_CREATED   = 0x04, /* Thread created */
+	PT_LWP_EXITED    = 0x08, /* Thread exited */
 };
 
 #define PT_STAT_ALL (PT_PROC_ZOMB | PT_LWP_SIGNAL \

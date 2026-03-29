@@ -221,9 +221,9 @@ waitforevent(struct proc *p, struct lwp *lp, void *user_addr, int data,
 	     struct ptrace_event *event)
 {
 	int error = 0;
-	
+
 	if (user_addr == NULL) return EINVAL;
-	
+
 #if 0
 	kprintf("waitforevent: [in] p_ptrace_events=%d p_stat=%d\n",
 		p->p_ptrace_events, p->p_stat);
@@ -231,48 +231,63 @@ waitforevent(struct proc *p, struct lwp *lp, void *user_addr, int data,
 
 loop:
 	print_signals(p);
-	
+
+#if 0
 	if (p->p_ptrace_events & PT_PROC_ZOMB) {
-		atomic_set_int(&p->p_ptrace_events, PT_PROC_ZOMB);
+		//atomic_set_int(&p->p_ptrace_events, PT_PROC_ZOMB);
 		kprintf("waitforevent: [out] error=%d p_ptrace_events=%d p_stat=%d\n",
 			error, p->p_ptrace_events, p->p_stat);
 		event->status = PT_PROC_ZOMB;
 		copyout(event, user_addr, sizeof(*event));
 		return 0;
 	}
+#endif
 
-	if (p->p_ptrace_events == 0) {
-		cpu_ccfence();
-		if (p->p_ptrace_events == 0) {
-			
+	if (p->p_stat == SACTIVE) {
+		cpu_mfence();
+		if (p->p_stat == SACTIVE) {
+
 			error = tsleep(&p->p_ptrace_events,
 				       PCATCH, "ptwait", 0);
-
-			if (!error && p->p_ptrace_events == 0) {
-				kprintf("waitforevent: loop 1\n");
+			if (error) {
+				kprintf("waitforevent: loop error=%d val=%d\n",
+					error, p->p_ptrace_events);
 				goto loop;
 			}
+#if 0
+			else {
+				kprintf("waitforevent: p_stat=%d events=%d\n",
+					p->p_stat, p->p_ptrace_events);
+			}
+#endif
 		}
 	}
 
 	cpu_ccfence();
 
-	if (p->p_stat == SZOMB || p->p_ptrace_events & PT_PROC_ZOMB) {
+	if (p->p_stat == SZOMB) {
 		/* TODO: is it a correct place? */
 		kprintf("waitforevent: SZOMB 2\n");
-		atomic_set_int(&p->p_ptrace_events, PT_PROC_ZOMB);
+		//atomic_set_int(&p->p_ptrace_events, PT_PROC_ZOMB);
 		event->status = PT_PROC_ZOMB;
 		copyout(event, user_addr, sizeof(*event));
 		return 0;
 	}
-	event->status = PT_NONE;
+	event->status = p->p_ptrace_events;
 	copyout(event, user_addr, sizeof(*event));
 
-	proc_wait_until_stopped(p);
+	//proc_wait_until_stopped(p);
+	cpu_mfence();
+	//cpu_wbinvd_on_all_cpus();
 
 #if 0
-	kprintf("waitforevent: [out] error=%d p_ptrace_events=%d p_stat=%d\n",
-		error, p->p_ptrace_events, p->p_stat);
+	int pstat = atomic_load_acq_int(&p->p_stat);
+	if (p->p_stat != SSTOP) {
+		//tsleep(waitforevent, 0, "blah", 1);
+		//cpu_mfence();
+		kprintf("waitforevent: [out] error=%d p_ptrace_events=%d p_stat=%d pstat=%d lwp_stat=%d\n",
+			error, p->p_ptrace_events, p->p_stat, pstat, lp->lwp_stat);
+	}
 #endif
 
 	return error;
@@ -283,6 +298,11 @@ getnextevent(struct proc *p, struct lwp *lp, void *user_addr, int data,
 	     struct ptrace_event *event)
 {
 	int error = 0;
+#if 0
+	int sigempty = 1;
+	int lwpcreated = 1;
+	int lwpexited = 1;
+#endif
 	//int sig;
 	struct lwp *tmplp;
 
@@ -293,6 +313,41 @@ getnextevent(struct proc *p, struct lwp *lp, void *user_addr, int data,
 
 	event->status = PT_NONE;
 
+	FOREACH_LWP_IN_PROC(tmplp, p) {
+		/* Find interesting event */
+
+		if (tmplp->lwp_mpflags & LWP_MP_CREATED) {
+			atomic_clear_int(&tmplp->lwp_mpflags,
+					 LWP_MP_CREATED);
+			event->status = PT_LWP_CREATED;
+			event->lwpid = tmplp->lwp_tid;
+			break;
+		}
+
+		if (tmplp->lwp_mpflags & LWP_MP_EXITED) {
+			atomic_clear_int(&tmplp->lwp_mpflags,
+					 LWP_MP_EXITED);
+			event->status = PT_LWP_EXITED;
+			event->lwpid = tmplp->lwp_tid;
+			break;
+		}
+
+		if (tmplp->lwp_mpflags & LWP_MP_SIGNALED) {
+			atomic_clear_int(&tmplp->lwp_mpflags,
+					 LWP_MP_SIGNALED);
+			event->status = PT_LWP_SIGNAL;
+			event->lwpid = tmplp->lwp_tid;
+			event->signal = tmplp->lwp_xstat;
+			tmplp->lwp_xstat = 0;
+			break;
+		}
+	}
+
+	copyout(event, user_addr, sizeof(*event));
+	error = 0;
+	return error;
+
+#if 0
 #if 0
 	kprintf("getnextevent: [in] p_ptrace_events=%d p_stat=%d\n",
 		p->p_ptrace_events, p->p_stat);
@@ -304,6 +359,7 @@ getnextevent(struct proc *p, struct lwp *lp, void *user_addr, int data,
 
 	if (p->p_ptrace_events & PT_PROC_ZOMB) {
 		/* Process exiting */
+
 		event->status = PT_PROC_ZOMB;
 		atomic_clear_int(&p->p_ptrace_events, PT_STAT_ALL);
 		goto out;
@@ -311,13 +367,14 @@ getnextevent(struct proc *p, struct lwp *lp, void *user_addr, int data,
 
 	if (p->p_ptrace_events & PT_LWP_EXITED) {
 		/* Thread exiting */
+
 		FOREACH_LWP_IN_PROC(tmplp, p) {
 			if (tmplp->lwp_mpflags & LWP_MP_EXITED) {
 				atomic_clear_int(&tmplp->lwp_mpflags,
 						 LWP_MP_SUSPEND | LWP_MP_CREATED | LWP_MP_EXITED);
 				event->status = PT_LWP_EXITED;
 				event->lwpid = tmplp->lwp_tid;
-				//wakeup(p);
+				wakeup(&p->p_ptrace_events);
 				goto out;
 			}
 		}
@@ -327,6 +384,7 @@ getnextevent(struct proc *p, struct lwp *lp, void *user_addr, int data,
 
 	if (p->p_ptrace_events & PT_LWP_CREATED) {
 		/* Thread created */
+
 		FOREACH_LWP_IN_PROC(tmplp, p) {
 			if (tmplp->lwp_mpflags & LWP_MP_CREATED) {
 				atomic_clear_int(&tmplp->lwp_mpflags,
@@ -345,7 +403,7 @@ getnextevent(struct proc *p, struct lwp *lp, void *user_addr, int data,
 
 		print_signals(p);
 		FOREACH_LWP_IN_PROC(tmplp, p) {
-			if (tmplp->lwp_xstat) {
+			if ((tmplp->lwp_mpflags & LWP_MP_SUSPEND == 0) && tmplp->lwp_xstat) {
 				event->status = PT_LWP_SIGNAL;
 				event->lwpid = tmplp->lwp_tid;
 				event->signal = tmplp->lwp_xstat;
@@ -370,7 +428,6 @@ getnextevent(struct proc *p, struct lwp *lp, void *user_addr, int data,
 
 		atomic_clear_int(&p->p_ptrace_events, PT_LWP_SIGNAL);
 	}
-
 out:
 
 #if 0
@@ -378,17 +435,39 @@ out:
 		"status=%d lwpid=%d signal=%d\n",
 		error, p->p_ptrace_events, event->status, event->lwpid, event->signal);
 #endif
+	FOREACH_LWP_IN_PROC(tmplp, p) {
+		if (tmplp->lwp_xstat) {
+			sigempty = 0;
+		}
+		if (tmplp->lwp_mpflags & LWP_MP_CREATED) {
+			lwpcreated = 0;
+		}
+		if (tmplp->lwp_mpflags & LWP_MP_EXITED) {
+			lwpexited = 0;
+		}
+	}
+
+	if (sigempty) {
+		atomic_clear_int(&p->p_ptrace_events, PT_LWP_SIGNAL);
+	}
+	if (lwpcreated) {
+		atomic_clear_int(&p->p_ptrace_events, PT_LWP_CREATED);
+	}
+	if (lwpexited) {
+		atomic_clear_int(&p->p_ptrace_events, PT_LWP_EXITED);
+	}
 
 	if (error == 0) {
 		copyout(event, user_addr, sizeof(*event));
 	}
 	return error;
+#endif
 }
 
 /*
  * Performs generic ptrace request.
  * Request id was validated before.
- * Called with PHOLD(p), LWPHOLD(lwp), and lwkt token held.
+ * Called with PHOLD(p), LWPHOLD(lwp), and p_token held.
  * NOTE! User addr points at userspace address.
  */
 static int
@@ -431,6 +510,14 @@ ptrace_req_generic(int req, struct proc *p, struct lwp *lp, void *user_addr,
 
 	case PT_KILL:
 		data = SIGKILL;
+		p->p_flags &= ~(P_TRACED | P_WAITED);
+		/*
+		FOREACH_LWP_IN_PROC(tmplp, p) {
+			if (p->p_ptrace_events != tmplp->lwp_tid) {
+				atomic_set_int(&tmplp->lwp_mpflags, LWP_MP_SUSPEND);
+			}
+		}
+		*/
 		goto sendsig;	/* in PT_CONTINUE below */
 
 	case PT_SETSTEP:
@@ -445,7 +532,7 @@ ptrace_req_generic(int req, struct proc *p, struct lwp *lp, void *user_addr,
 	case PT_CONTINUE:
 	case PT_DETACH:
 		/* Zero means do not send any signal */
-		if (data < 0 || data >= _SIG_MAXSIG) {
+		if (data < -1 || data >= _SIG_MAXSIG) {
 			return EINVAL;
 		}
 
@@ -492,8 +579,10 @@ ptrace_req_generic(int req, struct proc *p, struct lwp *lp, void *user_addr,
 		 */
 		crit_enter();
 		if (p->p_stat == SSTOP) {
-			p->p_xstat = data;
-			lp->lwp_xstat = data;
+			if (data != -1) {
+				p->p_xstat = data;
+				lp->lwp_xstat = data;
+			}
 			proc_unstop(p, SSTOP);
 		} else if (data) {
 			kprintf("  = ksignal, data=%d\n", data);
@@ -625,12 +714,15 @@ ptrace_req_generic(int req, struct proc *p, struct lwp *lp, void *user_addr,
 		kprintf("resume %d/%d lwp_stat %d mpflags 0x%x\n",
 			p->p_pid, lp->lwp_tid, lp->lwp_stat, lp->lwp_mpflags);
 #endif
-		atomic_clear_int(&lp->lwp_mpflags, LWP_MP_SUSPEND);
+		if ((lp->lwp_mpflags & LWP_MP_CREATED) == 0)
+			atomic_clear_int(&lp->lwp_mpflags, LWP_MP_SUSPEND);
 		break;
 	case PT_LWPINFO:
 		if (data != sizeof(r.pl))
 			return EINVAL;
 		r.pl.lwpid = lp->lwp_tid;
+		r.pl.signo = lp->lwp_sig;
+		r.pl.code = lp->lwp_code;
 		error = copyout(&r.pl, user_addr, sizeof (r.pl));
 		break;
 	case PT_LWPEVENT:

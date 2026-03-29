@@ -490,8 +490,8 @@ trap(struct trapframe *frame)
 		case T_BPTFLT:		/* bpt instruction fault */
 		case T_TRCTRAP:		/* trace trap */
 #if 0
-			kprintf("user cpu=%d, lwpid=%d, tf_rflags=0x%lx, type=%d\n",
-				gd->gd_cpuid, lp->lwp_tid, frame->tf_rflags, type);
+			kprintf("user cpu=%d, lwpid=%d, tf_rflags=0x%lx, type=%d rip=0x%lx\n",
+				gd->gd_cpuid, lp->lwp_tid, frame->tf_rflags, type, frame->tf_rip);
 #endif
 			frame->tf_rflags &= ~PSL_T;
 			i = SIGTRAP;

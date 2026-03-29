@@ -1263,7 +1263,7 @@ lwpsignal(struct proc *p, struct lwp *lp, int sig)
 				kprintf("p->p_stat == SSTOP for lp lwp=%d sig=%d\n",
 					lp->lwp_tid, sig);
 				lockmgr(&p->p_siglock, LK_SHARED);
-				atomic_set_int(&p->p_ptrace_events, PT_LWP_SIGNAL);
+				//atomic_set_int(&p->p_ptrace_events, PT_LWP_SIGNAL);
 				//wakeup(&p->p_ptrace_events);
 				lockmgr(&p->p_siglock, LK_RELEASE);
 			}
@@ -1473,10 +1473,10 @@ active_process:
 
 #if 0
 	if (p->p_flags & P_TRACED) {
-		kprintf("lwpsig: %d-%d\n", lp->lwp_tid, sig);
+		kprintf("lwpsig: %d-%d rip 0x%lx\n", lp->lwp_tid, sig, lp->lwp_md.md_regs->tf_rip);
 	}
 #endif
-	
+
 #if 0
 	if (p->p_flags & P_TRACED) {
 		lwkt_gettoken(&p->p_token);
@@ -1643,10 +1643,6 @@ proc_stop(struct proc *p, int stat)
 		}
 	}
 	p->p_stat = stat;
-	if (p->p_flags & P_TRACED) {
-		//kprintf("proc_stop\n");
-		//print_backtrace(4);
-	}
 
 	FOREACH_LWP_IN_PROC(lp, p) {
 		LWPHOLD(lp);
@@ -1687,7 +1683,7 @@ proc_stop(struct proc *p, int stat)
 		lwkt_reltoken(&lp->lwp_token);
 		LWPRELE(lp);
 	}
-	
+
 	if (p->p_nstopped == p->p_nthreads) {
 		/*
 		 * Token required to interlock kern_wait().  Reparenting can
@@ -1699,7 +1695,7 @@ proc_stop(struct proc *p, int stat)
 		p->p_flags &= ~P_WAITED;
 
 		if (p->p_flags & P_TRACED) {
-			//kprintf("proc_stop: wakeup\n");
+			kprintf("proc_stop: wakeup\n");
 			wakeup(&p->p_ptrace_events);
 		}
 
@@ -1708,8 +1704,6 @@ proc_stop(struct proc *p, int stat)
 			ksignal(p->p_pptr, SIGCHLD);
 		lwkt_reltoken(&q->p_token);
 		PRELE(q);
-	} else {
-		//kprintf("proc_stop: skip wake\n");
 	}
 }
 
@@ -1802,19 +1796,19 @@ proc_wait_until_stopped(struct proc *p)
 		kprintf("p_w_u_s: p_nstopped=%d p_nthreads=%d, p_stat=%d\n",
 			p->p_nstopped, p->p_nthreads, p->p_stat);
 		FOREACH_LWP_IN_PROC(tmplp, p) {
-		kprintf("p_w_u_s: %d/%d lwp_stat=%d lwp_xstat=%d lwp_mpflags=0x%x tf_rflags=0x%lx rip=0x%lx signals:",
-			p->p_pid, tmplp->lwp_tid, tmplp->lwp_stat, tmplp->lwp_xstat,
-			tmplp->lwp_mpflags,
-			tmplp->lwp_md.md_regs->tf_rflags,
-			tmplp->lwp_md.md_regs->tf_rip);
-	
-		sigset_t sigset = lwp_sigpend(tmplp);
-		for (int i = 1; i < _SIG_MAXSIG; i++)
-			if (SIGISMEMBER(sigset, i))
-				kprintf("%d ", i);
-		kprintf("\n");
+			kprintf("p_w_u_s: %d/%d lwp_stat=%d lwp_xstat=%d lwp_mpflags=0x%x tf_rflags=0x%lx rip=0x%lx signals:",
+				p->p_pid, tmplp->lwp_tid, tmplp->lwp_stat, tmplp->lwp_xstat,
+				tmplp->lwp_mpflags,
+				tmplp->lwp_md.md_regs->tf_rflags,
+				tmplp->lwp_md.md_regs->tf_rip);
+
+			sigset_t sigset = lwp_sigpend(tmplp);
+			for (int i = 1; i < _SIG_MAXSIG; i++)
+				if (SIGISMEMBER(sigset, i))
+					kprintf("%d ", i);
+			kprintf("\n");
 		}
-		
+
 		tsleep(&p->p_nstopped, 0, "stopwt2", hz);
 	}
 
@@ -2180,14 +2174,29 @@ issignal(struct lwp *lp, int maytrace, int *ptokp)
 			 */
 			if (p->p_flags & P_TRACED) {
 #if 0
-				kprintf("iss:1 p_stat=%d rip=0x%lx\n",
-					p->p_stat, lp->lwp_md.md_regs->tf_rip);
+				kprintf("iss:1 p_stat=%d lwp=%d rip=0x%lx\n",
+					p->p_stat, lp->lwp_tid, lp->lwp_md.md_regs->tf_rip);
 #endif
-				atomic_set_int(&p->p_ptrace_events, PT_LWP_SIGNAL);
-				tstop();
+				atomic_set_int(&lp->lwp_mpflags, LWP_MP_SIGNALED);
+				atomic_set_int(&p->p_ptrace_events, lp->lwp_tid);
+				do {
+					if (p->p_flags & P_WEXIT) {
+						break;
+					}
+
+					if (p->p_xstat == SIGKILL) {
+						lp->lwp_xstat = SIGKILL;
+						break;
+					}
+
+					proc_stop(p, SSTOP);
+					tstop();
+					cpu_ccfence();
+				} while (lp->lwp_mpflags & LWP_MP_SIGNALED);
 #if 0
-				kprintf("iss:2 p_stat=%d rip=0x%lx\n",
-					p->p_stat, lp->lwp_md.md_regs->tf_rip);
+				if (lp->lwp_xstat)
+					kprintf("iss:2 p_stat=%d lwp_xstat=%d lwp=%d rip=0x%lx\n",
+						p->p_stat, lp->lwp_xstat, lp->lwp_tid, lp->lwp_md.md_regs->tf_rip);
 #endif
 			}
 
@@ -2200,9 +2209,11 @@ issignal(struct lwp *lp, int maytrace, int *ptokp)
 			lwp_delsig(lp, sig, 1);	/* clear old signal */
 			spin_unlock(&lp->lwp_spin);
 			sig = p->p_xstat;
+#if 0
 			if (sig)
 				kprintf("-------------------------------- lwp=%d sig=%d\n",
 					lp->lwp_tid, sig);
+#endif
 			//kprintf("lwp=%d get p_xstat=%d\n", lp->lwp_tid, sig);
 			sig = lp->lwp_xstat;
 			if (sig == 0) {

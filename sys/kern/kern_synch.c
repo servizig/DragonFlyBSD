@@ -1369,7 +1369,10 @@ tstop(void)
 			wakeup(p->p_pptr);
 
 			if (p->p_flags & P_TRACED) {
-				//kprintf("tstop: wake p_stat=%d\n", p->p_stat);
+#if 0
+				kprintf("tstop: wake p_stat=%d lwp %d rip 0x%lx\n",
+					p->p_stat, lp->lwp_tid, lp->lwp_md.md_regs->tf_rip);
+#endif
 				wakeup(&p->p_ptrace_events);
 			}
 

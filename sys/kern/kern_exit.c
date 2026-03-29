@@ -521,7 +521,7 @@ exit1(int rv)
 #if 0
 		proc_stop(p, SSTOP);
 #endif
-		atomic_set_int(&p->p_ptrace_events, PT_PROC_ZOMB);
+		//atomic_set_int(&p->p_ptrace_events, PT_PROC_ZOMB);
 		wakeup(&p->p_ptrace_events);
 #if 0
 		while ((p->p_ptrace_events & PT_PROC_ZOMB) != 0) {
@@ -696,15 +696,29 @@ lwp_exit(int masterexit, void *waddr)
 	struct proc *p = lp->lwp_proc;
 	int dowake = 0;
 
-	if (!masterexit && (p->p_flags & P_TRACED)) {
-		proc_stop(p, SSTOP);
+	if (!masterexit && (p->p_flags & P_TRACED) && p->p_nthreads > 1) {
+		atomic_set_int(&lp->lwp_mpflags, LWP_MP_EXITED);
+		//atomic_set_int(&p->p_ptrace_events, PT_LWP_EXITED);
 
-		atomic_set_int(&lp->lwp_mpflags, LWP_MP_SUSPEND | LWP_MP_EXITED);
-		atomic_set_int(&p->p_ptrace_events, PT_LWP_EXITED);
-
-		cpu_ccfence();
-		while(STOPLWP(p, lp) && (lp->lwp_mpflags & LWP_MP_EXITED)) {
+		//wakeup(&p->p_ptrace_events);
+		//cpu_ccfence();
+		int c = 0;
+		while((lp->lwp_mpflags & LWP_MP_EXITED)) {
+			if (p->p_flags & P_WEXIT) {
+				break;
+			}
+			if (p->p_xstat == SIGKILL) {
+				break;
+			}
+			proc_stop(p, SSTOP);
 			tstop();
+			kprintf("exiting lwp %d\n", lp->lwp_tid);
+			c++;
+			if (c > 100) {
+				kprintf("stuck exiting %d\n", lp->lwp_tid);
+				tsleep(&c, 0, "blah", 0);
+			}
+			//tsleep(&p->p_ptrace_events, PCATCH, "lptwait", 0);
 		}
 	}
 

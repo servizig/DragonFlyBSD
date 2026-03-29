@@ -259,9 +259,13 @@ lwp_create1(struct lwp_params *uprm, const cpumask_t *umask)
 	crit_exit();
 
 	if (lp->lwp_tid > 1 && (p->p_flags & P_TRACED)) {
+		atomic_set_int(&lp->lwp_mpflags, LWP_MP_CREATED);
+		//atomic_set_int(&p->p_ptrace_events, PT_LWP_CREATED);
+		//struct lwp *lp2 = curthread->td_lwp;
+		//atomic_set_int(&lp2->lwp_mpflags, LWP_MP_SUSPEND);
+		//struct proc *p2 = lp->lwp_proc;
+
 		proc_stop(p, SSTOP);
-		atomic_set_int(&lp->lwp_mpflags, LWP_MP_SUSPEND | LWP_MP_CREATED);	
-		atomic_set_int(&p->p_ptrace_events, PT_LWP_CREATED);
 	}
 
 	lwkt_reltoken(&p->p_token);
