@@ -1,5 +1,11 @@
 .gitignore
 CMakeLists.txt
 INSTALL.md
+catalog/Makefile
+catalog/README
+cl/README.signal
 files/config.h.in
 files/recover.in
+regex/WHATSNEW
+regex/re_format.7
+regex/regex.3
