@@ -34,7 +34,7 @@ all:	${CAT}
 ${c}:	${c}.base
 	@echo "... $c";							\
 	rm -f $c;							\
-	env LANG=C sort -u ${.ALLSRC} |					\
+	env LC_ALL=C sort -u ${.ALLSRC} |				\
 	awk '{								\
 		if ($$1 == 1) {						\
 			print "\nMESSAGE NUMBER 1 IS NOT LEGAL";	\
@@ -48,7 +48,6 @@ ${c}:	${c}.base
 	}' |								\
 	sed -e '1s/^/$$set 1~$$quote "~/; 1y/~/\n/' |			\
 	gencat $c /dev/stdin;						\
-	chmod 444 $c;							\
 	if grep DUPLICATE $c > /dev/null; then				\
 		grep DUPLICATE $@;					\
 	fi;								\
@@ -65,7 +64,8 @@ check: ${CHK}
 ${c}.check: ${c}.base
 	@echo "... $c";							\
 	f=${.ALLSRC:S;.base$;;};					\
-	(echo "Unused message id's (this is okay):";			\
+	(export LC_ALL=C;						\
+	echo "Unused message id's (this is okay):";			\
 	awk '{								\
 		while (++nline < $$1)					\
 			printf "%03d\n", nline;				\
@@ -81,15 +81,15 @@ ${c}.check: ${c}.base
 	echo =========================;					\
 	echo "MESSAGES WITH THE SAME MESSAGE ID's (FIX!):";		\
 	for j in							\
-	    `sed '/^$$/d' < $$f.base | LANG=C sort -u |			\
+	    `sed '/^$$/d' < $$f.base | sort -u |			\
 	    awk '{print $$1}' | uniq -d`; do				\
 		egrep $$j $$f.base;					\
 	done;								\
 	echo =========================;					\
 	echo "Duplicate messages, both id and message (this is okay):";	\
-	sed '/^$$/d' < $$f.base | LANG=C sort | uniq -c |			\
+	sed '/^$$/d' < $$f.base | sort | uniq -c |			\
 	awk '$$1 != 1 { print $$0 }' | sort -n;				\
-	echo =========================) > $c
+	echo =========================) > ${.TARGET}
 .endfor
 
 english.base: ${SCAN}
