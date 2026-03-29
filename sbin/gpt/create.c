@@ -26,16 +26,15 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $FreeBSD: src/sbin/gpt/create.c,v 1.11 2005/08/31 01:47:19 marcel Exp $
- * $DragonFly: src/sbin/gpt/create.c,v 1.1 2007/06/16 22:29:27 dillon Exp $
  */
 
 #include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/errno.h>
-#include <sys/param.h>
-#include <bus/cam/scsi/scsi_daio.h>
+#include <sys/stat.h> /* mkdir() */
+#include <bus/cam/scsi/scsi_daio.h> /* DAIOCTRIM */
 
 #include <err.h>
+#include <errno.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,25 +42,29 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "map.h"
 #include "gpt.h"
 
-static int force;
-static int primary_only;
+static bool force = false;
+static bool primary_only = false;
+static uint32_t parts = 128;
 
 static void do_erase(int fd);
 
 static void
 usage_create(void)
 {
-	fprintf(stderr, "usage: %s [-fp] device ...\n", getprogname());
+	fprintf(stderr,
+		"usage: %s [-fP] [-p nparts] device ...\n",
+		getprogname());
 	exit(1);
 }
 
 static void
 usage_init(void)
 {
-	fprintf(stderr, "usage: %s -f [-B] [-E] device ...\n", getprogname());
+	fprintf(stderr,
+		"usage: %s -f [-B] [-E] [-p nparts] device ...\n",
+		getprogname());
 	fprintf(stderr, "\tnote: -f is mandatory for this command\n");
 	exit(1);
 }
@@ -81,8 +84,8 @@ create(int fd)
 
 	last = mediasz / secsz - 1LL;
 
-	if (map_find(MAP_TYPE_PRI_GPT_HDR) != NULL ||
-	    map_find(MAP_TYPE_SEC_GPT_HDR) != NULL) {
+	if (map_find(MAP_TYPE_GPT_PRI_HDR) != NULL ||
+	    map_find(MAP_TYPE_GPT_SEC_HDR) != NULL) {
 		warnx("%s: error: device already contains a GPT", device_name);
 		return;
 	}
@@ -92,43 +95,40 @@ create(int fd)
 			warnx("%s: error: device contains a MBR", device_name);
 			return;
 		}
+	}
 
-		/* Nuke the MBR in our internal map. */
-		map->map_type = MAP_TYPE_UNUSED;
+	if (map_init(mediasz / secsz) == -1) {
+		warnx("%s: error: map initialization failed", device_name);
+		return;
 	}
 
 	/*
 	 * Create PMBR.
 	 */
-	if (map_find(MAP_TYPE_PMBR) == NULL) {
-		if (map_free(0LL, 1LL) == 0) {
-			warnx("%s: error: no room for the PMBR", device_name);
-			return;
-		}
-		mbr = gpt_read(fd, 0LL, 1);
-		bzero(mbr, sizeof(*mbr));
-		mbr->mbr_sig = htole16(MBR_SIG);
-		mbr->mbr_part[0].part_shd = 0xff;
-		mbr->mbr_part[0].part_ssect = 0xff;
-		mbr->mbr_part[0].part_scyl = 0xff;
-		mbr->mbr_part[0].part_typ = 0xee;
-		mbr->mbr_part[0].part_ehd = 0xff;
-		mbr->mbr_part[0].part_esect = 0xff;
-		mbr->mbr_part[0].part_ecyl = 0xff;
-		mbr->mbr_part[0].part_start_lo = htole16(1);
-		if (last > 0xffffffff) {
-			mbr->mbr_part[0].part_size_lo = htole16(0xffff);
-			mbr->mbr_part[0].part_size_hi = htole16(0xffff);
-		} else {
-			mbr->mbr_part[0].part_size_lo = htole16(last);
-			mbr->mbr_part[0].part_size_hi = htole16(last >> 16);
-		}
-		map = map_add(0LL, 1LL, MAP_TYPE_PMBR, mbr);
-		gpt_write(fd, map);
+	mbr = gpt_read(fd, 0LL, 1);
+	if (mbr == NULL) {
+		warnx("%s: error: reading PMBR failed", device_name);
+		return;
 	}
+	bzero(mbr, sizeof(*mbr));
+	mbr->mbr_sig = htole16(DOSMAGIC);
+	mbr->mbr_part[0].dp_shd = 0xff;
+	mbr->mbr_part[0].dp_ssect = 0xff;
+	mbr->mbr_part[0].dp_scyl = 0xff;
+	mbr->mbr_part[0].dp_typ = DOSPTYP_PMBR;
+	mbr->mbr_part[0].dp_ehd = 0xff;
+	mbr->mbr_part[0].dp_esect = 0xff;
+	mbr->mbr_part[0].dp_ecyl = 0xff;
+	mbr->mbr_part[0].dp_start = htole32(1U);
+	if (last > 0xffffffff)
+		mbr->mbr_part[0].dp_size = htole32(0xffffffffU);
+	else
+		mbr->mbr_part[0].dp_size = htole32((uint32_t)last);
+	map = map_add(0LL, 1LL, MAP_TYPE_PMBR, mbr);
+	gpt_write(fd, map);
 
-	/* Get the amount of free space after the MBR */
-	blocks = map_free(1LL, 0LL);
+	/* Get the amount of free space after the PMBR */
+	blocks = map_free(1LL);
 	if (blocks == 0LL) {
 		warnx("%s: error: no room for the GPT header", device_name);
 		return;
@@ -146,38 +146,19 @@ create(int fd)
 	if ((blocks + 1LL) > ((last + 1LL) >> 1))
 		blocks = ((last + 1LL) >> 1) - 1LL;
 
-	/*
-	 * Get the amount of free space at the end of the device and
-	 * calculate the size for the GPT structures.
-	 */
-	map = map_last();
-	if (map->map_type != MAP_TYPE_UNUSED) {
-		warnx("%s: error: no room for the backup header", device_name);
-		return;
-	}
-
-	if (map->map_size < blocks)
-		blocks = map->map_size;
-	if (blocks == 1LL) {
-		warnx("%s: error: no room for the GPT table", device_name);
-		return;
-	}
-
 	blocks--;		/* Number of blocks in the GPT table. */
-	gpt = map_add(1LL, 1LL, MAP_TYPE_PRI_GPT_HDR, calloc(1, secsz));
-	tbl = map_add(2LL, blocks, MAP_TYPE_PRI_GPT_TBL,
+	gpt = map_add(1LL, 1LL, MAP_TYPE_GPT_PRI_HDR, calloc(1, secsz));
+	tbl = map_add(2LL, blocks, MAP_TYPE_GPT_PRI_TBL,
 	    calloc(blocks, secsz));
-	if (gpt == NULL || tbl == NULL)
+	if (gpt == NULL || tbl == NULL) {
+		warnx("%s: error: failed to create primary GPT", device_name);
 		return;
+	}
 
 	hdr = gpt->map_data;
 	memcpy(hdr->hdr_sig, GPT_HDR_SIG, sizeof(hdr->hdr_sig));
 	hdr->hdr_revision = htole32(GPT_HDR_REVISION);
-	/*
-	 * XXX struct gpt_hdr is not a multiple of 8 bytes in size and thus
-	 * contains padding we must not include in the size.
-	 */
-	hdr->hdr_size = htole32(offsetof(struct gpt_hdr, padding));
+	hdr->hdr_size = htole32(GPT_MIN_HDR_SIZE);
 	hdr->hdr_lba_self = htole64(gpt->map_start);
 	hdr->hdr_lba_alt = htole64(last);
 	hdr->hdr_lba_start = htole64(tbl->map_start + blocks);
@@ -207,10 +188,15 @@ create(int fd)
 	 * Create backup GPT if the user didn't suppress it.
 	 */
 	if (!primary_only) {
-		tpg = map_add(last, 1LL, MAP_TYPE_SEC_GPT_HDR,
+		tpg = map_add(last, 1LL, MAP_TYPE_GPT_SEC_HDR,
 		    calloc(1, secsz));
-		lbt = map_add(last - blocks, blocks, MAP_TYPE_SEC_GPT_TBL,
+		lbt = map_add(last - blocks, blocks, MAP_TYPE_GPT_SEC_TBL,
 		    tbl->map_data);
+		if (tpg == NULL || lbt == NULL) {
+			warnx("%s: error: failed to create backup GPT",
+			      device_name);
+			return;
+		}
 		memcpy(tpg->map_data, gpt->map_data, secsz);
 		hdr = tpg->map_data;
 		hdr->hdr_lba_self = htole64(tpg->map_start);
@@ -223,8 +209,7 @@ create(int fd)
 	}
 }
 
-static
-void
+static void
 dosys(const char *ctl, ...)
 {
 	va_list va;
@@ -245,16 +230,23 @@ dosys(const char *ctl, ...)
 int
 cmd_create(int argc, char *argv[])
 {
+	char *p;
 	int ch, fd;
 
-	while ((ch = getopt(argc, argv, "fp")) != -1) {
+	while ((ch = getopt(argc, argv, "fhPp")) != -1) {
 		switch(ch) {
 		case 'f':
-			force = 1;
+			force = true;
+			break;
+		case 'P':
+			primary_only = true;
 			break;
 		case 'p':
-			primary_only = 1;
+			parts = (uint32_t)strtol(optarg, &p, 10);
+			if (*p != 0 || parts == 0)
+				usage_create();
 			break;
+		case 'h':
 		default:
 			usage_create();
 		}
@@ -287,28 +279,35 @@ cmd_create(int argc, char *argv[])
 int
 cmd_init(int argc, char *argv[])
 {
+	char *p;
 	int ch, fd;
-	int with_boot = 0;
-	int with_trim = 0;
+	bool with_boot = false;
+	bool with_trim = false;
 
-	while ((ch = getopt(argc, argv, "fBEI")) != -1) {
+	while ((ch = getopt(argc, argv, "fBEhIp")) != -1) {
 		switch(ch) {
+		case 'B':
+			with_boot = true;
+			break;
+		case 'E':
+			with_trim = true;
+			break;
 		case 'f':
-			force = 1;
+			force = true;
 			break;
 		case 'I':
-			fprintf(stderr, "Maybe you were trying to supply "
-					"fdisk options.  This is the gpt "
-					"program\n");
+			fprintf(stderr,
+				"Maybe you were trying to supply fdisk(8) "
+				"options.  This is the gpt(8) program!\n");
 			usage_init();
 			/* NOT REACHED */
 			break;
-		case 'E':
-			with_trim = 1;
+		case 'p':
+			parts = (uint32_t)strtol(optarg, &p, 10);
+			if (*p != 0 || parts == 0)
+				usage_init();
 			break;
-		case 'B':
-			with_boot = 1;
-			break;
+		case 'h':
 		default:
 			usage_init();
 			/* NOT REACHED */
@@ -344,7 +343,7 @@ cmd_init(int argc, char *argv[])
 				continue;
 			}
 		}
-		do_destroy(fd);
+		destroy(fd, true);
 		gpt_close(fd);
 		sleep(1);
 
@@ -424,9 +423,9 @@ do_erase(int fd)
 	ioarg[1] = mediasz;
 
 	if (ioctl(fd, DAIOCTRIM, ioarg) < 0) {
-		printf("Trim error %s\n", strerror(errno));
+		warn("%s: Trim error", device_name);
 		printf("Continuing\n");
 	} else {
-		printf("Trim completed ok\n");
+		printf("%s: Trim completed ok\n", device_name);
 	}
 }

@@ -7,8 +7,7 @@
 CFLAGS+=	-mpreferred-stack-boundary=4
 
 # Retpoline spectre protection
-#
-.if ${CCVER:Mgcc8*}
+.if ${CCVER:S/gcc//} >= 80
 CFLAGS+=	-mindirect-branch=thunk-inline
 .endif
 

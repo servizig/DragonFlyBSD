@@ -16,6 +16,10 @@
     lib
         debug
         ..
+        gcc120
+            profile
+            ..
+        ..
         gcc47
             plugin
                 include
@@ -70,6 +74,10 @@
         ..
     ..
     libdata
+        gcc120
+            ssp
+            ..
+        ..
         gcc47
             ssp
             ..
@@ -103,6 +111,8 @@
         custom
         ..
         dhcpcd-hooks
+        ..
+        gcc120
         ..
         gcc47
         ..

@@ -16,7 +16,7 @@
 .\"
 .\" $FreeBSD: head/share/man/man4/lagg.4 243091 2012-11-15 16:54:14Z joel $
 .\"
-.Dd February 23, 2012
+.Dd March 17, 2026
 .Dt LAGG 4
 .Os
 .Sh NAME
@@ -45,9 +45,12 @@ interface for the purpose of providing fault-tolerance and high-speed links.
 .Pp
 A
 .Nm
-interface can be created using the
+interface can be created at runtime using the
 .Ic ifconfig lagg Ns Ar N Ic create
-command.
+command, or by configuring it via the
+.Va cloned_interfaces
+variable in
+.Xr rc.conf 5 .
 It can use different link aggregation protocols specified
 using the
 .Ic laggproto Ar proto
@@ -120,18 +123,6 @@ disabling the
 interface itself.
 .El
 .Pp
-Each
-.Nm
-interface is created at runtime using interface cloning.
-This is
-most easily done with the
-.Xr ifconfig 8
-.Cm create
-command or using the
-.Va cloned_interfaces
-variable in
-.Xr rc.conf 5 .
-.Pp
 The MTU of the first interface to be added is used as the lagg MTU.
 All additional interfaces are required to have exactly the same value.
 .Pp
@@ -165,15 +156,17 @@ between wired and wireless networks using two network devices.
 Whenever the wired master interface is unplugged, the wireless failover
 device will be used:
 .Bd -literal -offset indent
-# ifconfig em0 up
-# ifconfig ath0 ether 00:11:22:33:44:55
+# ifconfig em0 ether 00:11:22:33:44:55 up
 # ifconfig create wlan0 wlandev ath0 ssid my_net up
 # ifconfig lagg0 laggproto failover laggport em0 laggport wlan0 \e
 	192.168.1.1 netmask 255.255.255.0
 .Ed
 .Pp
-(Note the mac address of the wireless device is forced to match the wired
-device as a workaround.)
+(Note the MAC address of the wired device is forced to match that of the
+wireless device,
+.Dq 00:11:22:33:44:55
+in this example, because some common wireless devices do not support to
+change the MAC address.)
 .Sh SEE ALSO
 .Xr ifmedia 4 ,
 .Xr ng_one2many 4 ,

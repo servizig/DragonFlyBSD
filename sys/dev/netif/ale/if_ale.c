@@ -461,15 +461,16 @@ ale_attach(device_t dev)
 		irq = pci_read_config(dev, PCIR_INTLINE, 4);
 		mem = pci_read_config(dev, ALE_PCIR_BAR, 4);
 
-		device_printf(dev, "chip is in D%d power mode "
-		    "-- setting to D0\n", pci_get_powerstate(dev));
+		device_printf(dev, "chip is in %s power mode "
+		    "-- setting to D0\n",
+		    pci_powerstate_to_str(pci_get_powerstate(dev)));
 
 		pci_set_powerstate(dev, PCI_POWERSTATE_D0);
 
 		pci_write_config(dev, PCIR_INTLINE, irq, 4);
 		pci_write_config(dev, ALE_PCIR_BAR, mem, 4);
 	}
-#endif	/* !BURN_BRIDGE */
+#endif	/* !BURN_BRIDGES */
 
 	/* Enable bus mastering */
 	pci_enable_busmaster(dev);

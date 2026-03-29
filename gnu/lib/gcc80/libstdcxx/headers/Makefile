@@ -1,5 +1,5 @@
 RELUP=	/..
-.include "../../Makefile.inc"
+.include "../Makefile.inc"
 SRCDIR=	${GCCDIR}/libstdc++-v3
 .include "Makefile.headers"
 
@@ -49,7 +49,7 @@ INCSGROUPS+=		host_headers_extra
 host_headers_extraDIR=	${HD}/bits
 host_headers_extraNAME_basic_file_stdio.h=	basic_file.h
 host_headers_extraNAME_c_locale.h=		c++locale.h
-host_headers_extraNAME_c_io_stdio.h+=		c++io.h
+host_headers_extraNAME_c_io_stdio.h=		c++io.h
 host_headers_extraNAME_new_allocator_base.h=	c++allocator.h
 
 cxxabi_forced.h: ${SRCDIR}/libsupc++/cxxabi_forced.h

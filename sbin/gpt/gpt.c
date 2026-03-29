@@ -29,44 +29,40 @@
  */
 
 #include <sys/param.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <sys/diskslice.h>
+#include <sys/stat.h>
 
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <paths.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#include "map.h"
 #include "gpt.h"
 
 char	*device_name;
-
 off_t	mediasz;
-
-u_int	parts;
 u_int	secsz;
-
-int	readonly, verbose;
+bool	readonly;
+int	verbose;
 
 static uint32_t crc32_tab[] = {
 	0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f,
-	0xe963a535, 0x9e6495a3,	0x0edb8832, 0x79dcb8a4, 0xe0d5e91e, 0x97d2d988,
+	0xe963a535, 0x9e6495a3, 0x0edb8832, 0x79dcb8a4, 0xe0d5e91e, 0x97d2d988,
 	0x09b64c2b, 0x7eb17cbd, 0xe7b82d07, 0x90bf1d91, 0x1db71064, 0x6ab020f2,
-	0xf3b97148, 0x84be41de,	0x1adad47d, 0x6ddde4eb, 0xf4d4b551, 0x83d385c7,
-	0x136c9856, 0x646ba8c0, 0xfd62f97a, 0x8a65c9ec,	0x14015c4f, 0x63066cd9,
-	0xfa0f3d63, 0x8d080df5,	0x3b6e20c8, 0x4c69105e, 0xd56041e4, 0xa2677172,
-	0x3c03e4d1, 0x4b04d447, 0xd20d85fd, 0xa50ab56b,	0x35b5a8fa, 0x42b2986c,
-	0xdbbbc9d6, 0xacbcf940,	0x32d86ce3, 0x45df5c75, 0xdcd60dcf, 0xabd13d59,
+	0xf3b97148, 0x84be41de, 0x1adad47d, 0x6ddde4eb, 0xf4d4b551, 0x83d385c7,
+	0x136c9856, 0x646ba8c0, 0xfd62f97a, 0x8a65c9ec, 0x14015c4f, 0x63066cd9,
+	0xfa0f3d63, 0x8d080df5, 0x3b6e20c8, 0x4c69105e, 0xd56041e4, 0xa2677172,
+	0x3c03e4d1, 0x4b04d447, 0xd20d85fd, 0xa50ab56b, 0x35b5a8fa, 0x42b2986c,
+	0xdbbbc9d6, 0xacbcf940, 0x32d86ce3, 0x45df5c75, 0xdcd60dcf, 0xabd13d59,
 	0x26d930ac, 0x51de003a, 0xc8d75180, 0xbfd06116, 0x21b4f4b5, 0x56b3c423,
 	0xcfba9599, 0xb8bda50f, 0x2802b89e, 0x5f058808, 0xc60cd9b2, 0xb10be924,
-	0x2f6f7c87, 0x58684c11, 0xc1611dab, 0xb6662d3d,	0x76dc4190, 0x01db7106,
+	0x2f6f7c87, 0x58684c11, 0xc1611dab, 0xb6662d3d, 0x76dc4190, 0x01db7106,
 	0x98d220bc, 0xefd5102a, 0x71b18589, 0x06b6b51f, 0x9fbfe4a5, 0xe8b8d433,
 	0x7807c9a2, 0x0f00f934, 0x9609a88e, 0xe10e9818, 0x7f6a0dbb, 0x086d3d2d,
 	0x91646c97, 0xe6635c01, 0x6b6b51f4, 0x1c6c6162, 0x856530d8, 0xf262004e,
@@ -116,113 +112,138 @@ crc32(const void *buf, size_t size)
 	return crc ^ ~0U;
 }
 
-uint8_t *
-utf16_to_utf8(uint16_t *s16)
+/*
+ * Produce a NUL-terminated UTF-8 string from the non-NUL-terminated
+ * UTF-16LE string.  The destination buffer (s8) is suggested to have
+ * a size of (s16len * 3 + 1).
+ */
+void
+utf16_to_utf8(const uint16_t *s16, size_t s16len, char *s8, size_t s8len)
 {
-	static uint8_t *s8 = NULL;
-	static size_t s8len = 0;
-	size_t s8idx, s16idx, s16len;
-	uint32_t utfchar;
-	unsigned int c;
+	size_t s8idx, s16idx;
+	uint32_t utfchar, low;
+	unsigned char *us8 = (unsigned char *)s8;
 
-	s16len = 0;
-	while (s16[s16len++] != 0)
-		;
-	if (s8len < s16len * 3) {
-		if (s8 != NULL)
-			free(s8);
-		s8len = s16len * 3;
-		s8 = calloc(s16len, 3);
-	}
 	s8idx = s16idx = 0;
-	while (s16idx < s16len) {
+	while (s16idx < s16len && s16[s16idx] != 0) {
 		utfchar = le16toh(s16[s16idx++]);
-		if ((utfchar & 0xf800) == 0xd800) {
-			c = le16toh(s16[s16idx]);
-			if ((utfchar & 0x400) != 0 || (c & 0xfc00) != 0xdc00)
+
+		/* Handle surrogate pairs */
+		if (utfchar >= 0xd800 && utfchar <= 0xdbff) {
+			/* high surrogate */
+			if (s16idx < s16len) {
+				low = le16toh(s16[s16idx]);
+				if (low >= 0xdc00 && low <= 0xdfff) {
+					s16idx++;
+					utfchar = 0x10000 +
+					    ((utfchar - 0xd800) << 10) +
+					    (low - 0xdc00);
+				} else {
+					utfchar = 0xfffd;
+				}
+			} else {
 				utfchar = 0xfffd;
-			else
-				s16idx++;
+			}
+		} else if (utfchar >= 0xdc00 && utfchar <= 0xdfff) {
+			/* lone low surrogate */
+			utfchar = 0xfffd;
 		}
+
+		/* Encode as UTF-8 */
 		if (utfchar < 0x80) {
-			s8[s8idx++] = utfchar;
+			if (s8idx + 1 >= s8len)
+				break;
+			us8[s8idx++] = utfchar;
 		} else if (utfchar < 0x800) {
-			s8[s8idx++] = 0xc0 | (utfchar >> 6);
-			s8[s8idx++] = 0x80 | (utfchar & 0x3f);
+			if (s8idx + 2 >= s8len)
+				break;
+			us8[s8idx++] = 0xc0 | (utfchar >> 6);
+			us8[s8idx++] = 0x80 | (utfchar & 0x3f);
 		} else if (utfchar < 0x10000) {
-			s8[s8idx++] = 0xe0 | (utfchar >> 12);
-			s8[s8idx++] = 0x80 | ((utfchar >> 6) & 0x3f);
-			s8[s8idx++] = 0x80 | (utfchar & 0x3f);
-		} else if (utfchar < 0x200000) {
-			s8[s8idx++] = 0xf0 | (utfchar >> 18);
-			s8[s8idx++] = 0x80 | ((utfchar >> 12) & 0x3f);
-			s8[s8idx++] = 0x80 | ((utfchar >> 6) & 0x3f);
-			s8[s8idx++] = 0x80 | (utfchar & 0x3f);
+			if (s8idx + 3 >= s8len)
+				break;
+			us8[s8idx++] = 0xe0 | (utfchar >> 12);
+			us8[s8idx++] = 0x80 | ((utfchar >> 6) & 0x3f);
+			us8[s8idx++] = 0x80 | (utfchar & 0x3f);
+		} else {
+			if (s8idx + 4 >= s8len)
+				break;
+			us8[s8idx++] = 0xf0 | (utfchar >> 18);
+			us8[s8idx++] = 0x80 | ((utfchar >> 12) & 0x3f);
+			us8[s8idx++] = 0x80 | ((utfchar >> 6) & 0x3f);
+			us8[s8idx++] = 0x80 | (utfchar & 0x3f);
 		}
 	}
-	return (s8);
+
+	us8[s8idx] = 0;
 }
 
+/*
+ * Produce a non-NUL-terminated UTF-16LE string from the NUL-terminated
+ * UTF-8 string.
+ */
 void
-utf8_to_utf16(const uint8_t *s8, uint16_t *s16, size_t s16len)
+utf8_to_utf16(const char *s8, uint16_t *s16, size_t s16len)
 {
-	size_t s16idx, s8idx, s8len;
+	size_t s16idx, s8idx;
 	uint32_t utfchar;
-	unsigned int c, utfbytes;
+	uint8_t c, utfbytes;
+	const unsigned char *us8 = (const unsigned char *)s8;
 
-	s8len = 0;
-	while (s8[s8len++] != 0)
-		;
 	s8idx = s16idx = 0;
-	utfbytes = 0;
-	do {
-		utfchar = 0;
-		c = s8[s8idx++];
-		if ((c & 0xc0) != 0x80) {
-			/* Initial characters. */
-			if (utfbytes != 0) {
-				/* Incomplete encoding. */
-				s16[s16idx++] = 0xfffd;
-				if (s16idx == s16len) {
-					s16[--s16idx] = 0;
-					return;
-				}
-			}
-			if ((c & 0xf8) == 0xf0) {
-				utfchar = c & 0x07;
-				utfbytes = 3;
-			} else if ((c & 0xf0) == 0xe0) {
-				utfchar = c & 0x0f;
-				utfbytes = 2;
-			} else if ((c & 0xe0) == 0xc0) {
-				utfchar = c & 0x1f;
-				utfbytes = 1;
-			} else {
-				utfchar = c & 0x7f;
-				utfbytes = 0;
-			}
+	utfchar = 0;
+	while ((c = us8[s8idx++]) != 0) {
+		if ((c & 0x80) == 0x00) {
+			/* ASCII */
+			utfchar = c;
+			utfbytes = 0;
+		} else if ((c & 0xe0) == 0xc0) {
+			utfchar = c & 0x1f;
+			utfbytes = 1;
+		} else if ((c & 0xf0) == 0xe0) {
+			utfchar = c & 0x0f;
+			utfbytes = 2;
+		} else if ((c & 0xf8) == 0xf0) {
+			utfchar = c & 0x07;
+			utfbytes = 3;
 		} else {
-			/* Followup characters. */
-			if (utfbytes > 0) {
-				utfchar = (utfchar << 6) + (c & 0x3f);
-				utfbytes--;
-			} else if (utfbytes == 0)
-				utfbytes = -1;
+			/* Invalid leading byte */
+			utfchar = 0xfffd;
+			utfbytes = 0;
 		}
-		if (utfbytes == 0) {
-			if (utfchar >= 0x10000 && s16idx + 2 >= s16len)
+
+		while (utfbytes-- > 0) {
+			c = us8[s8idx++];
+			if ((c & 0xc0) != 0x80) {
 				utfchar = 0xfffd;
-			if (utfchar >= 0x10000) {
-				s16[s16idx++] = 0xd800 | ((utfchar>>10)-0x40);
-				s16[s16idx++] = 0xdc00 | (utfchar & 0x3ff);
-			} else
-				s16[s16idx++] = utfchar;
-			if (s16idx == s16len) {
-				s16[--s16idx] = 0;
-				return;
+				break;
 			}
+			utfchar = (utfchar << 6) | (c & 0x3f);
 		}
-	} while (c != 0);
+
+		/* Reject invalid Unicode scalar values */
+		if (utfchar > 0x10ffff ||
+		    (utfchar >= 0xd800 && utfchar <= 0xdfff)) {
+			utfchar = 0xfffd;
+		}
+
+		if (utfchar < 0x10000) {
+			if (s16idx + 1 > s16len)
+				break;
+			s16[s16idx++] = htole16((uint16_t)utfchar);
+		} else {
+			/* Surrogate pair */
+			if (s16idx + 2 > s16len)
+				break;
+			utfchar -= 0x10000;
+			s16[s16idx++] = htole16(0xd800 | (utfchar >> 10));
+			s16[s16idx++] = htole16(0xdc00 | (utfchar & 0x3ff));
+		}
+	}
+
+	/* Pad with zeros, but no need of explicit NUL termination */
+	while (s16idx < s16len)
+		s16[s16idx++] = 0;
 }
 
 static const struct {
@@ -231,8 +252,6 @@ static const struct {
 } uuid_aliases[] = {
 	{ "efi",		GPT_ENT_TYPE_EFI },
 	{ "bios",		GPT_ENT_TYPE_BIOS_BOOT },
-	{ "swap",		GPT_ENT_TYPE_FREEBSD_SWAP },
-	{ "ufs",		GPT_ENT_TYPE_FREEBSD_UFS },
 	/* DragonFly */
 	{ "ccd",		GPT_ENT_TYPE_DRAGONFLY_CCD },
 	{ "label32",		GPT_ENT_TYPE_DRAGONFLY_LABEL32 },
@@ -241,6 +260,8 @@ static const struct {
 	{ "dragonfly",		GPT_ENT_TYPE_DRAGONFLY_LABEL64 },
 	{ "hammer",		GPT_ENT_TYPE_DRAGONFLY_HAMMER },
 	{ "hammer2",		GPT_ENT_TYPE_DRAGONFLY_HAMMER2 },
+	{ "swap",		GPT_ENT_TYPE_DRAGONFLY_SWAP },
+	{ "ufs",		GPT_ENT_TYPE_DRAGONFLY_UFS1 },
 	{ "vinum",		GPT_ENT_TYPE_DRAGONFLY_VINUM },
 	/* FreeBSD */
 	{ "freebsd-legacy",	GPT_ENT_TYPE_FREEBSD },
@@ -312,12 +333,19 @@ gpt_read(int fd, off_t lba, size_t count)
 		return (NULL);
 
 	ofs = lba * secsz;
-	if (lseek(fd, ofs, SEEK_SET) == ofs &&
-	    read(fd, buf, count) == (ssize_t)count)
-		return (buf);
+	if (lseek(fd, ofs, SEEK_SET) != ofs) {
+		free(buf);
+		return (NULL);
+	}
 
-	free(buf);
-	return (NULL);
+	if (read(fd, buf, count) != (ssize_t)count) {
+		if (errno == 0) /* partial read */
+			errno = E2BIG;
+		free(buf);
+		return (NULL);
+	}
+
+	return (buf);
 }
 
 int
@@ -331,6 +359,10 @@ gpt_write(int fd, map_t *map)
 	if (lseek(fd, ofs, SEEK_SET) == ofs &&
 	    write(fd, map->map_data, count) == (ssize_t)count)
 		return (0);
+
+	warnx("%s: failed to write %ju sectors starting at %ju",
+	      device_name, (uintmax_t)map->map_size,
+	      (uintmax_t)map->map_start);
 	return (-1);
 }
 
@@ -346,10 +378,11 @@ gpt_mbr(int fd, off_t lba)
 	if (mbr == NULL)
 		return (-1);
 
-	if (mbr->mbr_sig != htole16(MBR_SIG)) {
-		if (verbose)
-			warnx("%s: MBR not found at sector %llu", device_name,
-			    (long long)lba);
+	if (mbr->mbr_sig != htole16(DOSMAGIC)) {
+		if (verbose) {
+			warnx("%s: MBR not found at sector %ju", device_name,
+			      (uintmax_t)lba);
+		}
 		free(mbr);
 		return (0);
 	}
@@ -361,80 +394,84 @@ gpt_mbr(int fd, off_t lba)
 	 */
 	pmbr = 0;
 	for (i = 0; i < 4; i++) {
-		if (mbr->mbr_part[i].part_typ == 0)
+		if (mbr->mbr_part[i].dp_typ == 0)
 			continue;
-		if (mbr->mbr_part[i].part_typ == 0xee)
+		if (mbr->mbr_part[i].dp_typ == DOSPTYP_PMBR)
 			pmbr++;
 		else
 			break;
 	}
 	if (pmbr && (i == 1 || i == 4) && lba == 0) {
-		if (pmbr != 1)
-			warnx("%s: Suspicious PMBR at sector %llu",
-			    device_name, (long long)lba);
-		else if (verbose > 1)
-			warnx("%s: PMBR at sector %llu", device_name,
-			    (long long)lba);
+		if (pmbr != 1) {
+			warnx("%s: Suspicious PMBR at sector %ju",
+			      device_name, (uintmax_t)lba);
+		} else if (verbose > 1) {
+			warnx("%s: PMBR at sector %ju", device_name,
+			      (uintmax_t)lba);
+		}
 		p = map_add(lba, 1LL, MAP_TYPE_PMBR, mbr);
-		return ((p == NULL) ? -1 : 0);
+		if (p == NULL)
+			return (-1);
+		return (0); /* PMBR found, but MBR not found */
 	}
-	if (pmbr)
-		warnx("%s: Suspicious MBR at sector %llu", device_name,
-		    (long long)lba);
-	else if (verbose > 1)
-		warnx("%s: MBR at sector %llu", device_name, (long long)lba);
+	if (pmbr) {
+		warnx("%s: Suspicious MBR at sector %ju", device_name,
+		      (uintmax_t)lba);
+	} else if (verbose > 1) {
+		warnx("%s: MBR at sector %ju", device_name, (uintmax_t)lba);
+	}
 
 	p = map_add(lba, 1LL, MAP_TYPE_MBR, mbr);
 	if (p == NULL)
 		return (-1);
 	for (i = 0; i < 4; i++) {
-		if (mbr->mbr_part[i].part_typ == 0 ||
-		    mbr->mbr_part[i].part_typ == 0xee)
+		if (mbr->mbr_part[i].dp_typ == 0 ||
+		    mbr->mbr_part[i].dp_typ == DOSPTYP_PMBR)
 			continue;
-		start = le16toh(mbr->mbr_part[i].part_start_hi);
-		start = (start << 16) + le16toh(mbr->mbr_part[i].part_start_lo);
-		size = le16toh(mbr->mbr_part[i].part_size_hi);
-		size = (size << 16) + le16toh(mbr->mbr_part[i].part_size_lo);
+		start = le32toh(mbr->mbr_part[i].dp_start);
+		size = le32toh(mbr->mbr_part[i].dp_size);
 		if (start == 0 && size == 0) {
-			warnx("%s: Malformed MBR at sector %llu", device_name,
-			    (long long)lba);
+			warnx("%s: Malformed MBR at sector %ju", device_name,
+			      (uintmax_t)lba);
 			continue;
 		}
 		/* start is relative to the offset of the MBR itself. */
 		start += lba;
-		if (verbose > 2)
-			warnx("%s: MBR part: type=%d, start=%llu, size=%llu",
-			    device_name, mbr->mbr_part[i].part_typ,
-			    (long long)start, (long long)size);
-		if (mbr->mbr_part[i].part_typ != 15) {
+		if (verbose > 2) {
+			warnx("%s: MBR part %d: type=%d, start=%ju, size=%ju",
+			      device_name, i, mbr->mbr_part[i].dp_typ,
+			      (uintmax_t)start, (uintmax_t)size);
+		}
+		if (mbr->mbr_part[i].dp_typ != DOSPTYP_EXTLBA) {
 			m = map_add(start, size, MAP_TYPE_MBR_PART, p);
 			if (m == NULL)
 				return (-1);
 			m->map_index = i;
 		} else {
+			/* Extended boot record (LBA) */
 			if (gpt_mbr(fd, start) == -1)
 				return (-1);
 		}
 	}
-	return (0);
+
+	return (1); /* MBR found */
 }
 
 static int
 gpt_gpt(int fd, off_t lba)
 {
-	uuid_t type;
-	off_t size;
-	struct gpt_ent *ent;
 	struct gpt_hdr *hdr;
-	char *p, *s;
+	char *p;
 	map_t *m;
 	size_t blocks, tblsz;
-	unsigned int i;
 	uint32_t crc;
 
 	hdr = gpt_read(fd, lba, 1);
-	if (hdr == NULL)
+	if (hdr == NULL) {
+		warn("%s: Reading GPT header at sector %ju failed",
+		     device_name, (uintmax_t)lba);
 		return (-1);
+	}
 
 	if (memcmp(hdr->hdr_sig, GPT_HDR_SIG, sizeof(hdr->hdr_sig)))
 		goto fail_hdr;
@@ -442,74 +479,109 @@ gpt_gpt(int fd, off_t lba)
 	crc = le32toh(hdr->hdr_crc_self);
 	hdr->hdr_crc_self = 0;
 	if (crc32(hdr, le32toh(hdr->hdr_size)) != crc) {
-		if (verbose)
-			warnx("%s: Bad CRC in GPT header at sector %llu",
-			    device_name, (long long)lba);
+		if (verbose) {
+			warnx("%s: Bad CRC in GPT header at sector %ju",
+			      device_name, (uintmax_t)lba);
+		}
 		goto fail_hdr;
 	}
 
 	tblsz = le32toh(hdr->hdr_entries) * le32toh(hdr->hdr_entsz);
 	blocks = tblsz / secsz + ((tblsz % secsz) ? 1 : 0);
 
-	/* Use generic pointer to deal with hdr->hdr_entsz != sizeof(*ent). */
 	p = gpt_read(fd, le64toh(hdr->hdr_lba_table), blocks);
-	if (p == NULL)
+	if (p == NULL) {
+		warn("%s: Reading GPT table at sector %ju failed",
+		     device_name, (uintmax_t)le64toh(hdr->hdr_lba_table));
 		return (-1);
+	}
 
 	if (crc32(p, tblsz) != le32toh(hdr->hdr_crc_table)) {
-		if (verbose)
-			warnx("%s: Bad CRC in GPT table at sector %llu",
-			    device_name,
-			    (long long)le64toh(hdr->hdr_lba_table));
+		if (verbose) {
+			warnx("%s: Bad CRC in GPT table at sector %ju",
+			      device_name,
+			      (uintmax_t)le64toh(hdr->hdr_lba_table));
+		}
 		goto fail_ent;
 	}
 
-	if (verbose > 1)
-		warnx("%s: %s GPT at sector %llu", device_name,
-		    (lba == 1) ? "Pri" : "Sec", (long long)lba);
-
-	m = map_add(lba, 1, (lba == 1)
-	    ? MAP_TYPE_PRI_GPT_HDR : MAP_TYPE_SEC_GPT_HDR, hdr);
-	if (m == NULL)
-		return (-1);
-
-	m = map_add(le64toh(hdr->hdr_lba_table), blocks, (lba == 1)
-	    ? MAP_TYPE_PRI_GPT_TBL : MAP_TYPE_SEC_GPT_TBL, p);
-	if (m == NULL)
-		return (-1);
-
-	if (lba != 1)
-		return (0);
-
-	for (i = 0; i < le32toh(hdr->hdr_entries); i++) {
-		ent = (void*)(p + i * le32toh(hdr->hdr_entsz));
-		if (uuid_is_nil(&ent->ent_type, NULL))
-			continue;
-
-		size = le64toh(ent->ent_lba_end) - le64toh(ent->ent_lba_start) +
-		    1LL;
-		if (verbose > 2) {
-			uuid_dec_le(&ent->ent_type, &type);
-			uuid_to_string(&type, &s, NULL);
-			warnx(
-	"%s: GPT partition: type=%s, start=%llu, size=%llu", device_name, s,
-			    (long long)le64toh(ent->ent_lba_start),
-			    (long long)size);
-			free(s);
-		}
-		m = map_add(le64toh(ent->ent_lba_start), size,
-		    MAP_TYPE_GPT_PART, ent);
-		if (m == NULL)
-			return (-1);
-		m->map_index = i;
+	if (verbose > 1) {
+		warnx("%s: %s GPT at sector %ju", device_name,
+		      (lba == 1) ? "Primary" : "Secondary", (uintmax_t)lba);
 	}
-	return (0);
+
+	m = map_add(lba, 1,
+	    (lba == 1) ? MAP_TYPE_GPT_PRI_HDR : MAP_TYPE_GPT_SEC_HDR, hdr);
+	if (m == NULL)
+		return (-1);
+
+	m = map_add(le64toh(hdr->hdr_lba_table), blocks,
+	    (lba == 1) ? MAP_TYPE_GPT_PRI_TBL : MAP_TYPE_GPT_SEC_TBL, p);
+	if (m == NULL)
+		return (-1);
+
+	return (1); /* found */
 
  fail_ent:
 	free(p);
 
  fail_hdr:
 	free(hdr);
+	return (0); /* not found */
+}
+
+static int
+gpt_read_table(bool primary)
+{
+	struct gpt_hdr *hdr;
+	struct gpt_ent *ent;
+	map_t *map, *tbl;
+	uuid_t type;
+	off_t size;
+	uint32_t i;
+	char *s;
+
+	if (primary) {
+		map = map_find(MAP_TYPE_GPT_PRI_HDR);
+		hdr = map->map_data;
+		tbl = map_find(MAP_TYPE_GPT_PRI_TBL);
+	} else {
+		map = map_find(MAP_TYPE_GPT_SEC_HDR);
+		hdr = map->map_data;
+		tbl = map_find(MAP_TYPE_GPT_SEC_TBL);
+	}
+
+	for (i = 0; i < le32toh(hdr->hdr_entries); i++) {
+		/*
+		 * Use generic pointer to deal with
+		 * hdr->hdr_entsz != sizeof(*ent).
+		 */
+		ent = (void *)((char *)tbl->map_data + i *
+		    le32toh(hdr->hdr_entsz));
+		if (uuid_is_nil(&ent->ent_type, NULL))
+			continue;
+
+		size = le64toh(ent->ent_lba_end) -
+		    le64toh(ent->ent_lba_start) + 1LL;
+		if (verbose > 2) {
+			uuid_dec_le(&ent->ent_type, &type);
+			uuid_to_string(&type, &s, NULL);
+			warnx("%s: GPT partition %d: type=%s, start=%ju, "
+			      "size=%ju",
+			      device_name, i, s,
+			      (uintmax_t)le64toh(ent->ent_lba_start),
+			      (uintmax_t)size);
+			free(s);
+		}
+
+		map = map_add(le64toh(ent->ent_lba_start), size,
+		    MAP_TYPE_GPT_PART, ent);
+		if (map == NULL)
+			return (-1);
+
+		map->map_index = i;
+	}
+
 	return (0);
 }
 
@@ -518,7 +590,7 @@ gpt_open(const char *dev)
 {
 	struct stat sb;
 	static char device_path[MAXPATHLEN];
-	int fd, mode;
+	int fd, mode, found;
 
 	mode = readonly ? O_RDONLY : O_RDWR|O_EXCL;
 
@@ -526,16 +598,17 @@ gpt_open(const char *dev)
 	device_name = device_path;
 
 	if ((fd = open(device_path, mode)) != -1)
-		goto found;
+		goto opened;
 
 	snprintf(device_path, sizeof(device_path), "%s%s", _PATH_DEV, dev);
 	device_name = device_path + strlen(_PATH_DEV);
+	errno = 0;
 	if ((fd = open(device_path, mode)) != -1)
-		goto found;
+		goto opened;
 
 	return (-1);
 
- found:
+ opened:
 	if (fstat(fd, &sb) == -1)
 		goto close;
 
@@ -566,19 +639,59 @@ gpt_open(const char *dev)
 		goto close;
 	}
 
-	if (verbose)
-		warnx("%s: mediasize=%llu; sectorsize=%u; blocks=%llu",
-		    device_name, (long long)mediasz, secsz,
-		    (long long)(mediasz / secsz));
+	if (verbose) {
+		warnx("%s: mediasize=%ju; sectorsize=%u; blocks=%ju",
+		      device_name, (uintmax_t)mediasz, secsz,
+		      (uintmax_t)(mediasz / secsz));
+	}
 
-	map_init(mediasz / secsz);
+	if (map_init(mediasz / secsz) == -1) {
+		warnx("%s: error: map initialization failed", device_name);
+		goto close;
+	}
 
-	if (gpt_mbr(fd, 0LL) == -1)
+	if ((found = gpt_mbr(fd, 0LL)) == -1)
 		goto close;
-	if (gpt_gpt(fd, 1LL) == -1)
-		goto close;
-	if (gpt_gpt(fd, mediasz / secsz - 1LL) == -1)
-		goto close;
+
+	if (!found) {
+		/*
+		 * MBR not found; try GPT.
+		 */
+		if ((found = gpt_gpt(fd, 1LL)) == -1)
+			goto close;
+
+		if (found) {
+			struct gpt_hdr *hdr;
+			map_t *map;
+			off_t lba;
+
+			if (gpt_read_table(true) < 0)
+				goto close;
+
+			/*
+			 * Read secondary GPT from position stored in the
+			 * primary header.
+			 */
+			map = map_find(MAP_TYPE_GPT_PRI_HDR);
+			hdr = map->map_data;
+			lba = le64toh(hdr->hdr_lba_alt);
+			if (lba < mediasz / secsz) {
+				if (gpt_gpt(fd, lba) == -1)
+					goto close;
+			}
+		} else {
+			/*
+			 * Try read secondary GPT at the end of the disk.
+			 */
+			found = gpt_gpt(fd, mediasz / secsz - 1LL);
+			if (found == -1) {
+				goto close;
+			} else if (found) {
+				if (gpt_read_table(false) < 0)
+					goto close;
+			}
+		}
+	}
 
 	return (fd);
 
@@ -599,21 +712,18 @@ static struct {
 	int (*fptr)(int, char *[]);
 	const char *name;
 } cmdsw[] = {
-	{ cmd_add, "add" },
-	{ cmd_boot, "boot" },
-	{ cmd_create, "create" },
-	{ cmd_destroy, "destroy" },
-	{ cmd_expand, "expand" },
-	{ NULL, "help" },
-	{ cmd_init, "init" },
-	{ cmd_label, "label" },
-	{ cmd_migrate, "migrate" },
-	{ cmd_recover, "recover" },
-	{ cmd_remove, "remove" },
-	{ NULL, "rename" },
-	{ cmd_show, "show" },
-	{ NULL, "verify" },
-	{ NULL, NULL }
+	{ cmd_add,	"add" },
+	{ cmd_boot,	"boot" },
+	{ cmd_create,	"create" },
+	{ cmd_destroy,	"destroy" },
+	{ cmd_expand,	"expand" },
+	{ cmd_init,	"init" },
+	{ cmd_label,	"label" },
+	{ cmd_migrate,	"migrate" },
+	{ cmd_recover,	"recover" },
+	{ cmd_remove,	"remove" },
+	{ cmd_show,	"show" },
+	{ NULL,		NULL },
 };
 
 static void
@@ -622,9 +732,9 @@ usage(void)
 	const char *prgname = getprogname();
 
 	fprintf(stderr,
-	    "usage: %s [-rv] [-p nparts] <command> [options] <device> ...\n"
-	    "       %s show <device>\n",
-	    prgname, prgname);
+		"usage: %s [-rv] <command> [options] <device> ...\n"
+		"       %s show <device>\n",
+		prgname, prgname);
 	exit(1);
 }
 
@@ -647,38 +757,30 @@ prefix(const char *cmd)
 int
 main(int argc, char *argv[])
 {
-	char *cmd, *p;
+	char *cmd;
 	int ch, i;
 
 	/* Get the generic options */
-	while ((ch = getopt(argc, argv, "p:rv")) != -1) {
+	while ((ch = getopt(argc, argv, "h:rv")) != -1) {
 		switch(ch) {
-		case 'p':
-			if (parts > 0)
-				usage();
-			parts = strtol(optarg, &p, 10);
-			if (*p != 0 || parts < 1)
-				usage();
-			break;
 		case 'r':
-			readonly = 1;
+			readonly = true;
 			break;
 		case 'v':
 			verbose++;
 			break;
+		case 'h':
 		default:
 			usage();
 		}
 	}
-	if (!parts)
-		parts = 128;
 
 	if (argc == optind)
 		usage();
 
 	cmd = argv[optind++];
-	for (i = 0; cmdsw[i].name != NULL && strcmp(cmd, cmdsw[i].name); i++);
-
+	for (i = 0; cmdsw[i].name != NULL && strcmp(cmd, cmdsw[i].name); i++)
+		;
 	if (cmdsw[i].fptr == NULL)
 		errx(1, "unknown command: %s", cmd);
 

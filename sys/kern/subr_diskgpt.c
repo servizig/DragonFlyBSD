@@ -1,13 +1,13 @@
 /*
  * Copyright (c) 2007 The DragonFly Project.  All rights reserved.
- * 
+ *
  * This code is derived from software contributed to The DragonFly Project
  * by Matthew Dillon <dillon@backplane.com>
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
@@ -17,7 +17,7 @@
  * 3. Neither the name of The DragonFly Project nor the names of its
  *    contributors may be used to endorse or promote products derived
  *    from this software without specific, prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -45,9 +45,12 @@
 #include <sys/bus.h>
 #include <sys/device.h>
 #include <sys/gpt.h>
+#include <sys/uuid.h>
+
+#define	MAX_GPT_ENTRIES	128	/* max number of GPT entries */
 
 static void gpt_setslice(const char *sname, struct disk_info *info,
-			 struct diskslice *sp, struct gpt_ent *sent);
+			 struct diskslice *sp, const struct gpt_ent *sent);
 
 /*
  * Handle GPT on raw disk.  Note that GPTs are not recursive.  The MBR is
@@ -76,8 +79,10 @@ gptinit(cdev_t dev, struct disk_info *info, struct diskslices **sspp)
 	uint32_t crc;
 	uint32_t table_lba;
 	uint32_t table_blocks;
-	int i = 0, j;
+	int i;
 	const char *dname;
+
+	error = 0;
 
 	/*
 	 * The GPT starts in sector 1.
@@ -128,9 +133,11 @@ gptinit(cdev_t dev, struct disk_info *info, struct diskslices **sspp)
 	table_lba = le32toh(gpt->hdr_lba_table);
 	table_blocks = (entries * entsz + info->d_media_blksize - 1) /
 		       info->d_media_blksize;
-	if (entries < 1 || entries > 128 ||
-	    entsz < 128 || (entsz & 7) || entsz > MAXBSIZE / entries ||
-	    table_lba < 2 || table_lba + table_blocks > info->d_media_blocks) {
+	if (entries < 1 || entries > MAX_GPT_ENTRIES ||
+	    entsz < sizeof(struct gpt_ent) || (entsz & 7) ||
+	    entsz > MAXBSIZE / entries ||
+	    table_lba < 2 || table_lba + table_blocks > info->d_media_blocks)
+	{
 		kprintf("%s: GPT partition table is out of bounds\n", dname);
 		error = EINVAL;
 		goto done;
@@ -162,18 +169,19 @@ gptinit(cdev_t dev, struct disk_info *info, struct diskslices **sspp)
 	 * it with a maximal one (128 slices + special slices).  Well,
 	 * really there is only one special slice (the WHOLE_DISK_SLICE)
 	 * since we use the compatibility slice for s0, but don't quibble.
-	 * 
+	 *
 	 */
 	kfree(*sspp, M_DEVBUF);
-	ssp = *sspp = dsmakeslicestruct(BASE_SLICE+128, info);
+	ssp = *sspp = dsmakeslicestruct(BASE_SLICE + MAX_GPT_ENTRIES, info);
 
 	/*
 	 * Create a slice for each partition.
 	 */
-	for (i = 0; i < (int)entries && i < 128; ++i) {
+	for (i = 0; i < (int)entries && i < MAX_GPT_ENTRIES; ++i) {
 		struct gpt_ent sent;
 		char partname[2];
 		char *sname;
+		size_t j;
 
 		ent = (void *)((char *)bp2->b_data + i * entsz);
 		le_uuid_dec(&ent->ent_type, &sent.ent_type);
@@ -213,7 +221,6 @@ gptinit(cdev_t dev, struct disk_info *info, struct diskslices **sspp)
 	}
 	ssp->dss_nslices = BASE_SLICE + i;
 
-	error = 0;
 done:
 	if (bp1) {
 		bp1->b_flags |= B_INVAL | B_AGE;
@@ -223,21 +230,34 @@ done:
 		bp2->b_flags |= B_INVAL | B_AGE;
 		relpbuf(bp2, NULL);
 	}
-	if (error == EINVAL)
-		error = 0;
 	return (error);
 }
 
-static
-void
+static void
 gpt_setslice(const char *sname, struct disk_info *info, struct diskslice *sp,
-	     struct gpt_ent *sent)
+	     const struct gpt_ent *sent)
 {
+	static const struct {
+		struct uuid	uuid;
+		int		type;
+	} slice_types[] = {
+		{ GPT_ENT_TYPE_DRAGONFLY_LABEL32,	DOSPTYP_DFLYBSD },
+		{ GPT_ENT_TYPE_DRAGONFLY_LABEL64,	DOSPTYP_DFLYBSD },
+		{ GPT_ENT_TYPE_DRAGONFLY_LEGACY,	DOSPTYP_DFLYBSD },
+		{ GPT_ENT_TYPE_FREEBSD,			DOSPTYP_386BSD },
+	};
+	size_t i;
+
+	for (i = 0; i < NELEM(slice_types); i++) {
+		if (kuuid_compare(&slice_types[i].uuid, &sent->ent_type) == 0) {
+			sp->ds_type = slice_types[i].type;
+			break;
+		}
+	}
+
 	sp->ds_offset = sent->ent_lba_start;
 	sp->ds_size   = sent->ent_lba_end + 1 - sent->ent_lba_start;
-	sp->ds_type   = 1;	/* XXX */
 	sp->ds_type_uuid = sent->ent_type;
 	sp->ds_stor_uuid = sent->ent_uuid;
 	sp->ds_reserved = 0;	/* no reserved sectors */
 }
-

@@ -111,20 +111,20 @@ dfui_connection_new(int transport, const char *rendezvous)
 
 #ifdef HAS_TCP
 	case DFUI_TRANSPORT_TCP:
-                AURA_MALLOC(c->t_data, dfui_conn_tcp);
+		AURA_MALLOC(c->t_data, dfui_conn_tcp);
 		T_TCP(c)->listen_sd = -1;
 		T_TCP(c)->connected_sd = -1;
 		T_TCP(c)->is_connected = 0;
 
-                /*
-                 * Set up dispatch functions.
-                 */
-                c->be_start = dfui_tcp_be_start;
-                c->be_stop = dfui_tcp_be_stop;
+		/*
+		 * Set up dispatch functions.
+		 */
+		c->be_start = dfui_tcp_be_start;
+		c->be_stop = dfui_tcp_be_stop;
 		c->be_ll_exchange = dfui_tcp_be_ll_exchange;
 
-                c->fe_connect = dfui_tcp_fe_connect;
-                c->fe_disconnect = dfui_tcp_fe_disconnect;
+		c->fe_connect = dfui_tcp_fe_connect;
+		c->fe_disconnect = dfui_tcp_fe_disconnect;
 		c->fe_ll_request = dfui_tcp_fe_ll_request;
 		break;
 #endif /* HAS_TCP */
@@ -293,6 +293,36 @@ dfui_be_stop(struct dfui_connection *c)
 	}
 }
 
+static struct aura_buffer *
+dfui_be_handle_field_changed(struct dfui_connection *c,
+			     struct dfui_form *f)
+{
+	struct aura_buffer *e;
+	char *field_id, *new_value;
+	int ret;
+
+	e = aura_buffer_new(1024);
+	aura_buffer_set(e, aura_buffer_buf(c->ebuf) + 1, aura_buffer_len(c->ebuf) - 1);
+	field_id = dfui_decode_string(e);
+	new_value = dfui_decode_string(e);
+	aura_buffer_free(e);
+	dfui_debug("handle changed field: id=`%s', new_value=`%s'\n",
+		   field_id, new_value);
+
+	ret = dfui_form_trigger_callbacks(f, field_id, new_value);
+	free(field_id);
+	free(new_value);
+
+	e = aura_buffer_new(16384);
+	if (ret == 0) {
+		dfui_encode_datasets(e, f->dataset_head);
+	} else {
+		/* TODO: encode and send error to frontend */
+	}
+
+	return(e);
+}
+
 /*
  * Present a form to the user.  This call is synchronous;
  * it does not return until the user has selected an action.
@@ -302,29 +332,33 @@ dfui_be_present(struct dfui_connection *c,
 		struct dfui_form *f, struct dfui_response **r)
 {
 	struct aura_buffer *e;
+	char msgtype;
 
 	e = aura_buffer_new(16384);
 	dfui_encode_form(e, f);
-
 	c->be_ll_exchange(c, DFUI_BE_MSG_PRESENT, aura_buffer_buf(e));
-
 	aura_buffer_free(e);
 
-	/* check for ABORT reply */
-	if (aura_buffer_buf(c->ebuf)[0] == DFUI_FE_MSG_ABORT) {
-		return(DFUI_FAILURE);
+	while (1) {
+		msgtype = aura_buffer_buf(c->ebuf)[0];
+		if (msgtype == DFUI_FE_MSG_ABORT)
+			return(DFUI_FAILURE);
+
+		if (msgtype == DFUI_FE_MSG_FIELD_CHANGED) {
+			e = dfui_be_handle_field_changed(c, f);
+			c->be_ll_exchange(c, DFUI_BE_MSG_FIELD_CHANGED_ACK, aura_buffer_buf(e));
+			aura_buffer_free(e);
+			continue;
+		}
+
+		/* Other response, like submit */
+		e = aura_buffer_new(16384);
+		aura_buffer_set(e, aura_buffer_buf(c->ebuf) + 1,
+				aura_buffer_len(c->ebuf) - 1);
+		*r = dfui_decode_response(e);
+		aura_buffer_free(e);
+		return(DFUI_SUCCESS);
 	}
-
-	/*
-	 * Now we've got the response; so decode it.
-	 */
-
-	e = aura_buffer_new(16384);
-	aura_buffer_set(e, aura_buffer_buf(c->ebuf) + 1, aura_buffer_len(c->ebuf) - 1);
-	*r = dfui_decode_response(e);
-	aura_buffer_free(e);
-
-	return(DFUI_SUCCESS);
 }
 
 /*
@@ -481,6 +515,13 @@ dfui_fe_receive(struct dfui_connection *c, char *msgtype, void **payload)
 		aura_buffer_free(e);
 		return(DFUI_SUCCESS);
 
+	case DFUI_BE_MSG_FIELD_CHANGED_ACK:
+		e = aura_buffer_new(16384);
+		aura_buffer_set(e, aura_buffer_buf(c->ebuf) + 1, aura_buffer_len(c->ebuf) - 1);
+		*payload = dfui_decode_datasets(e);
+		aura_buffer_free(e);
+		return(DFUI_SUCCESS);
+
 	case DFUI_BE_MSG_STOP:
 		*payload = NULL;
 		return(DFUI_SUCCESS);
@@ -526,6 +567,10 @@ dfui_fe_receive_payload(struct dfui_connection *c)
 		payload->global_setting = v;
 		break;
 
+	case DFUI_BE_MSG_FIELD_CHANGED_ACK:
+		payload->datasets = v;
+		break;
+
 	case DFUI_BE_MSG_PROG_END:
 	case DFUI_BE_MSG_STOP:
 		break;
@@ -558,6 +603,14 @@ dfui_payload_get_progress(const struct dfui_payload *p)
 	return(p->progress);
 }
 
+struct dfui_dataset *
+dfui_payload_get_datasets(const struct dfui_payload *p)
+{
+	if (p == NULL)
+		return(NULL);
+	return(p->datasets);
+}
+
 void
 dfui_payload_free(struct dfui_payload *p)
 {
@@ -567,7 +620,16 @@ dfui_payload_free(struct dfui_payload *p)
 		dfui_form_free(p->form);
 	if (p->progress != NULL)
 		dfui_progress_free(p->progress);
+	if (p->datasets != NULL)
+		dfui_datasets_free(p->datasets);
 	AURA_FREE(p, dfui_payload);
+}
+
+dfui_err_t
+dfui_fe_send(struct dfui_connection *c, char msgtype, struct aura_buffer *e)
+{
+	c->fe_ll_request(c, msgtype, aura_buffer_buf(e));
+	return(DFUI_SUCCESS);
 }
 
 /*

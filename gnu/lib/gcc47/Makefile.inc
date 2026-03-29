@@ -22,14 +22,13 @@ TARGET_DEBUGLIBDIR=	${LIBDIR}/${CCVER}/debug
 TARGET_PROFLIBDIR=	${LIBDIR}/${CCVER}/profile
 TARGET_SHLIBDIR=	${LIBDIR}/${CCVER}
 
-LIBSUPCPP=		${.OBJDIR}/../libsupc++/libsupc++.a
-
 # for now do not let the use of -flto
 .if ${CFLAGS:M-flto}
 CFLAGS+=	-fno-lto
 LDFLAGS+=	-flto
 .endif
 
+.if !defined(GCC_NO_INC)
 CFLAGS+=	-I${CCDIR}/cc_prep
 CFLAGS+=	-I${CCDIR}/cc_prep/config
 CFLAGS+=	-I${OCCDIR}/cc_prep
@@ -39,6 +38,7 @@ CFLAGS+=	-I${GCCDIR}/gcc
 CFLAGS+=	-I${GCCDIR}/gcc/config
 CFLAGS+=	-I${GCCDIR}/gcc/config/${GCC_CPU}
 CFLAGS+=	-I${CCDIR}/../gmp
+.endif
 
 # only gcc 4.8 and later has support for -Og
 .if defined(WORLD_CCOPTLEVEL) && ${WORLD_CCOPTLEVEL:Mg} && ${CCVER:Mgcc47}

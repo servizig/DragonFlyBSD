@@ -3963,6 +3963,7 @@ TO_REMOVE+=/usr/share/man/man9/crypto.9.gz
 TO_REMOVE+=/usr/share/man/man4/aesni.4.gz
 TO_REMOVE+=/boot/kernel/aesni.ko
 TO_REMOVE+=/usr/include/crypto
+TO_REMOVE+=/usr/include/vfs/mfs
 
 .if !defined(WANT_INSTALLER)
 TO_REMOVE+=/usr/sbin/dfuibe_installer

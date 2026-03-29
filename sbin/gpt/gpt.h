@@ -24,55 +24,43 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $FreeBSD: src/sbin/gpt/gpt.h,v 1.11 2006/06/22 22:05:28 marcel Exp $
- * $DragonFly: src/sbin/gpt/gpt.h,v 1.2 2008/07/30 00:45:26 dillon Exp $
  */
 
 #ifndef _GPT_H_
 #define	_GPT_H_
 
+#include <sys/cdefs.h>
+#include <sys/diskmbr.h>
 #include <sys/endian.h>
 #include <sys/gpt.h>
 
+#include <stdbool.h>
 #include <uuid.h>
 
-int	parse_uuid(const char *, uuid_t *);
+#include "map.h"
 
-struct mbr_part {
-	uint8_t		part_flag;		/* bootstrap flags */
-	uint8_t		part_shd;		/* starting head */
-	uint8_t		part_ssect;		/* starting sector */
-	uint8_t		part_scyl;		/* starting cylinder */
-	uint8_t		part_typ;		/* partition type */
-	uint8_t		part_ehd;		/* end head */
-	uint8_t		part_esect;		/* end sector */
-	uint8_t		part_ecyl;		/* end cylinder */
-	uint16_t	part_start_lo;		/* absolute starting ... */
-	uint16_t	part_start_hi;		/* ... sector number */
-	uint16_t	part_size_lo;		/* partition size ... */
-	uint16_t	part_size_hi;		/* ... in sectors */
+struct __packed mbr {
+	uint16_t		mbr_code[223];
+	struct dos_partition	mbr_part[4];
+	uint16_t		mbr_sig;
 };
-
-struct mbr {
-	uint16_t	mbr_code[223];
-	struct mbr_part	mbr_part[4];
-	uint16_t	mbr_sig;
-#define	MBR_SIG		0xAA55
-};
+CTASSERT(sizeof(struct mbr) == 512);
 
 extern char *device_name;
 extern off_t mediasz;
-extern u_int parts;
 extern u_int secsz;
-extern int readonly, verbose;
+extern bool readonly;
+extern int verbose;
 
 uint32_t crc32(const void *, size_t);
 void	gpt_close(int);
 int	gpt_open(const char *);
 void*	gpt_read(int, off_t, size_t);
 int	gpt_write(int, map_t *);
+int	parse_uuid(const char *, uuid_t *);
 
-uint8_t *utf16_to_utf8(uint16_t *);
-void	utf8_to_utf16(const uint8_t *, uint16_t *, size_t);
+void	utf16_to_utf8(const uint16_t *, size_t, char *, size_t);
+void	utf8_to_utf16(const char *, uint16_t *, size_t);
 
 int	cmd_add(int, char *[]);
 int	cmd_boot(int, char *[]);
@@ -87,6 +75,6 @@ int	cmd_remove(int, char *[]);
 int	cmd_show(int, char *[]);
 
 void	add_defaults(int fd);
-void	do_destroy(int fd);
+void	destroy(int fd, bool quiet);
 
 #endif /* _GPT_H_ */

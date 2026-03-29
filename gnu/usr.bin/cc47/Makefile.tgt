@@ -28,8 +28,6 @@ md_file=	${GCCDIR}/gcc/config/${GCC_CPU}/${GCC_CPU}.md
 out_file=	$(srcdir)/config/${GCC_CPU}/${GCC_CPU}.c
 
 EXTRA_GCC_SRCS=	driver-${GCC_CPU}.c
-GTFILES_SRCDIR = $(srcdir)
-
 
 # This is ordered to avoid build warnings/errors
 

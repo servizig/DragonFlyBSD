@@ -2,7 +2,6 @@
 # extension with cc instead of c++ (go figure).  To avoid that, we need
 # to define OBJS directly
 
-GCC_LANG_DIR=	gcc
 TOP_PREFIX=	../../
 
 .include "../../../Makefile.inc"
@@ -13,13 +12,13 @@ NOMAN=		yes
 
 ###CFLAGS+=	-static-libstdc++
 
-# verbatim from gcc/lto/Make-lang.in
-COLLECT_OBJS=	collect2.o tlink.o vec.o ggc-none.o \
-		collect-utils.o file-find.o hash-table.o
-# only when CROSS_AIX_SUPPORT
-#COLLECT_OBJS+=	collect2-aix.o
+# from gcc/Makefile.in
+# - excluded 'collect-aix.o' (effective when CROSS_AIX_SUPPORT)
+# - excluded 'selftest.o' (effective when CHECKING_P)
+COLLECT2_OBJS = collect2.o tlink.o vec.o ggc-none.o \
+  collect-utils.o file-find.o hash-table.o
 
-OBJS=		${COLLECT_OBJS:T}
+OBJS=		${COLLECT2_OBJS:T}
 SRCS=
 LIBS=		${LIBCOMMON} ${LIBCPP} ${LIBBACKTRACE} ${LIBIBERTY} \
 		${LIBDECNUMBER}

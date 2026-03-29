@@ -24,7 +24,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $FreeBSD: src/sbin/gpt/recover.c,v 1.8 2005/08/31 01:47:19 marcel Exp $
- * $DragonFly: src/sbin/gpt/recover.c,v 1.1 2007/06/16 22:29:27 dillon Exp $
  */
 
 #include <sys/types.h>
@@ -36,17 +35,12 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "map.h"
 #include "gpt.h"
-
-static int recoverable;
 
 static void
 usage_recover(void)
 {
-
-	fprintf(stderr,
-	    "usage: %s device ...\n", getprogname());
+	fprintf(stderr, "usage: %s device ...\n", getprogname());
 	exit(1);
 }
 
@@ -63,10 +57,10 @@ recover(int fd)
 		return;
 	}
 
-	gpt = map_find(MAP_TYPE_PRI_GPT_HDR);
-	tpg = map_find(MAP_TYPE_SEC_GPT_HDR);
-	tbl = map_find(MAP_TYPE_PRI_GPT_TBL);
-	lbt = map_find(MAP_TYPE_SEC_GPT_TBL);
+	gpt = map_find(MAP_TYPE_GPT_PRI_HDR);
+	tpg = map_find(MAP_TYPE_GPT_SEC_HDR);
+	tbl = map_find(MAP_TYPE_GPT_PRI_TBL);
+	lbt = map_find(MAP_TYPE_GPT_SEC_TBL);
 
 	if (gpt == NULL && tpg == NULL) {
 		warnx("%s: no primary or secondary GPT headers, can't recover",
@@ -83,7 +77,7 @@ recover(int fd)
 
 	if (tbl != NULL && lbt == NULL) {
 		lbt = map_add(last - tbl->map_size, tbl->map_size,
-		    MAP_TYPE_SEC_GPT_TBL, tbl->map_data);
+		    MAP_TYPE_GPT_SEC_TBL, tbl->map_data);
 		if (lbt == NULL) {
 			warnx("%s: adding secondary GPT table failed",
 			    device_name);
@@ -93,7 +87,7 @@ recover(int fd)
 		warnx("%s: recovered secondary GPT table from primary",
 		    device_name);
 	} else if (tbl == NULL && lbt != NULL) {
-		tbl = map_add(2LL, lbt->map_size, MAP_TYPE_PRI_GPT_TBL,
+		tbl = map_add(2LL, lbt->map_size, MAP_TYPE_GPT_PRI_TBL,
 		    lbt->map_data);
 		if (tbl == NULL) {
 			warnx("%s: adding primary GPT table failed",
@@ -106,7 +100,7 @@ recover(int fd)
 	}
 
 	if (gpt != NULL && tpg == NULL) {
-		tpg = map_add(last, 1LL, MAP_TYPE_SEC_GPT_HDR,
+		tpg = map_add(last, 1LL, MAP_TYPE_GPT_SEC_HDR,
 		    calloc(1, secsz));
 		if (tpg == NULL) {
 			warnx("%s: adding secondary GPT header failed",
@@ -124,7 +118,7 @@ recover(int fd)
 		warnx("%s: recovered secondary GPT header from primary",
 		    device_name);
 	} else if (gpt == NULL && tpg != NULL) {
-		gpt = map_add(1LL, 1LL, MAP_TYPE_PRI_GPT_HDR,
+		gpt = map_add(1LL, 1LL, MAP_TYPE_GPT_PRI_HDR,
 		    calloc(1, secsz));
 		if (gpt == NULL) {
 			warnx("%s: adding primary GPT header failed",
@@ -142,6 +136,41 @@ recover(int fd)
 		warnx("%s: recovered primary GPT header from secondary",
 		    device_name);
 	}
+
+	/* Create PMBR if missing. */
+	if (map_find(MAP_TYPE_PMBR) == NULL) {
+		map_t *map;
+		struct mbr *mbr;
+
+		if (map_free(0LL) == 0) {
+			warnx("%s: error: no room for the PMBR", device_name);
+			return;
+		}
+
+		mbr = gpt_read(fd, 0LL, 1);
+		if (mbr == NULL) {
+			warnx("%s: error: reading PMBR failed", device_name);
+			return;
+		}
+
+		bzero(mbr, sizeof(*mbr));
+		mbr->mbr_sig = htole16(DOSMAGIC);
+		mbr->mbr_part[0].dp_shd = 0xff;
+		mbr->mbr_part[0].dp_ssect = 0xff;
+		mbr->mbr_part[0].dp_scyl = 0xff;
+		mbr->mbr_part[0].dp_typ = DOSPTYP_PMBR;
+		mbr->mbr_part[0].dp_ehd = 0xff;
+		mbr->mbr_part[0].dp_esect = 0xff;
+		mbr->mbr_part[0].dp_ecyl = 0xff;
+		mbr->mbr_part[0].dp_start = htole32(1U);
+		if (last > 0xffffffff)
+			mbr->mbr_part[0].dp_size = htole32(0xffffffffU);
+		else
+			mbr->mbr_part[0].dp_size = htole32((uint32_t)last);
+		map = map_add(0LL, 1LL, MAP_TYPE_PMBR, mbr);
+		gpt_write(fd, map);
+		warnx("%s: recreated PMBR", device_name);
+	}
 }
 
 int
@@ -149,11 +178,9 @@ cmd_recover(int argc, char *argv[])
 {
 	int ch, fd;
 
-	while ((ch = getopt(argc, argv, "r")) != -1) {
+	while ((ch = getopt(argc, argv, "h")) != -1) {
 		switch(ch) {
-		case 'r':
-			recoverable = 1;
-			break;
+		case 'h':
 		default:
 			usage_recover();
 		}

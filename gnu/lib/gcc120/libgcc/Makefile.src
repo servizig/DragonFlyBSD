@@ -1,0 +1,206 @@
+# Check ${tmake_file} in gcc-build/{target}/libgcc/Makefile
+# for the effective makefiles, e.g.,
+# tmake_file = \
+#	$(srcdir)/config/t-crtstuff-pic \
+#	$(srcdir)/config/t-libgcc-pic \
+#	$(srcdir)/config/t-eh-dw2-dip \
+#	$(srcdir)/config/t-slibgcc \
+#	$(srcdir)/config/t-slibgcc-gld \
+#	$(srcdir)/config/t-slibgcc-elf-ver \
+#	$(srcdir)/config/i386/t-dragonfly \
+#	$(srcdir)/config/i386/t-crtstuff \
+#	$(srcdir)/config/i386/t-cpuinfo \
+#	$(srcdir)/config/t-softfp-tf \
+#	$(srcdir)/config/i386/64/t-softfp \
+#	$(srcdir)/config/i386/t-softfp \
+#	$(srcdir)/config/t-softfp
+
+srcdir=	${GCCDIR}/libgcc
+
+.PATH: ${srcdir}/config/i386
+.PATH: ${srcdir}/soft-fp
+.PATH: ${srcdir}
+
+# for now do not let the use of -flto
+.if ${CFLAGS:M-flto}
+CFLAGS+=	-fno-lto
+LDFLAGS+=	-flto
+.endif
+
+FLAGS_GROUPS=		sse2
+sse2_FLAGS=		-msse2
+
+# From: libgcc/config/t-eh-dw2-dip
+LIB2ADDEH=	${srcdir}/unwind-dw2.c \
+		${srcdir}/unwind-dw2-fde-dip.c \
+		${srcdir}/unwind-sjlj.c \
+		${srcdir}/unwind-c.c
+
+# From: libgcc/config/i386/t-cpuinfo
+LIB2ADD+=	${srcdir}/config/i386/cpuinfo.c
+
+# From: libgcc/config/t-softfp-tf
+softfp_float_modes=	tf
+softfp_int_modes=	si di ti
+softfp_extensions=	sftf dftf xftf
+softfp_truncations=	tfsf tfdf tfxf
+softfp_exclude_libgcc2=	n
+
+# From: libgcc/config/i386/64/t-softfp
+softfp_extras=		fixhfti fixunshfti floattihf floatuntihf
+sse2_FLAGS_FILES+=	fixhfti.c fixunshfti.c floattihf.c floatuntihf.c
+
+# From: libgcc/config/i386/t-softfp
+# {{{
+LIB2ADD+=	${srcdir}/config/i386/sfp-exceptions.c
+
+# Replace _divhc3 and _mulhc3.
+libgcc2-hf-functions=	_divhc3 _mulhc3
+LIB2FUNCS_EXCLUDE+=	${libgcc2-hf-functions}
+.for f in ${libgcc2-hf-functions}
+LIB2ADD+=		${srcdir}/config/i386/${f}.c
+.endfor
+
+softfp_extensions=	hfsf hfdf hftf hfxf sfdf sftf dftf xftf
+softfp_truncations=	tfhf xfhf dfhf sfhf tfsf dfsf tfdf tfxf
+
+softfp_extras+=		eqhf2
+sse2_FLAGS_FILES+=	extendhfsf2.c \
+			extendhfdf2.c \
+			extendhftf2.c \
+			extendhfxf2.c \
+			truncsfhf2.c \
+			truncdfhf2.c \
+			truncxfhf2.c \
+			trunctfhf2.c \
+			eqhf2.c \
+			_divhc3.c \
+			_mulhc3.c
+# }}}
+
+# From: libgcc/config/t-softfp
+# {{{
+softfp_float_funcs=	addMM3 divMM3 eqMM2 geMM2 leMM2 mulMM3 \
+			negMM2 subMM3 unordMM2
+softfp_floatint_funcs=	fixMMII fixunsMMII floatIIMM floatunIIMM
+
+softfp_func_list=
+.for m in ${softfp_float_modes}
+softfp_func_list+=	${softfp_float_funcs:S/MM/${m}/}
+. for i in ${softfp_int_modes}
+softfp_func_list+=	${softfp_floatint_funcs:S/MM/${m}/:S/II/${i}/}
+. endfor
+.endfor
+.for e in ${softfp_extensions}
+softfp_func_list+=	extend${e}2
+.endfor
+.for t in ${softfp_truncations}
+softfp_func_list+=	trunc${t}2
+.endfor
+softfp_func_list+=	${softfp_extras}
+
+.for f in ${softfp_func_list}
+LIB2ADD+=	${srcdir}/soft-fp/${f}.c
+.endfor
+
+# Functions in libgcc2.c are excluded for each soft-float mode (a
+# target may have both soft-float and hard-float modes), for the fixed
+# list of integer modes (si and di) for which libgcc2.c defines any
+# such functions.  Depending on the target, the si and di symbols may
+# in fact define di and ti functions.
+.for m in ${softfp_float_modes}
+. for i in si di
+LIB2FUNCS_EXCLUDE+=	${softfp_floatint_funcs:S/^/_/:S/MM/${m}/:S/II/${i}/}
+. endfor
+.endfor
+# }}}
+
+# From: libgcc/Makefile.in
+# {{{
+LIB2ADD+=	enable-execute-stack.c
+LIB2ADDEH+=	${srcdir}/emutls.c
+
+# Library members defined in libgcc2.c.
+lib2funcs = _muldi3 _negdi2 _lshrdi3 _ashldi3 _ashrdi3 _cmpdi2 _ucmpdi2	   \
+	    _clear_cache _trampoline __main _absvsi2 \
+	    _absvdi2 _addvsi3 _addvdi3 _subvsi3 _subvdi3 _mulvsi3 _mulvdi3 \
+	    _negvsi2 _negvdi2 _ctors _ffssi2 _ffsdi2 _clz _clzsi2 _clzdi2  \
+	    _ctzsi2 _ctzdi2 _popcount_tab _popcountsi2 _popcountdi2	   \
+	    _paritysi2 _paritydi2 _powisf2 _powidf2 _powixf2 _powitf2	   \
+	    _mulhc3 _mulsc3 _muldc3 _mulxc3 _multc3 _divhc3 _divsc3	   \
+	    _divdc3 _divxc3 _divtc3 _bswapsi2 _bswapdi2 _clrsbsi2	   \
+	    _clrsbdi2
+
+# The floating-point conversion routines that involve a single-word integer.
+# XX stands for the integer mode.
+.for _m in sf df xf
+swfloatfuncs+=	_fixuns${_m}XX
+.endfor
+# Likewise double-word routines.
+.for _m in sf df xf tf
+dwfloatfuncs+=	_fix${_m}XX _fixuns${_m}XX _floatXX${_m} _floatunXX${_m}
+.endfor
+lib2funcs+=	${swfloatfuncs:S/XX/si/}
+lib2funcs+=	${dwfloatfuncs:S/XX/di/}
+
+# These might cause a divide overflow trap and so are compiled with
+# unwinder info.
+LIB2_DIVMOD_FUNCS = _divdi3 _moddi3 _divmoddi4 \
+		    _udivdi3 _umoddi3 _udivmoddi4 _udiv_w_sdiv
+
+# Defined in libgcc2.c, included only in the static library.
+LIB2FUNCS_ST = _eprintf __gcc_bcmp
+
+# Remove any objects from lib2funcs and LIB2_DIVMOD_FUNCS that are
+# defined as C code in LIB2FUNCS_EXCLUDE.
+# (LIB1ASMFUNCS is empty on this target)
+.for f in ${LIB2FUNCS_EXCLUDE}
+lib2funcs:=		${lib2funcs:N${f}}
+LIB2_DIVMOD_FUNCS:=	${LIB2_DIVMOD_FUNCS:N${f}}
+LIB2FUNCS_ST:=		${LIB2FUNCS_ST:N${f}}
+.endfor
+
+.for f in ${lib2funcs} ${LIB2FUNCS_ST} ${LIB2_DIVMOD_FUNCS}
+FLAGS_${f}+=	-DL${f}
+.endfor
+.for f in ${LIB2_DIVMOD_FUNCS}
+FLAGS_${f}+=	-fexceptions -fnon-call-exceptions
+.endfor
+# }}}
+
+.for f in ${lib2funcs} ${LIB2FUNCS_ST} ${LIB2_DIVMOD_FUNCS}
+${f}.o: ${srcdir}/libgcc2.c
+	${CC} ${STATIC_CFLAGS} ${CFLAGS} ${FLAGS_${f}} \
+		-c ${.ALLSRC} -o ${.TARGET}
+
+${f}.po: ${srcdir}/libgcc2.c
+	${CC} ${PO_FLAG} ${STATIC_CFLAGS} ${PO_CFLAGS} ${FLAGS_${f}} \
+		-c ${.ALLSRC} -o ${.TARGET}
+
+${f}.So: ${srcdir}/libgcc2.c
+	${CC} ${PICFLAG} -DPIC ${SHARED_CFLAGS} ${CFLAGS} ${FLAGS_${f}} \
+		-c ${.ALLSRC} -o ${.TARGET}
+.endfor
+
+LIB2OBJS=	${lib2funcs:S/$/.o/} ${LIB2_DIVMOD_FUNCS:S/$/.o/}
+LIB2OBJS_ST=	${LIB2FUNCS_ST:S/$/.o/}
+
+# generated sources
+#
+enable-execute-stack.c: ${GCCDIR}/libgcc/enable-execute-stack-mprotect.c
+	cp ${.ALLSRC} ${.TARGET}
+
+gthr-default.h: ${GCCDIR}/libgcc/gthr-posix.h
+	cp ${.ALLSRC} ${.TARGET}
+
+unwind.h: ${GCCDIR}/libgcc/unwind-generic.h
+	cp ${.ALLSRC} ${.TARGET}
+
+md-unwind-support.h: ${GCCDIR}/libgcc/config/i386/dragonfly-unwind.h
+	cp ${.ALLSRC} ${.TARGET}
+
+sfp-machine.h: ${GCCDIR}/libgcc/config/i386/sfp-machine.h
+	cp ${.ALLSRC} ${.TARGET}
+
+CLEANFILES+=	enable-execute-stack.c gthr-default.h unwind.h \
+		md-unwind-support.h sfp-machine.h

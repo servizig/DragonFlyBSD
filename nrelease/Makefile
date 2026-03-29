@@ -5,7 +5,7 @@
 # Optional targets may be specified which set make variables which enhance
 # the build in various ways.
 #
-gui nopkgs binpkgs:
+gui nopkgs binpkgs curses:
 
 #########################################################################
 #				SETUP					#
@@ -81,6 +81,11 @@ DPORTS_OPTIONS+=	dns_bind-tools_UNSET=PYTHON
 REQ_ROOTSKELS=	${.CURDIR}/root
 ROOTSKELS?=	${REQ_ROOTSKELS}
 
+.if make(curses)
+DSYNTH_OPT?=
+.else
+DSYNTH_OPT?= -S
+.endif
 .if make(gui)
 ISOFILE?=		${ISODIR}/dfly-gui.iso
 IMGFILE?=		${ISODIR}/dfly-gui.img
@@ -93,17 +98,16 @@ DPORTS_PACKAGES+=	x11/xorg \
 			x11-wm/fluxbox \
 			x11-wm/fvwm3 \
 			www/firefox \
+			www/chromium \
 			graphics/xpdf \
 			shells/zsh \
 			editors/emacs \
 			editors/vim \
 			irc/irssi \
-			lang/perl5 \
 			editors/nano \
 			shells/bash \
 			devel/ctags \
 			archivers/zip \
-			security/sudo \
 			www/links \
 			ftp/wget \
 			x11-fonts/terminus-font \
@@ -111,18 +115,28 @@ DPORTS_PACKAGES+=	x11/xorg \
 			x11-clocks/asclock \
 			sysutils/screen \
 			sysutils/tmux
+
+# additional items
+#
+#			www/firefox
+#			security/sudo
+
 .endif
 
+ROOTSKELS+=		${.CURDIR}/gui
+.endif  # make(gui)
+
+# binpkgs adjustments
+#
 .if make(binpkgs)
+
 PKG_x11-wm/fvwm3?=fvwm3
 PKG_lang/perl5?=perl5
 # Only install the console flavor of vim, whereas
 # "pkg ins editors/vim" would install all flavors.
 PKG_editors/vim?=vim
-.endif
 
-ROOTSKELS+=		${.CURDIR}/gui
-.endif  # make(gui)
+.endif
 
 # one port may have multiple binary packages (e.g., Python flavors) or have a
 # different name that may not be found by pkg(8), therefore, allow to specify
@@ -160,6 +174,10 @@ realquick:	realquickrel
 #########################################################################
 
 check:
+	@echo ""
+	@echo NRELEASE-CHECK
+	@echo ""
+	@sleep 2
 .if make(nopkgs)
 	@echo Not building packages.
 .elif make(binpkgs)
@@ -178,26 +196,38 @@ check:
 .endif
 
 buildworld1 buildworld2:
+	@echo ""
+	@echo NRELEASE-BUILDWORLD1/2
+	@echo ""
+	@sleep 2
 	( cd ${SRCDIR}; \
 		${WORLD_CCVER:C/^..*$/WORLD_CCVER=/}${WORLD_CCVER} \
 			make -j ${NREL_MAKE_JOBS} -DWANT_INSTALLER \
-			${.TARGET:C/build(.*)2/quick\1/:C/1//} )
+			${.TARGET:C/build(.*)2/quick\1/:C/1//} ) > ${ISODIR}/buildworld.out 2>& 1
+
 
 buildkernel1 buildkernel2:
+	@echo ""
+	@echo NRELEASE-BUILDKERNEL/2
+	@echo ""
+	@sleep 2
 	( cd ${SRCDIR}; \
 		${WORLD_CCVER:C/^..*$/WORLD_CCVER=/}${WORLD_CCVER} \
 			make -j ${NREL_MAKE_JOBS} \
-			${.TARGET:C/build(.*)2/quick\1/:C/1//} )
+			${.TARGET:C/build(.*)2/quick\1/:C/1//} ) > ${ISODIR}/buildkernel.out 2>& 1
+
 
 # Unconditionally clean out ${ISOROOT} so a previous img build
 # does not blow up a future quick iso build
 #
-buildiso:
-	-chflags -R noschg ${ISOROOT}
-	rm -rf ${ISOROOT}
+buildiso: clean
+	@echo ""
+	@echo NRELEASE-BUILDISO
+	@echo ""
+	@sleep 2
 	mkdir -p ${ISOROOT}
 	( cd ${SRCDIR}; \
-		make -DWANT_INSTALLER DESTDIR=${ISOROOT} installworld )
+		make -DWANT_INSTALLER DESTDIR=${ISOROOT} installworld ) > ${ISODIR}/installworld.out 2>& 1
 	# Do not mess with any /usr/obj directories not related to
 	# buildworld, buildkernel, or nrelease.
 	( cd ${SRCDIR}/etc && \
@@ -206,7 +236,7 @@ buildiso:
 			make -m ${SRCDIR}/share/mk \
 			DESTDIR=${ISOROOT} distribution && \
 		rm -rf $${tmpdir} )
-	( cd ${SRCDIR}; make DESTDIR=${ISOROOT} reinstallkernel )
+	( cd ${SRCDIR}; make DESTDIR=${ISOROOT} reinstallkernel ) > ${ISODIR}/installkernel.out 2>& 1
 	rm -rf ${ISOROOT}/boot/kernel.old
 	ln -sf kernel ${ISOROOT}/boot/kernel/kernel.BOOTP
 	mtree ${MTREE_FSCHG} -deU -f ${SRCDIR}/etc/mtree/BSD.var.dist \
@@ -218,6 +248,10 @@ buildiso:
 # kernel source (~30 MB).
 #
 srcs:
+	@echo ""
+	@echo NRELEASE-SRCS
+	@echo ""
+	@sleep 2
 	rm -rf ${ISOROOT}/usr/dports
 	rm -f ${ISOROOT}/usr/src-sys.tar.bz2
 .if !defined(WITHOUT_SRCS)
@@ -241,6 +275,10 @@ srcs:
 #       can make changes to '/etc' (e.g., new users/groups/shells).
 #
 customizeiso:
+	@echo ""
+	@echo NRELEASE-CUSTOMIZEISO
+	@echo ""
+	@sleep 2
 	pwd_mkdb -p -d ${ISOROOT}/etc ${ISOROOT}/etc/master.passwd
 	cpdup ${ISOROOT}/etc ${ISOROOT}/etc.hdd
 
@@ -272,63 +310,115 @@ customizeiso:
 # Install packages by using pkg(8) or building from dports.
 #
 pkgs:
+	@echo ""
+	@echo NRELEASE-PKGS
+	@echo ""
+	@sleep 2
 .if !empty(DPORTS_PACKAGES)
-	cp /etc/resolv.conf ${ISOROOT}/etc
-	-cp /etc/ssl/cert.pem ${ISOROOT}/etc/ssl
-	-@umount ${ISOROOT}/dev
-	mount_null /dev ${ISOROOT}/dev
-
 .if make(binpkgs)
+	# install pkgs quickly from host repo config
+	#
 	${CHROOT_CMD} "cd /usr && make pkg-bootstrap-force"
 	${CHROOT_CMD} "pkg update"
+
 .for PKG in ${PACKAGES}
 	@${CHROOT_CMD} "pkg search --exact --search name ${PKG}" || \
 	${CHROOT_CMD} "pkg search --exact --search origin ${PKG}" || \
 	{ \
-		echo "ERROR: Cannot find the package for port '${PKG}'!"; \
-		echo "-----> Use 'PKG_${PKG}=<pkg-name>' to specify the package name."; \
-		false; \
+	       echo "ERROR: Cannot find the package for port '${PKG}'!"; \
+	       echo "-----> Use 'PKG_${PKG}=<pkg-name>' to specify the package name."; \
+	       false; \
 	}
 .endfor
 	${CHROOT_CMD} "pkg install --yes ${PACKAGES}"
 
-.else  # !make(binpkgs)
-	-@umount ${ISOROOT}/usr/distfiles
-	-@umount ${ISOROOT}/usr/dports
-	rm -rf ${ISOROOT}/usr/obj/dports
+.else	# !make(binpkgs)
 
+	# build pkgs with dsynth
+	#
+	cp /etc/resolv.conf ${ISOROOT}/etc
+	-cp /etc/ssl/cert.pem ${ISOROOT}/etc/ssl
+	-@umount ${ISOROOT}/build/synth/dports > /dev/null 2>& 1
+	-@umount ${ISOROOT}/build/synth/distfiles > /dev/null 2>& 1
+	-@umount ${ISOROOT}/dev > /dev/null 2>& 1
+	-@umount ${ISOROOT}/usr/distfiles > /dev/null 2>& 1
+	-@umount ${ISOROOT}/usr/dports > /dev/null 2>& 1
+	-@umount ${ISOROOT}/build > /dev/null 2>& 1
+
+	-${CHROOT_CMD} "cd /usr && make pkg-bootstrap"
+
+	mkdir -p ${ISODIR}/build
+	mkdir -p ${ISODIR}/build/synth
+	mkdir -p ${ISODIR}/build/synth/live_packages
+	mkdir -p ${ISODIR}/build/synth/logs
+	mkdir -p ${ISODIR}/build/synth/dports
+	mkdir -p ${ISODIR}/build/synth/options
+	mkdir -p ${ISODIR}/build/synth/distfiles
+	mkdir -p ${ISODIR}/build/synth/build
+
+	mkdir -p ${ISOROOT}/build
 	mkdir -p ${ISOROOT}/usr/dports
 	mkdir -p ${ISOROOT}/usr/distfiles
 
-	# Mount /usr/dports read-only for safety, else a failed umount
-	# and our rm -rf will do bad things.
-	mount_null -o ro ${DPORTS_PATH} ${ISOROOT}/usr/dports
+	mount_null /dev ${ISOROOT}/dev
+	mount_null ${ISODIR}/build ${ISOROOT}/build
+	mount_null -o ro ${DPORTS_PATH} ${ISOROOT}/build/synth/dports
 
-	# Make sure /usr/distfiles is writable
-	cp /etc/shells ${ISOROOT}/usr/distfiles/.test > /dev/null 2>&1 \
-	    || mount_null ${ISODIR}/distfiles ${ISOROOT}/usr/distfiles
+	# Make sure /usr/distfiles is writable, else just make it local.
+	#
+	cp /etc/shells ${ISOROOT}/build/synth/distfiles/.test > /dev/null 2>&1 \
+	    || mount_null ${ISODIR}/distfiles ${ISOROOT}/build/synth/distfiles
 
-.for PKG in ${DPORTS_PACKAGES}
-.if make(restartpkgs)
-	${CHROOT_CMD} "cd /usr/dports/${PKG} && make ${DPORTS_OPTIONS} deinstall"
-.endif
-	${CHROOT_CMD} "cd /usr/dports/${PKG} && make ${DPORTS_OPTIONS} install"
-.endfor
-.for PKG in ${DPORTS_PACKAGES}
-	${CHROOT_CMD} "cd /usr/dports/${PKG} && make ${DPORTS_OPTIONS} clean"
-.endfor
+	# Initialize dsynth (if not already initialized) and adjust the
+	# package format to something that compresses quickly.
+	#
+	-${CHROOT_CMD} "dsynth init" > /dev/null 2>&1
+	${CHROOT_CMD} "sed -i '' -e 's/\.txz/\.tgz/g' /etc/dsynth/dsynth.ini"
+
+	# (already handled by bootstrap, also chicken-and-egg problem)
+	# echo "NRELEASE - BUILDING AND INSTALLING PKG"
+	# ${CHROOT_CMD} "dsynth -y ${DSYNTH_OPT} build ports-mgmt/pkg"
+	# ${CHROOT_CMD} "dsynth -y ${DSYNTH_OPT} install ports-mgmt/pkg"
+
+	@echo ""
+	@echo "NRELEASE - BUILDING PACKAGES: ${DPORTS_PACKAGES}"
+	@echo ""
+	@sleep 2
+	${CHROOT_CMD} "dsynth -y ${DSYNTH_OPT} build ${DPORTS_PACKAGES}"
+
+	@echo ""
+	@echo "NRELEASE - INSTALLING PACKAGES: ${DPORTS_PACKAGES}"
+	@echo ""
+	@sleep 2
+
+	${CHROOT_CMD} "dsynth -y ${DSYNTH_OPT} install ${DPORTS_PACKAGES}"
+
+	@echo ""
+	@echo "NRELEASE - AUTOREMOVE PKG DEPENDS NO LONGER NEEDED"
+	@echo ""
+	@sleep 2
 
 	${CHROOT_CMD} "pkg autoremove --yes"
 
-	-umount ${ISOROOT}/usr/distfiles
-	umount ${ISOROOT}/usr/dports
+	# leave distfiles intact
+	# ${CHROOT_CMD} "pkg clean --yes --all"
+	sync
+	echo "UNMOUNTING CHROOT ENV, ^C HERE TO KEEP IT INTACT"
+	sleep 5
 
-	rm -rf ${ISOROOT}/usr/dports
-	rm -rf ${ISOROOT}/usr/distfiles
-	rm -rf ${ISOROOT}/usr/obj/dports
-.endif  # make(binpkgs)
+	# umounts must succeed
+	#
 
-	${CHROOT_CMD} "pkg clean --yes --all"
+	umount ${ISOROOT}/build/synth/dports > /dev/null 2>& 1
+	-umount ${ISOROOT}/build/synth/distfiles > /dev/null 2>& 1
+	-umount ${ISOROOT}/usr/distfiles > /dev/null 2>& 1
+	-umount ${ISOROOT}/usr/dports > /dev/null 2>& 1
+	umount ${ISOROOT}/build > /dev/null 2>& 1
+
+	# this is a bit dangerous if the umounts fail
+	#rm -rf ${ISOROOT}/usr/dports
+	#rm -rf ${ISOROOT}/usr/distfiles
+	#rm -rf ${ISOROOT}/usr/obj/dports
 
 	# Update the locate(8) and whatis(1) databases, allow ISODIR
 	# to be on tmpfs (fails to create locate database then)
@@ -342,9 +432,15 @@ pkgs:
 .if exists(${ISOROOT}/usr/local/etc)
 	echo "dummy /usr/local/etc tmpfs rw,-C 0 0" >> ${ISOROOT}/etc/fstab
 .endif
+
+.endif	# !make(binpkgs)
 .endif  # !empty(DPORTS_PACKAGES)
 
 mkiso:
+	@echo ""
+	@echo NRELEASE-MKISO
+	@echo ""
+	@sleep 2
 	( tmpdir=`mktemp -d -t nrelease` && \
 	    mkdir -p "$${tmpdir}/EFI/BOOT" && \
 	    cp ${ISOROOT}/boot/loader.efi $${tmpdir}/EFI/BOOT/BOOTX64.EFI && \
@@ -362,6 +458,10 @@ mkiso:
 	rm -f ${ISOROOT}/boot/efiboot.img
 
 mkimg:
+	@echo ""
+	@echo NRELEASE-MKIMG
+	@echo ""
+	@sleep 2
 	if [ ! -d ${IMGMNT} ]; then mkdir -p ${IMGMNT}; fi
 	rm -f ${IMGFILE}
 .ifdef IMGSIZE
@@ -374,7 +474,7 @@ mkimg:
 .else
 	@echo "STEP: Determine required image size in 1GB steps"
 	@echo "      Leave ~600MB of unused space"
-	sz=`du -ck ${ISOROOT} | tail -n 1 | cut -f 1`;			\
+	sz=`du -ctk ${ISOROOT} | tail -n 1 | cut -f 1`;			\
 	    sz=`bc -e "(($${sz}) * 1.15 + 999999 + 600000) / 1000000" -equit | \
 	    cut -f1 -d.`;						\
 	    sz=`bc -e "(($${sz}) * 953)" -equit | cut -f1 -d.`;		\
@@ -431,11 +531,20 @@ mkimg:
 	@echo "STEP: done, image files are in ${ISODIR}"
 
 clean:
+	@echo ""
+	@echo NRELEASE-CLEAN
+	@echo ""
+	@sleep 2
+	mkdir -p ${ISODIR}
 	sync
 	sleep 1
-	-umount ${ISOROOT}/usr/distfiles > /dev/null 2>&1
-	-umount ${ISOROOT}/usr/dports > /dev/null 2>&1
-	-umount ${ISOROOT}/dev > /dev/null 2>&1
+	-if [ -d ${ISOROOT} ]; then ${CHROOT_CMD} "dsynth cleanup"; fi
+	-umount ${ISOROOT}/build/synth/dports > /dev/null 2>& 1
+	-umount ${ISOROOT}/build/synth/distfiles > /dev/null 2>& 1
+	-umount ${ISOROOT}/dev > /dev/null 2>& 1
+	-umount ${ISOROOT}/usr/distfiles > /dev/null 2>& 1
+	-umount ${ISOROOT}/usr/dports > /dev/null 2>& 1
+	-umount ${ISOROOT}/build > /dev/null 2>& 1
 	-if [ -f ${ISODIR}/vn.which ]; then				\
 	    umount ${IMGMNT} > /dev/null 2>&1;				\
 	    vnconfig -u `cat ${ISODIR}/vn.which` > /dev/null 2>&1;	\
@@ -456,10 +565,11 @@ help:
 	@echo "  realquick   - attempt to restart after world & kernel"
 	@echo "  restartpkgs - attempt to restart at the pkg building stage"
 	@echo ""
-	@echo "Optional targets:"
-	@echo "  nopkgs      - do not install any packages"
-	@echo "  binpkgs     - use binary packages with pkg(8)"
-	@echo "  gui         - do a GUI release"
+	@echo "Optional targets in addition to one of the above:"
+	@echo "  gui         - add GUI packages (else just base packages)"
+	@echo "  binpkgs     - use current host binary repo config to"
+	@echo "                quickly install packages."
+	@echo "  curses      - run dsynth in curses mode, else console mode"
 	@echo ""
 	@echo "Variables:"
 	@echo "  DPORTS_EXTRA_PACKAGES: add additional packages"

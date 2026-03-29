@@ -1,0 +1,43 @@
+GCC-12 Release
+==============
+
+Original source can be downloaded from:
+https://ftp.gnu.org/gnu/gcc/gcc-12.5.0/gcc-12.5.0.tar.xz
+
+file = gcc-12.5.0.tar.xz
+date = 11 Jul 2025
+size = 85897368
+sha1 = a045ea36603aaea19b1b0994e22a87600dd93bd0
+
+The file README.DELETED contains a list of deleted files and directories.
+
+Use "git diff vendor/GCC120 contrib/gcc-12" to see local modifications.
+
+Configured with
+===============
+  --with-pkgversion=DragonFly
+  --with-bugurl=https://bugs.dragonflybsd.org
+  --enable-checking=release
+  --enable-languages=c,c++,lto --enable-threads=posix --enable-__cxa_atexit
+  --disable-libunwind-exceptions --disable-libstdcxx-pch
+  --disable-libquadmath --disable-libitm --enable-libstdcxx-dual-abi=yes
+  --enable-lto --enable-plugin --enable-gnu-indirect-function
+  --disable-nls --disable-multilib --disable-bootstrap
+
+The following files have been patched
+=====================================
+  gcc/c-family/c-format.cc		extra TZ "%+" format for strftime()
+  gcc/common.opt			set dwarf_version=4 and dwarf_strict=1
+  gcc/config/dragonfly.h		default dynamic linker path
+  gcc/doc/gcc.1				document -save-temps=objects
+  gcc/gcc.cc				default paths for base tools
+					add -save-temps=objects option
+  libgcc/gthr-posix.h			avoid weakref (ld.gold issue)
+  libgcc/unwind-dw2-fde-dip.c		avoid redefining ElfW
+  libstdc++-v3/config/locale/dragonfly/codecvt_members.cc
+					fix codecvt::do_length
+  libstdc++-v3/config/os/bsd/dragonfly/os_defines.h
+					fix _GLIBCXX_USE_C99_LONG_LONG_DYNAMIC
+  libstdc++-v3/include/c_global/cstdio	remove throw() decorations
+  libstdc++-v3/include/c_global/cstdlib	remove throw() decorations
+  libstdc++-v3/include/c_global/cwchar	remove throw() decorations

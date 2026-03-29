@@ -1,5 +1,5 @@
 RELUP=	/../..
-.include "../../../Makefile.inc"
+.include "../../Makefile.inc"
 SRCDIR=	${GCCDIR}/libstdc++-v3
 .include "Makefile.src"
 
@@ -30,7 +30,7 @@ COWG=	messages.x
 GENCC=	atomicity.cc basic_file.cc c++locale.cc
 GENCC+=	${COWD:.x=_members_cow.cc} ${COWG:.x=_members_cow.cc}
 
-FLAGS_GROUPS=		deprecated gnu98 gnu11 cow concept explicit
+FLAGS_GROUPS=		deprecated gnu98 gnu11 cow concept parallel explicit
 deprecated_FLAGS=	-std=gnu++98 -D_BACKWARD_BACKWARD_WARNING_H
 deprecated_FLAGS_FILES=	strstream.cc
 gnu98_FLAGS=		-std=gnu++98

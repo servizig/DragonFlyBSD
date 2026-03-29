@@ -39,8 +39,11 @@
  * $Id: fn_configure.c,v 1.82 2005/03/25 05:24:00 cpressey Exp $
  */
 
+#include <sys/param.h>
 #include <sys/stat.h>
-#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include <ctype.h>
 #include <dirent.h>
@@ -78,8 +81,7 @@
 #include "pathnames.h"
 
 struct config_vars	*rc_conf;
-
-static const char	*yes_to_y(const char *);
+struct config_vars	*resolv_conf;
 
 /** CONFIGURE FUNCTIONS **/
 
@@ -767,15 +769,36 @@ fn_assign_datetime(struct i_fn_args *a)
 	}
 }
 
+static void
+strip_domain(char *hostname, const char *domain)
+{
+	size_t hlen, dlen;
+
+	if (domain == NULL || domain[0] == '\0')
+		return;
+
+	hlen = strlen(hostname);
+	dlen = strlen(domain);
+	if (hlen > dlen + 1 &&
+	    hostname[hlen - dlen - 1] == '.' &&
+	    strcmp(hostname + hlen - dlen, domain) == 0) {
+		hostname[hlen - dlen - 1] = '\0';
+	}
+}
+
 void
 fn_assign_hostname_domain(struct i_fn_args *a)
 {
 	struct dfui_form *f;
 	struct dfui_response *r;
 	struct dfui_dataset *ds, *new_ds;
-	struct config_vars *resolv_conf;
 	const char *domain, *hostname;
-	char *fqdn;
+	char *fqdn, buf[MAXHOSTNAMELEN];
+
+	domain = config_var_get(resolv_conf, "search");
+	snprintf(buf, sizeof(buf), "%s", config_var_get(rc_conf, "hostname"));
+	strip_domain(buf, domain);
+	hostname = buf;
 
 	f = dfui_form_create(
 	    "set_hostname_domain",
@@ -796,8 +819,8 @@ fn_assign_hostname_domain(struct i_fn_args *a)
 	);
 
 	ds = dfui_dataset_new();
-	dfui_dataset_celldata_add(ds, "hostname", "");
-	dfui_dataset_celldata_add(ds, "domain", "");
+	dfui_dataset_celldata_add(ds, "hostname", hostname);
+	dfui_dataset_celldata_add(ds, "domain", domain);
 	dfui_form_dataset_add(f, ds);
 
 	if (!dfui_be_present(a->c, f, &r))
@@ -813,20 +836,83 @@ fn_assign_hostname_domain(struct i_fn_args *a)
 		else
 			asprintf(&fqdn, "%s.%s", hostname, domain);
 
-		resolv_conf = config_vars_new();
-
 		config_var_set(rc_conf, "hostname", fqdn);
-		config_var_set(resolv_conf, "search", domain);
-		config_vars_write(resolv_conf, CONFIG_TYPE_RESOLV,
-		    "%s%setc/resolv.conf", a->os_root, a->cfg_root);
-
-		config_vars_free(resolv_conf);
-
 		free(fqdn);
+
+		config_var_set(resolv_conf, "search", domain);
 	}
 
 	dfui_form_free(f);
 	dfui_response_free(r);
+}
+
+static int
+set_interface_router(char *router, size_t len, const char *ip, const char *netmask)
+{
+	struct in_addr in_ip, in_netmask, in_gw;
+
+	memset(router, 0, len);
+
+	if (ip == NULL || strlen(ip) == 0)
+		return(0);
+	if (netmask == NULL || strlen(netmask) == 0)
+		return(0);
+
+	if (inet_pton(AF_INET, ip, &in_ip) != 1)
+		return(-1);
+	if (inet_pton(AF_INET, netmask, &in_netmask) != 1)
+		return(-1);
+
+	in_gw.s_addr = ntohl(in_ip.s_addr) & ntohl(in_netmask.s_addr);
+	in_gw.s_addr = htonl(in_gw.s_addr + 1); /* network + 1 */
+	inet_ntop(AF_INET, &in_gw, router, len);
+
+	return(0);
+}
+
+static int
+cb_field_interface_ip(struct dfui_form *form, struct dfui_field *field __unused,
+		      const char *new_value, void *userdata __unused)
+{
+	struct dfui_dataset *ds;
+	const char *netmask;
+	char router[INET_ADDRSTRLEN];
+
+	if (new_value == NULL || strlen(new_value) == 0)
+		return(0);
+
+	ds = dfui_form_dataset_get_first(form);
+	netmask = dfui_dataset_get_value(ds, "interface_netmask");
+
+	if (set_interface_router(router, sizeof(router), new_value, netmask) != 0)
+		return(-1);
+
+	dfui_dataset_set_value(ds, "defaultrouter", router);
+
+	return(0);
+}
+
+static int
+cb_field_interface_netmask(struct dfui_form *form,
+			   struct dfui_field *field __unused,
+			   const char *new_value, void *userdata __unused)
+{
+	struct dfui_dataset *ds;
+	const char *ip;
+	char router[INET_ADDRSTRLEN];
+
+	if (new_value == NULL || strlen(new_value) == 0)
+		return(0);
+
+	ds = dfui_form_dataset_get_first(form);
+	ip = dfui_dataset_get_value(ds, "interface_ip");
+
+	if (set_interface_router(router, sizeof(router), ip, new_value) != 0)
+		return(-1);
+
+	dfui_dataset_set_value(ds, "defaultrouter", router);
+
+	return(0);
 }
 
 void
@@ -835,9 +921,9 @@ fn_assign_ip(struct i_fn_args *a)
 	FILE *p;
 	struct commands *cmds;
 	struct command *cmd;
-	struct config_vars *resolv_conf;
 	struct dfui_dataset *ds, *new_ds;
 	struct dfui_form *f;
+	struct dfui_field *fi;
 	struct dfui_action *k;
 	struct dfui_response *r;
 	const char *domain, *hostname;
@@ -845,8 +931,8 @@ fn_assign_ip(struct i_fn_args *a)
 	char *string, *string1;
 	char *word;
 	char interface[256];
-	char line[256];
-	int write_config = 0;
+	char line[256], buf[MAXHOSTNAMELEN];
+	int write_config;
 
 	/*
 	 * Get interface list.
@@ -890,7 +976,10 @@ fn_assign_ip(struct i_fn_args *a)
 
 	strlcpy(interface, dfui_response_get_action_id(r), 256);
 
-	resolv_conf = config_vars_new();
+	domain = config_var_get(resolv_conf, "search");
+	snprintf(buf, sizeof(buf), "%s", config_var_get(rc_conf, "hostname"));
+	strip_domain(buf, domain);
+	hostname = buf;
 
 	switch (dfui_be_present_dialog(a->c, _("Use DHCP?"),
 	    _("Use DHCP|Configure Manually"),
@@ -898,8 +987,7 @@ fn_assign_ip(struct i_fn_args *a)
 	    "an IP address from a nearby DHCP server.\n\n"
 	    "Would you like to enable DHCP for %s?"), interface)) {
 	case 1:
-		asprintf(&string, "ifconfig_%s", interface);
-
+		write_config = 0;
 		cmds = commands_new();
 		cmd = command_add(cmds, "%s%s dhclient",
 		    a->os_root, cmd_name(a, "KILLALL"));
@@ -928,8 +1016,12 @@ fn_assign_ip(struct i_fn_args *a)
 			}
 		}
 		commands_free(cmds);
-		config_var_set(rc_conf, string, "DHCP");
-		free(string);
+
+		if (write_config) {
+			asprintf(&string, "ifconfig_%s", interface);
+			config_var_set(rc_conf, string, "DHCP");
+			free(string);
+		}
 		break;
 	case 2:
 		dfui_form_free(f);
@@ -942,7 +1034,7 @@ fn_assign_ip(struct i_fn_args *a)
 
 		    "f", "interface_ip", _("IP Address"),
 		    _("Enter the IP Address you would like to use"), "",
-		    "f", "interface_netmask",	_("Netmask"),
+		    "f", "interface_netmask", _("Netmask"),
 		    _("Enter the netmask of the IP address"), "",
 		    "f", "defaultrouter", _("Default Router"),
 		    _("Enter the IP address of the default router"), "",
@@ -963,76 +1055,89 @@ fn_assign_ip(struct i_fn_args *a)
 		);
 
 		ds = dfui_dataset_new();
-		dfui_dataset_celldata_add(ds, "interface_netmask", "");
-		dfui_dataset_celldata_add(ds, "defaultrouter", "");
-		dfui_dataset_celldata_add(ds, "dns_resolver", "");
-		dfui_dataset_celldata_add(ds, "hostname", "");
-		dfui_dataset_celldata_add(ds, "domain", "");
 		dfui_dataset_celldata_add(ds, "interface_ip", "");
+		dfui_dataset_celldata_add(ds, "interface_netmask",
+		    "255.255.255.0");
+		dfui_dataset_celldata_add(ds, "defaultrouter", "");
+		dfui_dataset_celldata_add(ds, "dns_resolver",
+		    config_var_get(resolv_conf, "nameserver"));
+		dfui_dataset_celldata_add(ds, "hostname", hostname);
+		dfui_dataset_celldata_add(ds, "domain", domain);
 		dfui_form_dataset_add(f, ds);
+
+		fi = dfui_form_field_find(f, "interface_ip");
+		dfui_field_set_callback(fi, cb_field_interface_ip, NULL);
+		fi = dfui_form_field_find(f, "interface_netmask");
+		dfui_field_set_callback(fi, cb_field_interface_netmask, NULL);
 
 		if (!dfui_be_present(a->c, f, &r))
 			abort_backend();
 
-		if (strcmp(dfui_response_get_action_id(r), "ok") == 0) {
-			new_ds = dfui_response_dataset_get_first(r);
+		if (strcmp(dfui_response_get_action_id(r), "cancel") == 0)
+			break;
 
-			interface_ip = dfui_dataset_get_value(
-						new_ds, "interface_ip");
-			interface_netmask = dfui_dataset_get_value(
-						new_ds, "interface_netmask");
-			defaultrouter = dfui_dataset_get_value(
-						new_ds, "defaultrouter");
-			dns_resolver = dfui_dataset_get_value(
-						new_ds, "dns_resolver");
-			hostname = dfui_dataset_get_value(
-						new_ds, "hostname");
-			domain = dfui_dataset_get_value(
-						new_ds, "domain");
+		new_ds = dfui_response_dataset_get_first(r);
 
+		interface_ip = dfui_dataset_get_value(
+					new_ds, "interface_ip");
+		interface_netmask = dfui_dataset_get_value(
+					new_ds, "interface_netmask");
+		defaultrouter = dfui_dataset_get_value(
+					new_ds, "defaultrouter");
+		dns_resolver = dfui_dataset_get_value(
+					new_ds, "dns_resolver");
+		hostname = dfui_dataset_get_value(
+					new_ds, "hostname");
+		domain = dfui_dataset_get_value(
+					new_ds, "domain");
+
+		cmds = commands_new();
+		command_add(cmds, "%s%s %s %s netmask %s",
+		    a->os_root, cmd_name(a, "IFCONFIG"),
+		    interface, interface_ip, interface_netmask);
+		command_add(cmds, "%s%s add default %s",
+		    a->os_root, cmd_name(a, "ROUTE"),
+		    defaultrouter);
+
+		write_config = 0;
+		if (commands_execute(a, cmds)) {
+			/* XXX sleep(3); */
+			show_ifconfig(a->c, interface);
+			write_config = 1;
+		} else {
+			switch (dfui_be_present_dialog(a->c,
+			    _("ifconfig Failure"),
+			    _("Yes|No"),
+			    _("Warning: could not assign IP address "
+			      "or default gateway.\n\n"
+			      "Write the corresponding settings to "
+			      "rc.conf anyway?"))) {
+			case 1:
+				write_config = 1;
+				break;
+			case 2:
+				write_config = 0;
+				break;
+			default:
+				abort_backend();
+			}
+		}
+		commands_free(cmds);
+
+		if (write_config) {
 			asprintf(&string, "ifconfig_%s", interface);
 			asprintf(&string1, "inet %s netmask %s",
 			    interface_ip, interface_netmask);
-
-			cmds = commands_new();
-			command_add(cmds, "%s%s %s %s netmask %s",
-			    a->os_root, cmd_name(a, "IFCONFIG"),
-			    interface, interface_ip, interface_netmask);
-			command_add(cmds, "%s%s add default %s",
-			    a->os_root, cmd_name(a, "ROUTE"),
-			    defaultrouter);
-
-			if (commands_execute(a, cmds)) {
-				/* XXX sleep(3); */
-				show_ifconfig(a->c, interface);
-				write_config = 1;
-			} else {
-				switch (dfui_be_present_dialog(a->c,
-				    _("ifconfig Failure"),
-				    _("Yes|No"),
-				    _("Warning: could not assign IP address "
-				      "or default gateway.\n\n"
-				      "Write the corresponding settings to "
-				      "rc.conf anyway?"))) {
-				case 1:
-					write_config = 1;
-					break;
-				case 2:
-					write_config = 0;
-					break;
-				default:
-					abort_backend();
-				}
-			}
-			commands_free(cmds);
-
 			config_var_set(rc_conf, string, string1);
-			config_var_set(rc_conf, "defaultrouter", defaultrouter);
-
 			free(string);
 			free(string1);
 
-			asprintf(&string, "%s.%s", hostname, domain);
+			config_var_set(rc_conf, "defaultrouter", defaultrouter);
+
+			if (strlen(domain) == 0)
+				asprintf(&string, "%s", hostname);
+			else
+				asprintf(&string, "%s.%s", hostname, domain);
 			config_var_set(rc_conf, "hostname", string);
 			free(string);
 
@@ -1042,95 +1147,6 @@ fn_assign_ip(struct i_fn_args *a)
 		break;
 	default:
 		abort_backend();
-	}
-
-	if (write_config) {
-		/*
-		 * Save out changes to /etc/rc.conf and /etc/resolv.conf.
-		 */
-		config_vars_write(resolv_conf, CONFIG_TYPE_RESOLV,
-		    "%s%setc/resolv.conf", a->os_root, a->cfg_root);
-	}
-
-	config_vars_free(resolv_conf);
-
-	dfui_form_free(f);
-	dfui_response_free(r);
-}
-
-static const char *
-yes_to_y(const char *value)
-{
-	return(strcasecmp(value, "YES") == 0 ? "Y" : "N");
-}
-
-void
-fn_select_services(struct i_fn_args *a)
-{
-	struct dfui_dataset *ds;
-	struct dfui_form *f;
-	struct dfui_response *r;
-
-	if (!config_vars_read(a, rc_conf, CONFIG_TYPE_SH, "%s%setc/rc.conf",
-		a->os_root, a->cfg_root)) {
-		inform(a->c, _("Couldn't read %s%setc/rc.conf."),
-		    a->os_root, a->cfg_root);
-		a->result = 0;
-		return;
-	}
-
-	f = dfui_form_create(
-	    "select_services",
-	    _("Select Services"),
-	    _("Please select which services you would like "
-	      "started at boot time."),
-	    "",
-
-	    "f", "syslogd", "syslogd",
-		_("System Logging Daemon"), "",
-		"p", "control", "checkbox",
-	    "f", "inetd", "inetd",
-		_("Internet Super-Server"), "",
-		"p", "control", "checkbox",
-	    "f", "named", "named",
-		_("BIND Name Server"), "",
-		"p", "control", "checkbox",
-	    "f", "ntpd", "ntpd",
-		_("Network Time Protocol Daemon"), "",
-		"p", "control", "checkbox",
-	    "f", "sshd", "sshd",
-		_("Secure Shell Daemon"), "",
-		"p", "control", "checkbox",
-
-	    "a", "ok", _("Enable/Disable Services"),
-	        "", "",
-	    "a", "cancel", _("Return to Utilities Menu"),
-		"", "",
-	        "p", "accelerator", "ESC",
-
-	    NULL
-	);
-
-	ds = dfui_dataset_new();
-	dfui_dataset_celldata_add(ds, "syslogd",
-	    yes_to_y(config_var_get(rc_conf, "syslogd_enable")));
-	dfui_dataset_celldata_add(ds, "inetd",
-	    yes_to_y(config_var_get(rc_conf, "inetd_enable")));
-	dfui_dataset_celldata_add(ds, "named",
-	    yes_to_y(config_var_get(rc_conf, "named_enable")));
-	dfui_dataset_celldata_add(ds, "ntpd",
-	    yes_to_y(config_var_get(rc_conf, "ntpd_enable")));
-	dfui_dataset_celldata_add(ds, "sshd",
-	    yes_to_y(config_var_get(rc_conf, "sshd_enable")));
-	dfui_form_dataset_add(f, ds);
-
-	if (!dfui_be_present(a->c, f, &r))
-		abort_backend();
-
-	if (strcmp(dfui_response_get_action_id(r), "cancel") == 0) {
-		dfui_form_free(f);
-		dfui_response_free(r);
-		return;
 	}
 
 	dfui_form_free(f);

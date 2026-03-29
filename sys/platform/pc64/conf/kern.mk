@@ -17,8 +17,7 @@ CFLAGS+=	-mno-mmx -mno-3dnow -mno-sse -mno-sse2 -mno-sse3
 
 .if ${CCVER:Mgcc*}
 CFLAGS+=	-mpreferred-stack-boundary=4
-CFLAGS+=	-mno-ssse3 -mno-sse4.1 -mno-sse4.2 -mno-sse4 -mno-sse4a \
-		-mno-sse5 
+CFLAGS+=	-mno-ssse3 -mno-sse4.1 -mno-sse4.2 -mno-sse4 -mno-sse4a
 CFLAGS+=	-mno-abm -mno-aes -mno-avx -mno-pclmul -mno-popcnt
 
 .if ${CCVER:Mgcc4[789]} || ${CCVER:Mgcc5*}
@@ -28,12 +27,14 @@ CFLAGS+=	-mno-bmi -mno-bmi2
 CFLAGS+=	-mno-xop -mno-lwp -mno-lzcnt -mno-tbm
 .endif
 
-.if ${CCVER:Mgcc8*}
+# Retpoline spectre protection
+.if ${CCVER:S/gcc//} >= 80
 CFLAGS+=	-mindirect-branch=thunk-inline
 .endif
 .endif
 
 CFLAGS+=	-msoft-float
+CFLAGS+=	-mno-fp-ret-in-387
 CFLAGS+=	-fno-asynchronous-unwind-tables -fno-omit-frame-pointer
 
 INLINE_LIMIT?=	8000

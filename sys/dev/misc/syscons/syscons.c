@@ -44,7 +44,6 @@
 #include <sys/caps.h>
 #include <sys/conf.h>
 #include <sys/proc.h>
-#include <sys/caps.h>
 #include <sys/signalvar.h>
 #include <sys/sysctl.h>
 #include <sys/taskqueue.h>
@@ -64,6 +63,8 @@
 #include <machine/pc/display.h>
 #include <machine/frame.h>
 #include <machine/framebuffer.h>
+
+#include <vm/pmap.h>
 
 #include <dev/misc/kbd/kbdreg.h>
 #include <dev/video/fb/fbreg.h>
@@ -4087,7 +4088,8 @@ scmmap(struct dev_mmap_args *ap)
 	    lwkt_reltoken(&vga_token);
 	    return EINVAL;
 	} else {
-	    ap->a_result = atop(scp->sc->fbi->paddr + ap->a_offset);
+	    /* This works for amdgpu(4) as well. */
+	    ap->a_result = atop(vtophys(scp->sc->fbi->vaddr + ap->a_offset));
 	}
     } else {
 	ap->a_result = (*vidsw[scp->sc->adapter]->mmap)(scp->sc->adp,

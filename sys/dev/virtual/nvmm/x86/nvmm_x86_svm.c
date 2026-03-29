@@ -34,6 +34,7 @@
 #include "../nvmm.h"
 #include "../nvmm_internal.h"
 #include "nvmm_x86.h"
+#include "nvmm_x86_internal.h"
 
 void svm_vmrun(paddr_t, uint64_t *);
 
@@ -259,7 +260,7 @@ struct vmcb_ctrl {
 #define VMCB_CTRL_INTERCEPT_SMI		__BIT(2)
 #define VMCB_CTRL_INTERCEPT_INIT	__BIT(3)
 #define VMCB_CTRL_INTERCEPT_VINTR	__BIT(4)
-#define VMCB_CTRL_INTERCEPT_CR0_SPEC	__BIT(5)
+#define VMCB_CTRL_INTERCEPT_CR0_SEL	__BIT(5)
 #define VMCB_CTRL_INTERCEPT_RIDTR	__BIT(6)
 #define VMCB_CTRL_INTERCEPT_RGDTR	__BIT(7)
 #define VMCB_CTRL_INTERCEPT_RLDTR	__BIT(8)
@@ -522,6 +523,17 @@ static uint64_t svm_xcr0_mask __read_mostly;
 
 #define IOBM_NPAGES	3
 #define IOBM_SIZE	(IOBM_NPAGES * PAGE_SIZE)
+
+/*
+ * CR0 bits that must be handled specially:
+ * - CR0_ET: hardwired to 1 in modern CPUs; must always be 1
+ * - CR0_NE: proper FPU error handling; must always be 1
+ * - CR0_CD, CR0_NW: cache control; must be forced to 0 for performance
+ */
+#define CR0_FORCE_ZERO \
+	(CR0_NW | CR0_CD)
+#define CR0_FORCE_ONE \
+	(CR0_ET | CR0_NE)
 
 /* Does not include EFER_LMSLE. */
 #define EFER_VALID \
@@ -942,9 +954,11 @@ svm_inkernel_handle_cpuid(struct nvmm_machine *mach, struct nvmm_cpu *vcpu,
 			cpudata->vmcb->state.rax = svm_xcr0_mask & 0xFFFFFFFF;
 			cpudata->gprs[NVMM_X64_GPR_RDX] = svm_xcr0_mask >> 32;
 			/* XSAVE size for currently enabled XCR0 features. */
-			cpudata->gprs[NVMM_X64_GPR_RBX] = nvmm_x86_xsave_size(cpudata->gxcr0);
+			cpudata->gprs[NVMM_X64_GPR_RBX] =
+			    nvmm_x86_xsave_size(cpudata->gxcr0);
 			/* XSAVE size for all supported XCR0 features. */
-			cpudata->gprs[NVMM_X64_GPR_RCX] = nvmm_x86_xsave_size(svm_xcr0_mask);
+			cpudata->gprs[NVMM_X64_GPR_RCX] =
+			    nvmm_x86_xsave_size(svm_xcr0_mask);
 			break;
 		case 1:
 			cpudata->vmcb->state.rax &=
@@ -1120,6 +1134,66 @@ svm_exit_hlt(struct nvmm_machine *mach, struct nvmm_cpu *vcpu,
 	exit->reason = NVMM_VCPU_EXIT_HALTED;
 }
 
+#define SVM_EXIT_CR_GPR		__BITS(3,0)	/* GPR number */
+#define SVM_EXIT_CR_MOV		__BIT(63)	/* instruction was MOV */
+
+static void
+svm_exit_cr0(struct nvmm_machine *mach, struct nvmm_cpu *vcpu,
+    struct nvmm_vcpu_exit *exit)
+{
+	struct svm_cpudata *cpudata = vcpu->cpudata;
+	struct vmcb *vmcb = cpudata->vmcb;
+	uint64_t info = cpudata->vmcb->ctrl.exitinfo1;
+	uint64_t gpr, cr0, oldcr0, efer;
+
+	if (__predict_false(!(info & SVM_EXIT_CR_MOV))) {
+		/*
+		 * Instruction wasn't MOV; must be LMSW since we're
+		 * intercepting a selective CR0 write (changing any bits
+		 * other than CR0.TS or CR0.MP).
+		 *
+		 * XXX: Should delegate to userland emulation.
+		 */
+		goto handled;
+	}
+
+	gpr = __SHIFTOUT(info, SVM_EXIT_CR_GPR);
+	if (gpr == NVMM_X64_GPR_RAX) {
+		cr0 = vmcb->state.rax;
+	} else if (gpr == NVMM_X64_GPR_RSP) {
+		cr0 = vmcb->state.rsp;
+	} else {
+		cr0 = cpudata->gprs[gpr];
+	}
+	cr0 = (cr0 & ~CR0_FORCE_ZERO) | CR0_FORCE_ONE;
+
+	if (cr0 & CR0_PG) {
+		efer = vmcb->state.efer;
+		if (efer & EFER_LME) {
+			efer |= EFER_LMA;
+		} else {
+			efer &= ~EFER_LMA;
+		}
+		if (efer != vmcb->state.efer) {
+			vmcb->state.efer = efer;
+			svm_vmcb_cache_flush(vmcb, VMCB_CTRL_VMCB_CLEAN_CR);
+		}
+	}
+
+	oldcr0 = vmcb->state.cr0;
+	if ((cr0 ^ oldcr0) & CR0_TLB_FLUSH) {
+		cpudata->gtlb_want_flush = true;
+	}
+	if (cr0 != oldcr0) {
+		vmcb->state.cr0 = cr0;
+		svm_vmcb_cache_flush(vmcb, VMCB_CTRL_VMCB_CLEAN_CR);
+	}
+
+handled:
+	exit->reason = NVMM_VCPU_EXIT_NONE;
+	svm_inkernel_advance(cpudata->vmcb);
+}
+
 #define SVM_EXIT_IO_PORT	__BITS(31,16)
 #define SVM_EXIT_IO_SEG		__BITS(12,10)
 #define SVM_EXIT_IO_A64		__BIT(9)
@@ -1145,7 +1219,7 @@ svm_exit_io(struct nvmm_machine *mach, struct nvmm_cpu *vcpu,
 	exit->u.io.in = (info & SVM_EXIT_IO_IN) != 0;
 	exit->u.io.port = __SHIFTOUT(info, SVM_EXIT_IO_PORT);
 
-	if (svm_decode_assist) {
+	if (__predict_true(svm_decode_assist)) {
 		OS_ASSERT(__SHIFTOUT(info, SVM_EXIT_IO_SEG) < 6);
 		exit->u.io.seg = __SHIFTOUT(info, SVM_EXIT_IO_SEG);
 	} else {
@@ -1647,6 +1721,9 @@ svm_vcpu_run(struct nvmm_machine *mach, struct nvmm_cpu *vcpu,
 			svm_event_waitexit_disable(vcpu, false);
 			exit->reason = NVMM_VCPU_EXIT_INT_READY;
 			break;
+		case VMCB_EXITCODE_CR0_SEL_WRITE:
+			svm_exit_cr0(mach, vcpu, exit);
+			break;
 		case VMCB_EXITCODE_IRET:
 			svm_event_waitexit_disable(vcpu, true);
 			exit->reason = NVMM_VCPU_EXIT_NMI_READY;
@@ -1791,7 +1868,8 @@ svm_vcpu_setstate_seg(const struct nvmm_x64_state_seg *seg,
 }
 
 static void
-svm_vcpu_getstate_seg(struct nvmm_x64_state_seg *seg, struct vmcb_segment *vseg)
+svm_vcpu_getstate_seg(struct nvmm_x64_state_seg *seg,
+    const struct vmcb_segment *vseg)
 {
 	seg->selector = vseg->selector;
 	seg->attrib.type = __SHIFTOUT(vseg->attrib, SVM_SEG_ATTRIB_TYPE);
@@ -1807,8 +1885,8 @@ svm_vcpu_getstate_seg(struct nvmm_x64_state_seg *seg, struct vmcb_segment *vseg)
 }
 
 static inline bool
-svm_state_gtlb_flush(const struct vmcb *vmcb, const struct nvmm_x64_state *state,
-    uint64_t flags)
+svm_state_gtlb_flush(const struct vmcb *vmcb,
+    const struct nvmm_x64_state *state, uint64_t flags)
 {
 	if (flags & NVMM_X64_STATE_CRS) {
 		if ((vmcb->state.cr0 ^
@@ -1886,7 +1964,9 @@ svm_vcpu_setstate(struct nvmm_cpu *vcpu)
 	}
 
 	if (flags & NVMM_X64_STATE_CRS) {
-		vmcb->state.cr0 = state->crs[NVMM_X64_CR_CR0];
+		vmcb->state.cr0 =
+		    (state->crs[NVMM_X64_CR_CR0] & ~CR0_FORCE_ZERO) |
+		    CR0_FORCE_ONE;
 		vmcb->state.cr2 = state->crs[NVMM_X64_CR_CR2];
 		vmcb->state.cr3 = state->crs[NVMM_X64_CR_CR3];
 		vmcb->state.cr4 = state->crs[NVMM_X64_CR_CR4];
@@ -1993,7 +2073,7 @@ svm_vcpu_getstate(struct nvmm_cpu *vcpu)
 	struct nvmm_comm_page *comm = vcpu->comm;
 	struct nvmm_x64_state *state = &comm->state;
 	struct svm_cpudata *cpudata = vcpu->cpudata;
-	struct vmcb *vmcb = cpudata->vmcb;
+	const struct vmcb *vmcb = cpudata->vmcb;
 	uint64_t flags;
 
 	flags = comm->state_wanted;
@@ -2166,7 +2246,11 @@ svm_vcpu_init(struct nvmm_machine *mach, struct nvmm_cpu *vcpu)
 	struct svm_cpudata *cpudata = vcpu->cpudata;
 	struct vmcb *vmcb = cpudata->vmcb;
 
-	/* Allow reads/writes of Control Registers. */
+	/*
+	 * Allow reads/writes of Control Registers.
+	 * However, selective CR0 write is actually intercepted below with
+	 * VMCB_CTRL_INTERCEPT_CR0_SEL.
+	 */
 	vmcb->ctrl.intercept_cr = 0;
 
 	/* Allow reads/writes of Debug Registers. */
@@ -2179,7 +2263,6 @@ svm_vcpu_init(struct nvmm_machine *mach, struct nvmm_cpu *vcpu)
 	 * Allow:
 	 *  - SMI [smm interrupts]
 	 *  - VINTR [virtual interrupts]
-	 *  - CR0_SPEC [CR0 writes changing other fields than CR0.TS or CR0.MP]
 	 *  - RIDTR [reads of IDTR]
 	 *  - RGDTR [reads of GDTR]
 	 *  - RLDTR [reads of LDTR]
@@ -2213,6 +2296,9 @@ svm_vcpu_init(struct nvmm_machine *mach, struct nvmm_cpu *vcpu)
 	    VMCB_CTRL_INTERCEPT_MSR_PROT |
 	    VMCB_CTRL_INTERCEPT_FERR_FREEZE |
 	    VMCB_CTRL_INTERCEPT_SHUTDOWN;
+	if (svm_decode_assist) {
+		vmcb->ctrl.intercept_misc1 |= VMCB_CTRL_INTERCEPT_CR0_SEL;
+	}
 
 	/*
 	 * Allow:
@@ -2530,6 +2616,10 @@ svm_ident(void)
 	}
 
 	svm_decode_assist = (descs.edx & CPUID_8_0A_EDX_DecodeAssists) != 0;
+	if (!svm_decode_assist) {
+		os_printf("nvmm: DecodeAssists not available; "
+		    "performance may be reduced\n");
+	}
 
 	msr = rdmsr(MSR_VM_CR);
 	if ((msr & VM_CR_SVMED) && (msr & VM_CR_LOCK)) {

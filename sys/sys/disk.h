@@ -123,6 +123,7 @@ struct disk_info {
 #define DSO_MBRQUIET		0x0040
 #define DSO_DEVICEMAPPER	0x0080
 #define DSO_RAWPSIZE		0x0100
+/* 0x0200 unused; was DSO_NOMBR */
 
 #if defined(_KERNEL) || defined(_KERNEL_STRUCTURES)
 

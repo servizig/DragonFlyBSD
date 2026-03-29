@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD: src/sbin/gpt/gpt.8,v 1.17 2006/06/22 22:22:32 marcel Exp $
 .\"
-.Dd May 16, 2025
+.Dd February 22, 2026
 .Dt GPT 8
 .Os
 .Sh NAME
@@ -43,18 +43,15 @@ utility provides the necessary functionality to manipulate GUID partition
 tables (GPTs), but see
 .Sx BUGS
 below for how and where functionality is missing.
-GPT partitions are accessed as
-.Dx
-disk slices, with same number as GPT partition,
-127 slices per disk device are supported.
+.Pp
 The basic usage model of the
 .Nm
 tool follows that of the
 .Xr cvs 1
 tool.
-The general options are described in the following paragraph.
-The remaining paragraphs describe the individual commands with their options.
-Here we conclude by mentioning that a
+The general options are described in the following subsection.
+The remaining subsections describe the individual commands with their options.
+A
 .Ar device
 is either a special file
 corresponding to a disk-like device or a regular file.
@@ -66,40 +63,28 @@ The general options allow the user to change default settings or otherwise
 change the behaviour that is applicable to all commands.
 Not all commands use all default settings, so some general options may not
 have an effect on all commands.
-.Pp
-The
-.Fl p Ar count
-option allows the user to change the number of partitions the GPT can
-accommodate.
-This is used whenever a new GPT is created.
-By default, the
-.Nm
-utility will create space for 128 partitions (or 32 sectors of 512 bytes).
-.Pp
-The
-.Fl r
-option causes the
-.Nm
-utility to open the device for reading only.
+.Bl -tag -width indent
+.It Fl r
+Open the device for reading only.
 Currently this option is primarily useful for the
 .Ic show
-command, but the intent
-is to use it to implement dry-run behaviour.
-.Pp
-The
-.Fl v
-option controls the verbosity level.
+command, but the intent is to use it to implement dry-run behaviour.
+.It Fl v
+Control the verbosity level.
 The level increases with every occurrence of this option.
 There is no formalized definition of the different levels yet.
+.El
 .Ss Commands
 .Bl -tag -width indent
 .\" ==== add ====
 .It Xo
 .Nm
 .Ic add
+.Op Fl a Ar alignment
 .Op Fl b Ar number
 .Op Fl i Ar index
-.Op Fl s Ar count
+.Op Fl l Ar label
+.Op Fl s Ar size
 .Op Fl t Ar type
 .Ar device ...
 .Xc
@@ -108,32 +93,64 @@ The
 command allows the user to add a new partition to an existing table.
 By default, it will create a
 .Cm dfly
-partition covering the first available block
-of an unused disk space.
+partition covering the first available block of an unused disk space.
+.Pp
+The
+.Fl a Ar alignment
+option specifies the alignment of the partition position and size.
+The alignment is given in bytes and may have the
+.Cm k , K , m , M , g
+and
+.Cm G
+suffixes to indicate KB, MB and GB, respectively.
+By default,
+.Nm
+will align the partition to 1MB in size and position.
 .Pp
 The
 .Fl b Ar number
-option allows the user to specify the starting (beginning) sector number of
-the partition.
+option specifies the starting (beginning) sector number of the partition.
 The minimum sector number is 1, but has to fall inside an unused region of
 disk space that is covered by the GPT.
 .Pp
 The
 .Fl i Ar index
-option allows the user to specify which (free) entry in the GPT table is to
+option specifies which (free) entry in the GPT table is to
 be used for the new partition.
 By default, the first free entry is selected.
 Entries start at index 0 representing partition 0 of the GPT.
 .Pp
 The
-.Fl s Ar count
-option allows the user to specify the size of the partition in sectors.
-The minimum size is 1.
+.Fl l Ar label
+option specifies the label for the partition.
+.Pp
+The
+.Fl s Ar size
+option specifies the size of the partition.
+If there is no suffix, the size is in sectors;
+otherwise, the following suffixes may be used:
+.Bl -tag -width indent -offset indent -compact
+.It Cm s , S
+sectors
+.It Cm b , B
+bytes (B)
+.It Cm k , K
+kilobytes (KB)
+.It Cm m , M
+megabytes (MB)
+.It Cm g , G
+gigabytes (GB)
+.It Cm t , T
+terabytes (TB)
+.It Cm p , P
+petabytes (PB)
+.El
+The minimum size is 1 sector.
 .Pp
 The
 .Fl t Ar type
 option allows the user to specify the partition type.
-The type is given as an UUID, but
+The type is given as a UUID, but
 .Nm
 accepts the following aliases for the most commonly used partition types:
 .Bl -tag -width "windows-reserved" -offset indent -compact
@@ -149,7 +166,7 @@ Apple ZFS
 BIOS Boot (e.g., used by GRUB 2)
 .It Cm ccd
 .Dx
-.Xr ccd (4)
+.Xr ccd 4
 .It Cm dfly
 .Dx
 .Xr disklabel64 5
@@ -201,9 +218,11 @@ NetBSD Swap
 .It Cm openbsd
 OpenBSD Data
 .It Cm swap
-FreeBSD Swap
+.Dx
+Swap
 .It Cm ufs
-FreeBSD UFS/UFS2
+.Dx
+.Xr UFS 5
 .It Cm vinum
 .Dx
 .Xr vinum 4
@@ -217,12 +236,6 @@ Microsoft Recovery
 Any symbolic name in the system
 .Xr uuids 5
 files may also be specified.
-.Pp
-.Em NOTE!
-If you don't specify a beginning sector with
-.Fl b Ar number ,
-the new partition will be aligned to 1MiB in size and position
-(in case of 512 byte sector size).
 .\" ==== boot ====
 .It Nm Ic boot Ar device ...
 The
@@ -258,16 +271,16 @@ command,
 .Sq packet
 option usually needs to be set.
 .Pp
-.Em NOTE!
+.Sy NOTE!
 A disk setup with the
-.Ar boot
+.Ic boot
 command may not be shared with another OS,
 as it doesn't use a fully standard GPT.
 .Pp
-.Em WARNING!
+.Sy WARNING!
 Some BIOSes may not be able to deal with this hack, your mileage may vary.
 .\" ==== create ====
-.It Nm Ic create Oo Fl fp Oc Ar device ...
+.It Nm Ic create Oo Fl fP Oc Oo Fl p Ar nparts Oc Ar device ...
 The
 .Ic create
 command allows the user to create a new (empty) GPT.
@@ -281,10 +294,17 @@ option is specified, an existing MBR is destroyed and any partitions
 described by the MBR are lost.
 .Pp
 The
-.Fl p
+.Fl p Ar nparts
+option specifies the number of partitions the GPT can accommodate.
+By default, the
+.Nm
+utility will create space for 128 partitions.
+.Pp
+The
+.Fl P
 option tells
 .Nm
-to create only the primary table and not the backup table.
+to create only the primary table but not the secondary/backup table.
 This option is only useful for debugging and should not be used otherwise.
 .\" ==== destroy ====
 .It Nm Ic destroy Oo Fl r Oc Ar device ...
@@ -301,7 +321,7 @@ to destroy the table in a way that it can be recovered.
 .It Nm Ic expand Ar device
 The
 .Ic expand
-command will expand an existing GPT label to cover a device which
+command will expand an existing GPT table to cover a device which
 has grown in size, and will also expand the size of the last GPT
 partition to fit.
 This is typically the first step when expanding a HAMMER2 filesystem,
@@ -390,7 +410,7 @@ This can cause multiple partitions to be labeled.
 The
 .Fl t Ar type
 option selects all partitions that have the given type.
-The type is given as an UUID or by the aliases that the
+The type is given as a UUID or by the aliases that the
 .Ic add
 command accepts.
 This can cause multiple partitions to be labeled.
@@ -414,7 +434,7 @@ The
 option is used to specify the label in the command line.
 The label is assumed to be encoded in UTF-8.
 .\" ==== migrate ====
-.It Nm Ic migrate Oo Fl fs Oc Ar device ...
+.It Nm Ic migrate Oo Fl fs Oc Oo Fl p Ar nparts Oc Ar device ...
 The
 .Ic migrate
 command allows the user to migrate an MBR-based disk partitioning into a
@@ -430,11 +450,25 @@ option will cause unknown partitions to be ignored and any data in it
 to be lost.
 .Pp
 The
+.Fl p Ar nparts
+option specifies the number of partitions the GPT can accommodate.
+By default, the
+.Nm
+utility will create space for 128 partitions (i.e., 32 sectors of 512 bytes).
+.Pp
+The
 .Fl s
 option prevents migrating
 .Bx
-disk labels into GPT partitions by creating
+disklabels into GPT partitions by creating
 the GPT equivalent of a slice.
+.\" ==== recover ====
+.It Nm Ic recover
+The
+.Ic recover
+command tries to recover the primary GPT table from the secondary/backup table
+at the end of the disk, or vice versa.
+If the PMBR is missing, it will be recreated as well.
 .\" ==== remove ====
 .It Nm Ic remove Oo Fl a Oc Ar device ...
 .It Xo
@@ -486,6 +520,8 @@ The order of precedence of the options are:
 The default
 .Sq boot0
 image.
+.It Pa /boot/boot1.efi
+The first stage UEFI bootstrap.
 .It Pa /etc/defaults/uuids
 A list of UUIDs
 and their symbolic names provided by the OS vendor.
@@ -495,94 +531,110 @@ and their symbolic names provided by the system administrator.
 .El
 .Sh EXAMPLES
 To install an empty GPT on
-.Pa ad6 :
+.Pa da1 :
 .Pp
-.Dl "gpt create ad6"
+.Dl "gpt create da1"
 .Pp
-GPT partitions are defined in number of sectors, the sector size is usually 512B,
-which is assumed in the examples below, it can be found using:
+To add a GPT partition of size 200MB with type
+.Cm efi :
 .Pp
-.Dl "gpt -v show ad6"
-.Pp
-To add a dummy GPT partition 0:
-.Pp
-.Dl "gpt add -i0 -s16 ad6"
-.Pp
-You might want to do this to not use slice 0 for data;
-when GPT is not used on a disk, slice 0 is the compatibility slice,
-which is used for
-.Dq dangerously dedicated
-disks.
-For GPT slice 0 has no special meaning, it is just the first slice on the disk.
-.Pp
-To add a GPT partition of size approx. 100GB:
-.Pp
-.Dl "gpt add -s200000000 ad6"
-.Pp
-This will be GPT partition 1 as it is the first one free,
-it will be accessible as
-.Pa ad6s1 ,
-which is also printed by the command.
-The type will be
-.Dq DragonFly Label64 ,
-it will have to be set up by
-.Xr disklabel64 8 .
+.Dl "gpt add -s 200M -t efi da1"
 .Pp
 To add GPT partition 5 with type
-.Dq DragonFly HAMMER
+.Cm hammer2
 using the remaining free space:
-.Bd -literal -offset indent
-gpt add -i5 -t "DragonFly HAMMER" ad6
-.Ed
+.Pp
+.Dl "gpt add -i 5 -t hammer2 da1"
 .Pp
 To print the contents of the GPT:
 .Pp
-.Dl "gpt show ad6"
+.Dl "gpt show da1"
 .Ss Boot Setup
-To setup a disk using GPT for booting, the steps below can be used.
-System is copied from an already installed disk,
-e.g.\& a hard disk or an install CD.
-This example will setup disk
-.Pa da1
-with GPT for booting, using the
-.Ic boot
-command.
+To setup a disk using GPT for UEFI booting, the following examples may be used.
+Adjust the partition scheme and sizes to your needs.
 .Pp
-.Em WARNING!
+.Sy WARNING!
 Any previous data on disk installed to will be deleted.
+.Pp
+This example only uses GPT partitions.
 .Bd -literal -offset indent
-gpt create -f da1
-gpt boot da1
+# Setup disk partitions
+gpt create -f da1		# WARNING! DATA WILL BE DELETED!
+gpt add -s 200M -t efi da1	# da1s0: EFI system partition
+gpt add -s 2G -t ufs da1	# da1s1: UFS boot partition
+gpt add -s 8G -t swap da1	# da1s2: recommended to be twice of RAM
+gpt add -s 100G -t hammer2 da1	# da1s3: root partition; add to loader.conf:
+				#   `vfs.root.mountfrom="hammer2:da1s3@ROOT"'
+gpt add -t hammer2 da1		# da1s4: home partition; using free space
+
+# Setup UEFI bootstrap
+newfs_msdos -F 16 -L EFI /dev/da1s0
+mkdir /mnt/efi
+mount -t msdos /dev/da1s0 /mnt/efi
+mkdir -p /mnt/efi/EFI/BOOT
+cp /boot/boot1.efi /mnt/efi/EFI/BOOT/BOOTX64.efi
+umount /mnt/efi
+.Ed
+.Pp
+The follwoing example combines GPT partitions with
+.Xr disklabel 8 .
+The system is copied from an already installed disk,
+e.g., an installation CD.
+.Pp
+.Sy NOTE!
+This example uses the
+.Cm boot
+command to create a hybrid MBR/GPT partition table.
+This is not standard GPT and may not work with other OSes.
+.Bd -literal -offset indent
+# Setup slices and partitions
+gpt create -f da1	# WARNING! DATA WILL BE DELETED!
+gpt boot da1		# create hybrid MBR
 boot0cfg -s 2 da1
-disklabel -B -r -w da1s0 auto
+disklabel -B -r -w da1s0
 disklabel -e da1s0	# add `a: * * 4.2BSD', to add `a' partition
 			#   with fstype `4.2BSD' covering whole slice
-
 gpt add da1
-disklabel64 -r -w da1s1 auto
+disklabel64 -r -w da1s1
 disklabel64 -e da1s1	# add `b: 4G * swap', to add `b' partition
-			#   with fstype `swap' and size 4GB,
-			# add `a: * * HAMMER', to add `a' partition
-			#   with fstype `HAMMER' covering rest of slice
-newfs_hammer -L ROOT /dev/da1s1a
-mount_hammer /dev/da1s1a /mnt
+			#   with fstype `swap' and size 4GB
+			# add `a: * * HAMMER2', to add `a' partition
+			#   with fstype `HAMMER2' covering rest of slice
 
+# Format partitions and mount filesystems
 newfs /dev/da1s0a
+newfs_hammer2 -L ROOT /dev/da1s1a
+mount_hammer2 /dev/da1s1a@ROOT /mnt
 mkdir /mnt/boot
 mount /dev/da1s0a /mnt/boot
 
-cpdup / /mnt		# copy each file system you need, e.g.
+# Copy system
+cpdup / /mnt
 cpdup /boot /mnt/boot
 cpdup /var /mnt/var
 cpdup /var/tmp /mnt/var/tmp
 cpdup /usr /mnt/usr
 
+# Delete unwanted files from installation CD
 cd /mnt
-vi etc/fstab		# add `/dev/da1s1a / hammer rw',
-			# add `/dev/da1s1b none swap sw',
-			# add `/dev/da1s0a /boot ufs rw 1 1',
-			# delete lines for file systems cpdup'ed above
-vi boot/loader.conf	# add `vfs.root.mountfrom="hammer:da1s1a"'
+rm -rf README* autorun* dflybsd.ico index.html
+rm -rf etc
+mv etc.hdd etc
+
+# Create/edit necessary configs
+vi boot/loader.conf	# add `vfs.root.mountfrom="hammer2:da1s1a@ROOT"'
+vi etc/fstab		# add `/dev/da1s1a@ROOT / hammer2 rw 1 1'
+			# add `/dev/da1s1b none swap sw 0 0'
+			# add `/dev/da1s0a /boot ufs rw 2 2'
+vi etc/rc.conf		# add `dumpdev="/dev/da1s1b"'
+			# add other configs per your needs
+
+# Update user and password
+pwd_mkdb -p -d /mnt/etc /mnt/etc/master.passwd
+pw -V /mnt/etc userdel installer
+chroot /mnt passwd
+
+# Umount
 cd
 umount /mnt/boot
 umount /mnt
@@ -595,16 +647,20 @@ GPT uses 64 bits to store number of sectors, this supports very large disks.
 With the prevalent sector size of 512B this is 8 billion TB.
 .Sh SEE ALSO
 .Xr uuid 3 ,
+.Xr disklabel32 5 ,
 .Xr disklabel64 5 ,
 .Xr uuids 5 ,
 .Xr boot0cfg 8 ,
-.Xr disklabel 8 ,
+.Xr disklabel32 8 ,
 .Xr disklabel64 8 ,
+.Xr efibootmgr 8 ,
 .Xr fdisk 8 ,
 .Xr mount 8 ,
 .Xr newfs 8 ,
 .Xr newfs_hammer 8 ,
-.Xr swapon 8
+.Xr newfs_hammer2 8 ,
+.Xr swapon 8 ,
+.Xr uefi 8
 .Sh HISTORY
 The
 .Nm
@@ -625,23 +681,6 @@ However, it is believed that the currently present functionality is reliable
 and stable enough that this tool can be used without bullet-proof footware if
 one thinks one does not make mistakes.
 .Pp
-It is expected that the basic usage model does not change, but it is
-possible that future versions will not be compatible in the strictest sense
-of the word.
-For example, the
-.Fl p Ar count
-option may be changed to a command option rather than a generic option.
-There are only two commands that use it so there is a chance that the natural
-tendency for people is to use it as a command option.
-Also, options primarily intended for diagnostic or debug purposes may be
-removed in future versions.
-.Pp
 Another possibility is that the current usage model is accompanied by
 other interfaces to make the tool usable as a back-end.
 This all depends on demand and thus feedback.
-.Pp
-The
-.Ic migrate
-command doesn't support
-.Dx
-partition types.

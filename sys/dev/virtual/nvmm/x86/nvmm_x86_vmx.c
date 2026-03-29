@@ -34,6 +34,7 @@
 #include "../nvmm.h"
 #include "../nvmm_internal.h"
 #include "nvmm_x86.h"
+#include "nvmm_x86_internal.h"
 
 int vmx_vmlaunch(uint64_t *gprs);
 int vmx_vmresume(uint64_t *gprs);
@@ -131,7 +132,7 @@ vmx_vmwrite(uint64_t field, uint64_t value)
 	);
 }
 
-static inline paddr_t __unused
+static inline paddr_t __diagused
 vmx_vmptrst(void)
 {
 	paddr_t pa;
@@ -683,6 +684,7 @@ static uint64_t vmx_tlb_flush_op __read_mostly;
 static uint64_t vmx_ept_flush_op __read_mostly;
 static uint64_t vmx_eptp_type __read_mostly;
 static bool vmx_ept_has_ad __read_mostly;
+static bool vmx_cpu_has_arch_cap __read_mostly;
 
 static uint64_t vmx_pinbased_ctls __read_mostly;
 static uint64_t vmx_procbased_ctls __read_mostly;
@@ -759,8 +761,20 @@ static uint64_t vmx_xcr0_mask __read_mostly;
 #define MSRBM_NPAGES	1
 #define MSRBM_SIZE	(MSRBM_NPAGES * PAGE_SIZE)
 
+/* Guest/host CR0 mask: bits owned by the host */
 #define CR0_STATIC_MASK \
 	(CR0_ET | CR0_NW | CR0_CD)
+
+/*
+ * Guest real CR0 bits that must be handled specially:
+ * - CR0_ET: hardwired to 1 in modern CPUs; must always be 1
+ * - CR0_NE: proper FPU error handling; must always be 1
+ * - CR0_CD, CR0_NW: cache control; must be forced to 0 for performance
+ */
+#define CR0_FORCE_ZERO \
+	(CR0_NW | CR0_CD)
+#define CR0_FORCE_ONE \
+	(CR0_ET | CR0_NE)
 
 #define CR4_VALID \
 	(CR4_VME |			\
@@ -1375,6 +1389,9 @@ vmx_inkernel_handle_cpuid(struct nvmm_machine *mach, struct nvmm_cpu *vcpu,
 			if (vmx_procbased_ctls2 & PROC_CTLS2_INVPCID_ENABLE) {
 				cpudata->gprs[NVMM_X64_GPR_RBX] |= CPUID_0_07_EBX_INVPCID;
 			}
+			if (vmx_cpu_has_arch_cap) {
+				cpudata->gprs[NVMM_X64_GPR_RDX] |= CPUID_0_07_EDX_ARCH_CAP;
+			}
 			break;
 		default:
 			cpudata->gprs[NVMM_X64_GPR_RAX] = 0;
@@ -1647,19 +1664,9 @@ vmx_inkernel_handle_cr0(struct nvmm_machine *mach, struct nvmm_cpu *vcpu,
 	} else {
 		fakecr0 = cpudata->gprs[gpr];
 	}
+	fakecr0 |= CR0_ET; /* Force ET=1 for consistency. */
 
-	/*
-	 * fakecr0 is the value the guest believes is in %cr0. realcr0 is the
-	 * actual value in %cr0.
-	 *
-	 * In fakecr0 we must force CR0_ET to 1.
-	 *
-	 * In realcr0 we must force CR0_NW and CR0_CD to 0, and CR0_ET and
-	 * CR0_NE to 1.
-	 */
-	fakecr0 |= CR0_ET;
-	realcr0 = (fakecr0 & ~CR0_STATIC_MASK) | CR0_ET | CR0_NE;
-
+	realcr0 = (fakecr0 & ~CR0_FORCE_ZERO) | CR0_FORCE_ONE;
 	if (vmx_check_cr(realcr0, vmx_cr0_fixed0, vmx_cr0_fixed1) == -1) {
 		return -1;
 	}
@@ -1898,13 +1905,7 @@ vmx_inkernel_handle_msr(struct nvmm_machine *mach, struct nvmm_cpu *vcpu,
 			goto handled;
 		}
 		if (exit->u.rdmsr.msr == MSR_IA32_ARCH_CAPABILITIES) {
-			cpuid_desc_t descs;
-			x86_get_cpuid(0x00000000, &descs);
-			if (descs.eax < 7) {
-				goto error;
-			}
-			x86_get_cpuid(0x00000007, &descs);
-			if (!(descs.edx & CPUID_0_07_EDX_ARCH_CAP)) {
+			if (!vmx_cpu_has_arch_cap) {
 				goto error;
 			}
 			val = rdmsr(MSR_IA32_ARCH_CAPABILITIES);
@@ -2650,17 +2651,12 @@ vmx_vcpu_setstate(struct nvmm_cpu *vcpu)
 	}
 
 	if (flags & NVMM_X64_STATE_CRS) {
-		/*
-		 * CR0_ET must be 1 both in the shadow and the real register.
-		 * CR0_NE must be 1 in the real register.
-		 * CR0_NW and CR0_CD must be 0 in the real register.
-		 */
 		vmx_vmwrite(VMCS_CR0_SHADOW,
 		    (state->crs[NVMM_X64_CR_CR0] & CR0_STATIC_MASK) |
 		    CR0_ET);
 		vmx_vmwrite(VMCS_GUEST_CR0,
-		    (state->crs[NVMM_X64_CR_CR0] & ~CR0_STATIC_MASK) |
-		    CR0_ET | CR0_NE);
+		    (state->crs[NVMM_X64_CR_CR0] & ~CR0_FORCE_ZERO) |
+		    CR0_FORCE_ONE);
 
 		cpudata->gcr2 = state->crs[NVMM_X64_CR_CR2];
 
@@ -2961,7 +2957,7 @@ vmx_vcpu_init(struct nvmm_machine *mach, struct nvmm_cpu *vcpu)
 	vmx_vmcs_enter(vcpu);
 
 	/* No link pointer. */
-	vmx_vmwrite(VMCS_LINK_POINTER, 0xFFFFFFFFFFFFFFFF);
+	vmx_vmwrite(VMCS_LINK_POINTER, 0xFFFFFFFFFFFFFFFFULL);
 
 	/* Install the CTLSs. */
 	vmx_vmwrite(VMCS_PINBASED_CTLS, vmx_pinbased_ctls);
@@ -3475,6 +3471,15 @@ vmx_ident(void)
 	if (!(msr & IA32_VMX_EPT_VPID_UC) && !(msr & IA32_VMX_EPT_VPID_WB)) {
 		os_printf("nvmm: EPT UC/WB memory types not supported\n");
 		return false;
+	}
+
+	vmx_cpu_has_arch_cap = false;
+	x86_get_cpuid(0x00000000, &descs);
+	if (descs.eax >= 7) {
+		x86_get_cpuid(0x00000007, &descs);
+		if (descs.edx & CPUID_0_07_EDX_ARCH_CAP) {
+			vmx_cpu_has_arch_cap = true;
+		}
 	}
 
 	return true;

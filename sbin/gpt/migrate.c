@@ -26,61 +26,126 @@
  * $FreeBSD: src/sbin/gpt/migrate.c,v 1.16 2005/09/01 02:42:52 marcel Exp $
  */
 
-#include <sys/types.h>
+#include <sys/param.h>
 #include <sys/disklabel32.h>
+#include <sys/disklabel64.h>
 #include <sys/dtype.h>
 
 #include <err.h>
+#include <errno.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#include "map.h"
 #include "gpt.h"
 
-/*
- * Allow compilation on platforms that do not have a BSD label.
- * The values are valid for x86_64, i386 and ia64 disklabels.
- */
-#ifndef LABELOFFSET
-#define	LABELOFFSET	0
-#endif
-#ifndef LABELSECTOR
-#define	LABELSECTOR	1
-#endif
-
-static int force;
-static int slice;
+static bool force = false;
+static bool keep_slice = false;
+static uint32_t parts = 128;
 
 static void
 usage_migrate(void)
 {
-
 	fprintf(stderr,
-	    "usage: %s [-fs] device ...\n", getprogname());
+		"usage: %s [-fs] [-p nparts] device ...\n",
+		getprogname());
 	exit(1);
 }
 
-static struct gpt_ent*
-migrate_disklabel(int fd, off_t start, struct gpt_ent *ent)
+static int
+read_disklabel32(int fd, off_t start, struct disklabel32 **dlp)
 {
 	char *buf;
 	struct disklabel32 *dl;
+
+	buf = gpt_read(fd, start + LABELSECTOR32, 1);
+	if (buf == NULL) {
+		warnx("%s: error: reading disklabel32 failed", device_name);
+		return (EIO);
+	}
+
+	dl = (void *)(buf + LABELOFFSET32);
+	if (le32toh(dl->d_magic) != DISKMAGIC32 ||
+	    le32toh(dl->d_magic2) != DISKMAGIC32) {
+		warnx("%s: warning: no disklabel32 in slice", device_name);
+		free(buf);
+		return (ENOENT);
+	}
+
+	*dlp = dl;
+	return 0;
+}
+
+static int
+read_disklabel64(int fd, off_t start, struct disklabel64 **dlp)
+{
+	struct disklabel64 *dl;
+
+	dl = gpt_read(fd, start, roundup2(sizeof(*dl), secsz) / secsz);
+	if (dl == NULL) {
+		warnx("%s: error: reading disklabel64 failed", device_name);
+		return (EIO);
+	}
+
+	if (le32toh(dl->d_magic) != DISKMAGIC64) {
+		warnx("%s: warning: no disklabel64 in slice", device_name);
+		free(dl);
+		return (ENOENT);
+	}
+
+	*dlp = dl;
+	return 0;
+}
+
+static int
+convert_fstype(uint8_t fstype, uuid_t *uuid)
+{
+	switch (fstype) {
+	case FS_UNUSED:
+		uuid_create_nil(uuid, NULL);
+		return 0;
+	case FS_SWAP:
+		*uuid = (uuid_t)GPT_ENT_TYPE_DRAGONFLY_SWAP;
+		return 0;
+	case FS_BSDFFS:
+		*uuid = (uuid_t)GPT_ENT_TYPE_DRAGONFLY_UFS1;
+		return 0;
+	case FS_MSDOS:
+		*uuid = (uuid_t)GPT_ENT_TYPE_MS_BASIC_DATA;
+		return 0;
+	case FS_VINUM:
+		*uuid = (uuid_t)GPT_ENT_TYPE_DRAGONFLY_VINUM;
+		return 0;
+	case FS_CCD:
+		*uuid = (uuid_t)GPT_ENT_TYPE_DRAGONFLY_CCD;
+		return 0;
+	case FS_HAMMER:
+		*uuid = (uuid_t)GPT_ENT_TYPE_DRAGONFLY_HAMMER;
+		return 0;
+	case FS_HAMMER2:
+		*uuid = (uuid_t)GPT_ENT_TYPE_DRAGONFLY_HAMMER2;
+		return 0;
+	default:
+		uuid_create_nil(uuid, NULL);
+		return (-1);
+	}
+}
+
+static struct gpt_ent*
+migrate_disklabel32(const struct disklabel32 *dl, off_t start,
+		    struct gpt_ent *ent)
+{
+	uuid_t uuid;
 	off_t ofs, rawofs;
 	int i;
 
-	buf = gpt_read(fd, start + LABELSECTOR32, 1);
-	dl = (void*)(buf + LABELOFFSET32);
-
-	if (le32toh(dl->d_magic) != DISKMAGIC32 ||
-	    le32toh(dl->d_magic2) != DISKMAGIC32) {
-		warnx("%s: warning: FreeBSD slice without disklabel",
-		    device_name);
-		return (ent);
-	}
-
+	/*
+	 * If any partition starts before RAW_PART, then RAW_PART is not acting
+	 * as a base coordinate; i.e., partition offsets are already absolute.
+	 */
 	rawofs = le32toh(dl->d_partitions[RAW_PART].p_offset) *
 	    le32toh(dl->d_secsize);
 	for (i = 0; i < le16toh(dl->d_npartitions); i++) {
@@ -94,35 +159,17 @@ migrate_disklabel(int fd, off_t start, struct gpt_ent *ent)
 	rawofs /= secsz;
 
 	for (i = 0; i < le16toh(dl->d_npartitions); i++) {
-		switch (dl->d_partitions[i].p_fstype) {
-		case FS_UNUSED:
+		if (convert_fstype(dl->d_partitions[i].p_fstype, &uuid) < 0) {
+			warnx("%s: %s: unknown partition type (%d)",
+			      device_name, (force ? "warning" : "error"),
+			      dl->d_partitions[i].p_fstype);
+			if (!force)
+				return (NULL);
+		}
+		if (uuid_is_nil(&uuid, NULL))
 			continue;
-		case FS_SWAP: {
-			uuid_t swap = GPT_ENT_TYPE_FREEBSD_SWAP;
-			uuid_enc_le(&ent->ent_type, &swap);
-			utf8_to_utf16("FreeBSD swap partition",
-			    ent->ent_name, 36);
-			break;
-		}
-		case FS_BSDFFS: {
-			uuid_t ufs = GPT_ENT_TYPE_FREEBSD_UFS;
-			uuid_enc_le(&ent->ent_type, &ufs);
-			utf8_to_utf16("FreeBSD UFS partition",
-			    ent->ent_name, 36);
-			break;
-		}
-		case FS_VINUM: {
-			uuid_t vinum = GPT_ENT_TYPE_FREEBSD_VINUM;
-			uuid_enc_le(&ent->ent_type, &vinum);
-			utf8_to_utf16("FreeBSD vinum partition",
-			    ent->ent_name, 36);
-			break;
-		}
-		default:
-			warnx("%s: warning: unknown FreeBSD partition (%d)",
-			    device_name, dl->d_partitions[i].p_fstype);
-			continue;
-		}
+
+		uuid_enc_le(&ent->ent_type, &uuid);
 
 		ofs = (le32toh(dl->d_partitions[i].p_offset) *
 		    le32toh(dl->d_secsize)) / secsz;
@@ -130,7 +177,53 @@ migrate_disklabel(int fd, off_t start, struct gpt_ent *ent)
 		ent->ent_lba_start = htole64(start + ofs);
 		ent->ent_lba_end = htole64(start + ofs +
 		    le32toh(dl->d_partitions[i].p_size) - 1LL);
+
 		ent++;
+		if (verbose > 1) {
+			warnx("%s: migrated slice partition %d: "
+			      "type=%d, start=%ju, size=%u",
+			      device_name, i, dl->d_partitions[i].p_fstype,
+			      (uintmax_t)(start + ofs),
+			      le32toh(dl->d_partitions[i].p_size));
+		}
+	}
+
+	return (ent);
+}
+
+static struct gpt_ent*
+migrate_disklabel64(const struct disklabel64 *dl, off_t start,
+		    struct gpt_ent *ent)
+{
+	uuid_t uuid;
+	off_t offset, blocks;
+	uint32_t i;
+
+	for (i = 0; i < le32toh(dl->d_npartitions); i++) {
+		if (convert_fstype(dl->d_partitions[i].p_fstype, &uuid) < 0) {
+			warnx("%s: %s: unknown partition type (%d)",
+			      device_name, (force ? "warning" : "error"),
+			      dl->d_partitions[i].p_fstype);
+			if (!force)
+				return (NULL);
+		}
+		if (uuid_is_nil(&uuid, NULL))
+			continue;
+
+		uuid_enc_le(&ent->ent_type, &uuid);
+
+		offset = le64toh(dl->d_partitions[i].p_boffset) / secsz;
+		blocks = le64toh(dl->d_partitions[i].p_bsize) / secsz;
+		ent->ent_lba_start = htole64(start + offset);
+		ent->ent_lba_end = htole64(start + offset + blocks - 1LL);
+
+		ent++;
+		if (verbose > 1) {
+			warnx("%s: migrated slice partition %d: "
+			      "type=%d, start=%ju, size=%ju",
+			      device_name, i, dl->d_partitions[i].p_fstype,
+			      (uintmax_t)(start + offset), (uintmax_t)blocks);
+		}
 	}
 
 	return (ent);
@@ -160,17 +253,21 @@ migrate(int fd)
 
 	mbr = map->map_data;
 
-	if (map_find(MAP_TYPE_PRI_GPT_HDR) != NULL ||
-	    map_find(MAP_TYPE_SEC_GPT_HDR) != NULL) {
+	if (map_find(MAP_TYPE_GPT_PRI_HDR) != NULL ||
+	    map_find(MAP_TYPE_GPT_SEC_HDR) != NULL) {
 		warnx("%s: error: device already contains a GPT", device_name);
 		return;
 	}
 
 	/* Get the amount of free space after the MBR */
-	blocks = map_free(1LL, 0LL);
+	blocks = map_free(1LL);
 	if (blocks == 0LL) {
 		warnx("%s: error: no room for the GPT header", device_name);
 		return;
+	}
+	if (verbose > 1) {
+		warnx("%s: found %ju free blocks after MBR",
+		      device_name, (uintmax_t)blocks);
 	}
 
 	/* Don't create more than parts entries. */
@@ -203,24 +300,30 @@ migrate(int fd)
 	}
 
 	blocks--;		/* Number of blocks in the GPT table. */
-	gpt = map_add(1LL, 1LL, MAP_TYPE_PRI_GPT_HDR, calloc(1, secsz));
-	tbl = map_add(2LL, blocks, MAP_TYPE_PRI_GPT_TBL,
+	if (verbose > 1) {
+		warnx("%s: create GPT table with %ju blocks",
+		      device_name, (uintmax_t)blocks);
+	}
+	gpt = map_add(1LL, 1LL, MAP_TYPE_GPT_PRI_HDR, calloc(1, secsz));
+	tbl = map_add(2LL, blocks, MAP_TYPE_GPT_PRI_TBL,
 	    calloc(blocks, secsz));
-	if (gpt == NULL || tbl == NULL)
+	if (gpt == NULL || tbl == NULL) {
+		warnx("%s: error: failed to create primary GPT", device_name);
 		return;
+	}
 
-	lbt = map_add(last - blocks, blocks, MAP_TYPE_SEC_GPT_TBL,
+	lbt = map_add(last - blocks, blocks, MAP_TYPE_GPT_SEC_TBL,
 	    tbl->map_data);
-	tpg = map_add(last, 1LL, MAP_TYPE_SEC_GPT_HDR, calloc(1, secsz));
+	tpg = map_add(last, 1LL, MAP_TYPE_GPT_SEC_HDR, calloc(1, secsz));
+	if (lbt == NULL || tpg == NULL) {
+		warnx("%s: error: failed to create backup GPT", device_name);
+		return;
+	}
 
 	hdr = gpt->map_data;
 	memcpy(hdr->hdr_sig, GPT_HDR_SIG, sizeof(hdr->hdr_sig));
 	hdr->hdr_revision = htole32(GPT_HDR_REVISION);
-	/*
-	 * XXX struct gpt_hdr is not a multiple of 8 bytes in size and thus
-	 * contains padding we must not include in the size.
-	 */
-	hdr->hdr_size = htole32(offsetof(struct gpt_hdr, padding));
+	hdr->hdr_size = htole32(GPT_MIN_HDR_SIZE);
 	hdr->hdr_lba_self = htole64(gpt->map_start);
 	hdr->hdr_lba_alt = htole64(tpg->map_start);
 	hdr->hdr_lba_start = htole64(tbl->map_start + blocks);
@@ -241,52 +344,77 @@ migrate(int fd)
 
 	/* Mirror partitions. */
 	for (i = 0; i < 4; i++) {
-		start = le16toh(mbr->mbr_part[i].part_start_hi);
-		start = (start << 16) + le16toh(mbr->mbr_part[i].part_start_lo);
-		size = le16toh(mbr->mbr_part[i].part_size_hi);
-		size = (size << 16) + le16toh(mbr->mbr_part[i].part_size_lo);
+		start = le32toh(mbr->mbr_part[i].dp_start);
+		size = le32toh(mbr->mbr_part[i].dp_size);
 
-		switch (mbr->mbr_part[i].part_typ) {
+		switch (mbr->mbr_part[i].dp_typ) {
 		case 0:
-			continue;
-#if 0
-		case 108:
-			/* TODO: Port to DragonFly and test */
-			continue;
-#endif
-		case 165: {	/* FreeBSD */
-			if (slice) {
-				uuid_t freebsd = GPT_ENT_TYPE_FREEBSD;
-				uuid_enc_le(&ent->ent_type, &freebsd);
+			break;
+		case DOSPTYP_DFLYBSD:
+		case DOSPTYP_386BSD: {
+			struct disklabel32 *dl32 = NULL;
+			struct disklabel64 *dl64 = NULL;
+			int err;
+
+			err = read_disklabel64(fd, start, &dl64);
+			if (err == ENOENT)
+				err = read_disklabel32(fd, start, &dl32);
+			if (err == ENOENT)
+				break;
+			else if (err != 0)
+				return;
+
+			if (keep_slice) {
+				if (dl64 != NULL) {
+					uuid = (uuid_t)
+					    GPT_ENT_TYPE_DRAGONFLY_LABEL64;
+				} else {
+					uuid = (uuid_t)
+					    GPT_ENT_TYPE_DRAGONFLY_LABEL32;
+				}
+				uuid_enc_le(&ent->ent_type, &uuid);
 				ent->ent_lba_start = htole64((uint64_t)start);
 				ent->ent_lba_end = htole64(start + size - 1LL);
-				utf8_to_utf16("FreeBSD disklabel partition",
-				    ent->ent_name, 36);
 				ent++;
-			} else
-				ent = migrate_disklabel(fd, start, ent);
+			} else if (dl64 != NULL) {
+				ent = migrate_disklabel64(dl64, start, ent);
+			} else {
+				ent = migrate_disklabel32(dl32, start, ent);
+			}
+			free(dl64);
+			free(dl32);
+			if (ent == NULL)
+				return;
+			if (verbose > 1) {
+				warnx("%s: migrated partition %d: "
+				      "disklabel%s, start=%u, size=%u",
+				      device_name, i, dl64 ? "64" : "32",
+				      start, size);
+			}
 			break;
 		}
-		case 239: {	/* EFI */
-			uuid_t efi_slice = GPT_ENT_TYPE_EFI;
-			uuid_enc_le(&ent->ent_type, &efi_slice);
+		case DOSPTYP_EFI:
+			uuid = (uuid_t)GPT_ENT_TYPE_EFI;
+			uuid_enc_le(&ent->ent_type, &uuid);
 			ent->ent_lba_start = htole64((uint64_t)start);
 			ent->ent_lba_end = htole64(start + size - 1LL);
-			utf8_to_utf16("EFI system partition",
-			    ent->ent_name, 36);
 			ent++;
-			break;
-		}
-		default:
-			if (!force) {
-				warnx("%s: error: unknown partition type (%d)",
-				    device_name, mbr->mbr_part[i].part_typ);
-				return;
+			if (verbose > 1) {
+				warnx("%s: migrated partition %d: "
+				      "EFI, start=%u, size=%u",
+				      device_name, i, start, size);
 			}
+			break;
+		default:
+			warnx("%s: %s: partition %d: unknown type (%d)",
+			      device_name, (force ? "warning" : "error"),
+			      i, mbr->mbr_part[i].dp_typ);
+			if (!force)
+				return;
 		}
 	}
-	ent = tbl->map_data;
 
+	ent = tbl->map_data;
 	hdr->hdr_crc_table = htole32(crc32(ent, le32toh(hdr->hdr_entries) *
 	    le32toh(hdr->hdr_entsz)));
 	hdr->hdr_crc_self = htole32(crc32(hdr, le32toh(hdr->hdr_size)));
@@ -314,38 +442,42 @@ migrate(int fd)
 	 * Turn the MBR into a Protective MBR.
 	 */
 	bzero(mbr->mbr_part, sizeof(mbr->mbr_part));
-	mbr->mbr_part[0].part_shd = 0xff;
-	mbr->mbr_part[0].part_ssect = 0xff;
-	mbr->mbr_part[0].part_scyl = 0xff;
-	mbr->mbr_part[0].part_typ = 0xee;
-	mbr->mbr_part[0].part_ehd = 0xff;
-	mbr->mbr_part[0].part_esect = 0xff;
-	mbr->mbr_part[0].part_ecyl = 0xff;
-	mbr->mbr_part[0].part_start_lo = htole16(1);
-	if (last > 0xffffffff) {
-		mbr->mbr_part[0].part_size_lo = htole16(0xffff);
-		mbr->mbr_part[0].part_size_hi = htole16(0xffff);
-	} else {
-		mbr->mbr_part[0].part_size_lo = htole16(last);
-		mbr->mbr_part[0].part_size_hi = htole16(last >> 16);
-	}
+	mbr->mbr_part[0].dp_shd = 0xff;
+	mbr->mbr_part[0].dp_ssect = 0xff;
+	mbr->mbr_part[0].dp_scyl = 0xff;
+	mbr->mbr_part[0].dp_typ = DOSPTYP_PMBR;
+	mbr->mbr_part[0].dp_ehd = 0xff;
+	mbr->mbr_part[0].dp_esect = 0xff;
+	mbr->mbr_part[0].dp_ecyl = 0xff;
+	mbr->mbr_part[0].dp_start = htole32(1U);
+	if (last > 0xffffffff)
+		mbr->mbr_part[0].dp_size = htole32(0xffffffffU);
+	else
+		mbr->mbr_part[0].dp_size = htole32((uint32_t)last);
 	gpt_write(fd, map);
 }
 
 int
 cmd_migrate(int argc, char *argv[])
 {
+	char *p;
 	int ch, fd;
 
 	/* Get the migrate options */
-	while ((ch = getopt(argc, argv, "fs")) != -1) {
+	while ((ch = getopt(argc, argv, "fhps")) != -1) {
 		switch(ch) {
 		case 'f':
-			force = 1;
+			force = true;
+			break;
+		case 'p':
+			parts = (uint32_t)strtol(optarg, &p, 10);
+			if (*p != 0 || parts == 0)
+				usage_migrate();
 			break;
 		case 's':
-			slice = 1;
+			keep_slice = true;
 			break;
+		case 'h':
 		default:
 			usage_migrate();
 		}

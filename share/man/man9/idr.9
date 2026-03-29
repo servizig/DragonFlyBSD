@@ -24,11 +24,12 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd March 16, 2019
+.Dd January 20, 2026
 .Dt IDR 9
 .Os
 .Sh NAME
 .Nm idr ,
+.Nm idr_alloc ,
 .Nm idr_destroy ,
 .Nm idr_find ,
 .Nm idr_for_each ,
@@ -42,6 +43,8 @@
 .Nd integer ID management library
 .Sh SYNOPSIS
 .In sys/idr.h
+.Ft int
+.Fn idr_alloc "struct idr *idp" "void *ptr" "int start" "int end" "unsigned gfp_mask"
 .Ft void
 .Fn idr_destroy "struct idr *idp"
 .Ft void *
@@ -64,6 +67,12 @@
 .Fn idr_replace "struct idr *idp" "void *ptr" "int id"
 .Sh DESCRIPTION
 The
+.Nm
+API is a generic facility to manage ID allocations and
+provides the ability to map an ID to a pointer.
+It is implemented and expected to be compatible with the Linux implementation.
+.Pp
+The
 .Fn idr_init
 function initialize an
 .Nm
@@ -77,9 +86,37 @@ handle
 .Fa idp .
 .Pp
 The
+.Fn idr_alloc
+function allocates an unused ID in the range specified by
+.Fa start
+(inclusive) and
+.Fa end
+(exclusive).
+If
+.Fa end
+is <= 0, it is treated as one larger than
+.Dv INT_MAX .
+It returns the newly allocated ID,
+.Fl Ns Er ENOMEM
+if memory allocation failed, or
+.Fl Ns Er ENOSPC
+if no free IDs could be found.
+The
+.Fa gfp_mask
+is only present for compatibility with the Linux implementation and is unused on
+.Dx .
+.Pp
+The
 .Fn idr_find
 function returns the data pointer that is mapped with the specified
 .Fa id .
+A
+.Dv NULL
+return may indicate that the
+.Fa id
+is not allocated or that the
+.Dv NULL
+pointer was associated with this ID.
 .Pp
 The
 .Fn idr_for_each
@@ -130,7 +167,10 @@ The
 function removes the specified
 .Fa id
 from the tree, returning its pointer.
-NULL is returned if the id could not be found.
+.Dv NULL
+is returned if the
+.Fa id
+could not be found.
 .Pp
 The
 .Fn idr_remove_all
@@ -146,7 +186,27 @@ function replaces the pointer for the specified
 with the new pointer
 .Fa ptr .
 It returns
-.Dv NULL
-if the id is not found.
-This behavior is different from the Linux API, which returns ERR_PTR(-ENOENT)
-if the id could not be found.
+.Fl Ns Er ENOENT
+if the
+.Fa id
+could not be found.
+.Sh FILES
+The above functions are implemented in
+.Pa sys/libkern/linux_idr.c .
+.Sh SEE ALSO
+.Xr unr 9
+.Sh HISTORY
+The
+.Nm
+API first appeared in
+.Dx
+3.3
+as an alternative to the
+.Fx
+.Xr unr 9
+API.
+.Sh AUTHORS
+.An Vishesh Yadav Aq Mt vishesh3y@gmail.com ,
+.An François Tigeot Aq Mt ftigeot@wolfpond.org ,
+and
+.An Matthew Dillon Aq Mt dillon@apollo.backplane.com .

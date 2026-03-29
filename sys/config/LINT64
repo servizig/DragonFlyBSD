@@ -1640,6 +1640,9 @@ device		perfbias
 # Intel software controlled clock modulation
 device		clockmod
 
+# Intel Nehalem and newer CPUs Cstate and Package-Cstate residency counters.
+device		corecstat
+
 # Intel Sandy Bridge and newer CPUs power usage estimation
 device		corepower
 
@@ -2221,7 +2224,6 @@ options	KTR_ENTRIES=1024
 options	KTR_VERBOSE=1
 #options KTR_ACPI_EC
 #options KTR_CTXSW
-#options KTR_DMCRYPT
 #options KTR_ETHERNET
 #options KTR_HAMMER
 #options KTR_IFQ

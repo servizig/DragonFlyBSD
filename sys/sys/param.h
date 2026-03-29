@@ -263,9 +263,11 @@
  * 600515 - remove /dev/crypto pseudo-device / cryptodev(4)
  * 600516 - remove in-kernel crypto(9) framework, aesni(4) and
  *          /usr/include/crypto
+ * 600517 - add DSO_NOMBR to <sys/disk.h>
+ * 600518 - remove DSO_NOMBR from <sys/disk.h>
  */
 #undef __DragonFly_version
-#define __DragonFly_version 600516	/* propagated to newvers */
+#define __DragonFly_version 600518	/* propagated to newvers */
 
 #include <sys/_null.h>
 

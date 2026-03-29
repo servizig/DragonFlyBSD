@@ -172,6 +172,7 @@ MAN=	accept_filter.9 \
 	tvtohz.9 \
 	uio.9 \
 	usbdi.9 \
+	unr.9 \
 	vcount.9 \
 	vflush.9 \
 	VFS.9 \
@@ -502,7 +503,8 @@ MLINKS+=hashinit.9 hashdestroy.9 \
 	hashinit.9 hashinit_ext.9 \
 	hashinit.9 phashinit.9 \
 	hashinit.9 phashinit_ext.9
-MLINKS+=idr.9 idr_destroy.9 \
+MLINKS+=idr.9 idr_alloc.9 \
+	idr.9 idr_destroy.9 \
 	idr.9 idr_find.9 \
 	idr.9 idr_for_each.9 \
 	idr.9 idr_get_new.9 \
@@ -1049,6 +1051,11 @@ MLINKS+=usbdi.9 usb_fifo_alloc_buffer.9 \
 	usbdi.9 usbd_xfer_softc.9 \
 	usbdi.9 usbd_xfer_state.9 \
 	usbdi.9 usbd_xfer_status.9
+MLINKS+=unr.9 alloc_unr.9 \
+	unr.9 alloc_unrl.9 \
+	unr.9 delete_unrhdr.9 \
+	unr.9 free_unr.9 \
+	unr.9 new_unrhdr.9
 MLINKS+=vcount.9 count_dev.9
 MLINKS+=vhold.9 vdrop.9
 MLINKS+=vn_lock.9 vn_islocked.9 \

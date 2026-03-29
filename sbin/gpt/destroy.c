@@ -24,42 +24,40 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $FreeBSD: src/sbin/gpt/destroy.c,v 1.6 2005/08/31 01:47:19 marcel Exp $
- * $DragonFly: src/sbin/gpt/destroy.c,v 1.1 2007/06/16 22:29:27 dillon Exp $
  */
 
 #include <sys/types.h>
 
 #include <err.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#include "map.h"
 #include "gpt.h"
 
-static int recoverable;
-static int quiet;
+static bool recoverable = false;
 
 static void
 usage_destroy(void)
 {
 	fprintf(stderr,
-	    "usage: %s [-r] device ...\n", getprogname());
+		"usage: %s [-r] device ...\n", getprogname());
 	exit(1);
 }
 
-static void
-destroy(int fd)
+void
+destroy(int fd, bool quiet)
 {
 	map_t *pri_hdr, *sec_hdr;
 
-	pri_hdr = map_find(MAP_TYPE_PRI_GPT_HDR);
-	sec_hdr = map_find(MAP_TYPE_SEC_GPT_HDR);
+	pri_hdr = map_find(MAP_TYPE_GPT_PRI_HDR);
+	sec_hdr = map_find(MAP_TYPE_GPT_SEC_HDR);
 
 	if (pri_hdr == NULL && sec_hdr == NULL) {
-		if (quiet == 0) {
+		if (!quiet) {
 			warnx("%s: error: device doesn't contain a GPT",
 			      device_name);
 		}
@@ -87,11 +85,12 @@ cmd_destroy(int argc, char *argv[])
 {
 	int ch, fd;
 
-	while ((ch = getopt(argc, argv, "r")) != -1) {
+	while ((ch = getopt(argc, argv, "hr")) != -1) {
 		switch(ch) {
 		case 'r':
-			recoverable = 1;
+			recoverable = true;
 			break;
+		case 'h':
 		default:
 			usage_destroy();
 		}
@@ -107,18 +106,10 @@ cmd_destroy(int argc, char *argv[])
 			continue;
 		}
 
-		destroy(fd);
+		destroy(fd, false);
 
 		gpt_close(fd);
 	}
 
 	return (0);
-}
-
-void
-do_destroy(int fd)
-{
-	quiet = 1;
-	destroy(fd);
-	quiet = 0;
 }

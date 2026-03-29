@@ -30,9 +30,25 @@
   } \
  }"
 
-#define NATIVE_SYSTEM_HEADER_DIR	PREFIX2"/include"
-#define STD_EXEC_PATH			PREFIX1"/libexec/gcc"GCCSHORTVER
-#define STANDARD_EXEC_PREFIX		STD_EXEC_PATH"/"
+/*
+ * Link GCC's libssp_nonshared.a to provide __stack_chk_fail_local() for stack
+ * protection.  This hidden symbol avoids PLT overhead on 32-bit x86 by
+ * deferring PIC register setup to the cold failure path.
+ *
+ * On x86-64, GCC calls __stack_chk_fail() directly because RIP-relative
+ * addressing makes PLT efficient, but we link libssp_nonshared.a for
+ * consistency with other systems.
+ *
+ * Adapted from gcc/config/freebsd.h
+ */
+#undef	LINK_SSP_SPEC
+#define LINK_SSP_SPEC "%{fstack-protector|fstack-protector-all" \
+		       "|fstack-protector-strong|fstack-protector-explicit" \
+		       ":-lssp_nonshared}"
+
+#define NATIVE_SYSTEM_HEADER_DIR	PREFIX2 "/include"
+#define STD_EXEC_PATH			PREFIX1 "/libexec/gcc" GCCSHORTVER
+#define STANDARD_EXEC_PREFIX		STD_EXEC_PATH "/"
 #define STANDARD_LIBEXEC_PREFIX 	STANDARD_EXEC_PREFIX
 #define STANDARD_BINDIR_PREFIX		STANDARD_EXEC_PREFIX
 #define STANDARD_STARTFILE_PREFIX	STANDARD_EXEC_PREFIX
@@ -43,14 +59,14 @@
 #define MD_STARTFILE_PREFIX_1		""
 #define TOOLDIR_BASE_PREFIX		"./"
 
-#define STARTFILE_PREFIX_SPEC		PREFIX2"/lib/gcc"GCCSHORTVER"/ "PREFIX2"/lib/"
+#define STARTFILE_PREFIX_SPEC		PREFIX2 "/lib/gcc" GCCSHORTVER "/ " PREFIX2 "/lib/"
 
-#define GPLUSPLUS_INCLUDE_DIR		PREFIX2"/include/c++/"GCCPOINTVER
+#define GPLUSPLUS_INCLUDE_DIR		PREFIX2 "/include/c++/" GCCPOINTVER
 #define GPLUSPLUS_INCLUDE_DIR_ADD_SYSROOT 0
 #undef	GPLUSPLUS_TOOL_INCLUDE_DIR
-#define	GPLUSPLUS_BACKWARD_INCLUDE_DIR	PREFIX2"/include/c++/"GCCPOINTVER"/backward"
+#define	GPLUSPLUS_BACKWARD_INCLUDE_DIR	PREFIX2 "/include/c++/" GCCPOINTVER "/backward"
 #undef	LOCAL_INCLUDE_DIR
-#define	GCC_INCLUDE_DIR			PREFIX2"/libdata/gcc"GCCSHORTVER
+#define	GCC_INCLUDE_DIR			PREFIX2 "/libdata/gcc" GCCSHORTVER
 #undef	FIXED_INCLUDE_DIR
 #undef	CROSS_INCLUDE_DIR
 #undef	TOOL_INCLUDE_DIR

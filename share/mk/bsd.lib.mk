@@ -38,7 +38,7 @@ TARGET_SHLIBDIR?=	${SHLIBDIR}
 TARGET_LIBDIR?=		${LIBDIR}/priv
 TARGET_DEBUGLIBDIR?=	${DEBUGLIBDIR:S!/debug$!/priv/debug!}
 TARGET_PROFLIBDIR?=	${PROFLIBDIR:S!/profile$!/priv/profile!}
-.if !empty(PRIVATELIB) && ${PRIVATELIB} == "shpub"
+. if !empty(PRIVATELIB) && ${PRIVATELIB} == "shpub"
 TARGET_SHLIBDIR?=	${SHLIBDIR}
 . else
 TARGET_SHLIBDIR?=	${SHLIBDIR}/priv
@@ -80,7 +80,7 @@ PO_CXXFLAGS=${CXXFLAGS:N-ffunction-sections}
 	${CXX} ${_${.IMPSRC:T}_FLAGS} ${PICFLAG} -DPIC ${SHARED_CXXFLAGS} ${CXXFLAGS} -c ${.IMPSRC} -o ${.TARGET}
 
 .f.o:
-	${FC} ${_${.IMPSRC:T}_FLAGS} ${FFLAGS} -o ${.TARGET} -c ${.IMPSRC} 
+	${FC} ${_${.IMPSRC:T}_FLAGS} ${FFLAGS} -o ${.TARGET} -c ${.IMPSRC}
 
 .f.po:
 	${FC} ${_${.IMPSRC:T}_FLAGS} ${PO_FLAG} ${FFLAGS} -o ${.TARGET} -c ${.IMPSRC}
@@ -163,8 +163,8 @@ lib${LIB}_p.a: ${POBJS}
 . endif
 .endif
 
-.if !defined(INTERNALLIB) && defined(SHLIB_NAME) || \
-    defined(INSTALL_PIC_ARCHIVE) && defined(LIB) && !empty(LIB)
+.if (!defined(INTERNALLIB) && defined(SHLIB_NAME)) || \
+    (defined(INSTALL_PIC_ARCHIVE) && defined(LIB) && !empty(LIB))
 SOBJS+=		${OBJS:.o=.So}
 .endif
 
@@ -280,7 +280,7 @@ realinstall: _maninstall
 ${OBJS} ${STATICOBJS} ${POBJS}: ${SRCS:M*.h}
 .endif
 .if defined(SHLIB_NAME) || \
-    defined(INSTALL_PIC_ARCHIVE) && defined(LIB) && !empty(LIB)
+    (defined(INSTALL_PIC_ARCHIVE) && defined(LIB) && !empty(LIB))
 ${SOBJS}: ${SRCS:M*.h}
 .endif
 .endif
@@ -294,7 +294,7 @@ clean:
 	rm -f a.out ${OBJS} ${OBJS:S/$/.tmp/} ${STATICOBJS}
 .endif
 .if defined(SHLIB_NAME) || \
-    defined(INSTALL_PIC_ARCHIVE) && defined(LIB) && !empty(LIB)
+    (defined(INSTALL_PIC_ARCHIVE) && defined(LIB) && !empty(LIB))
 	rm -f ${SOBJS} ${SOBJS:.So=.so} ${SOBJS:S/$/.tmp/}
 .endif
 .if !defined(INTERNALLIB) || defined(INTERNALLIBPROF)
