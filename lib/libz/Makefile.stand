@@ -4,6 +4,8 @@
 ZLIBDIR= ${LIBSTAND_SRC}/../../contrib/zlib
 .PATH: ${ZLIBDIR}
 
-CFLAGS+=-DCOMPILING_LIBSTAND -I${ZLIBDIR}
+# Define Z_SOLO to avoid pulling in <unistd.h> that would conflict with
+# libstand.
+CFLAGS+=-I${ZLIBDIR} -DZ_SOLO
 SRCS+=	adler32.c crc32.c deflate.c infback.c inffast.c inflate.c \
 	inftrees.c zutil.c

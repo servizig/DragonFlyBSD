@@ -17,7 +17,6 @@ Upgrade Notes
 -------------
 1. Configure with:
    $ ./configure
-2. Merge zconf.h into lib/libz/zconf.h:
-   Note the changes for 'COMPILING_LIBSTAND'.
+2. Copy zconf.h into lib/libz/.
 3. If there are new symbols, update Symbol.map and Versions.def in lib/libz
    according to zlib.map.

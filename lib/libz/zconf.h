@@ -444,9 +444,7 @@ typedef uLong FAR uLongf;
 #endif
 
 #if 1     /* was set to #if 1 by ./configure */
-#ifndef COMPILING_LIBSTAND	/* libstand has issues with unistd.h */
 #  define Z_HAVE_UNISTD_H
-#endif
 #endif
 
 #if 1     /* was set to #if 1 by ./configure */
