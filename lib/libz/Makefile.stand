@@ -7,5 +7,12 @@ ZLIBDIR= ${LIBSTAND_SRC}/../../contrib/zlib
 # Define Z_SOLO to avoid pulling in <unistd.h> that would conflict with
 # libstand.
 CFLAGS+=-I${ZLIBDIR} -DZ_SOLO
+
+# zlib v1.3.2 changed 'z_off_t' from 'long' to 'long long', which would
+# require libgcc helpers for 64bit operations.
+.if ${LIBSTAND_ARCH} == "i386"
+CFLAGS+=-Dz_off_t=long
+.endif
+
 SRCS+=	adler32.c crc32.c deflate.c infback.c inffast.c inflate.c \
 	inftrees.c zutil.c
