@@ -248,10 +248,6 @@ vm_offset_t kernel_vm_end = VM_MIN_KERNEL_ADDRESS;
 static pt_entry_t pat_pte_index[PAT_INDEX_SIZE];	/* PAT -> PG_ bits */
 static pt_entry_t pat_pde_index[PAT_INDEX_SIZE];	/* PAT -> PG_ bits */
 
-static uint64_t KPTbase;
-static uint64_t KPTphys;
-static uint64_t KPDphys;	/* phys addr of kernel level 2 */
-static uint64_t KPDbase;	/* phys addr of kernel level 2 @ KERNBASE */
 uint64_t KPDPphys;		/* phys addr of kernel level 3 */
 uint64_t KPML4phys;		/* phys addr of kernel level 4 */
 
@@ -858,6 +854,10 @@ static
 void
 create_pagetables(vm_paddr_t *firstaddr)
 {
+	uint64_t kpt_base;
+	uint64_t kpt_phys;
+	uint64_t kpd_base;	/* phys addr of kernel level 2 @ KERNBASE */
+	uint64_t kpd_phys;	/* phys addr of kernel level 2 */
 	long i;		/* must be 64 bits */
 	long nkpt_base;
 	long nkpt_phys;
@@ -938,16 +938,16 @@ create_pagetables(vm_paddr_t *firstaddr)
 	 * NOTE: We allocate all kernel PD pages up-front, typically
 	 *	 ~511G of KVM, requiring 511 PD pages.
 	 */
-	KPTbase = allocpages(firstaddr, nkpt_base);	/* KERNBASE to end */
-	KPTphys = allocpages(firstaddr, nkpt_phys);	/* KVA start */
+	kpt_base = allocpages(firstaddr, nkpt_base);	/* KERNBASE to end */
+	kpt_phys = allocpages(firstaddr, nkpt_phys);	/* KVA start */
 	KPML4phys = allocpages(firstaddr, 1);		/* recursive PML4 map */
 	KPDPphys = allocpages(firstaddr, NKPML4E);	/* kernel PDP pages */
-	KPDphys = allocpages(firstaddr, nkpd_phys);	/* kernel PD pages */
+	kpd_phys = allocpages(firstaddr, nkpd_phys);	/* kernel PD pages */
 
 	/*
 	 * Alloc PD pages for the area starting at KERNBASE.
 	 */
-	KPDbase = allocpages(firstaddr, NPDPEPG - KPDPI);
+	kpd_base = allocpages(firstaddr, NPDPEPG - KPDPI);
 
 	/*
 	 * Stuff for our DMAP.  Use 2MB pages even when 1GB pages
@@ -971,8 +971,8 @@ create_pagetables(vm_paddr_t *firstaddr)
 	 * XXX not fully used, underneath 2M pages
 	 */
 	for (i = 0; (i << PAGE_SHIFT) < *firstaddr; i++) {
-		((pt_entry_t *)KPTbase)[i] = i << PAGE_SHIFT;
-		((pt_entry_t *)KPTbase)[i] |=
+		((pt_entry_t *)kpt_base)[i] = i << PAGE_SHIFT;
+		((pt_entry_t *)kpt_base)[i] |=
 		    pmap_bits_default[PG_RW_IDX] |
 		    pmap_bits_default[PG_V_IDX] |
 		    pmap_bits_default[PG_G_IDX];
@@ -985,14 +985,14 @@ create_pagetables(vm_paddr_t *firstaddr)
 	 * data, bss, and initial pre-allocations.
 	 */
 	for (i = 0; i < nkpt_base; i++) {
-		((pd_entry_t *)KPDbase)[i] = KPTbase + (i << PAGE_SHIFT);
-		((pd_entry_t *)KPDbase)[i] |=
+		((pd_entry_t *)kpd_base)[i] = kpt_base + (i << PAGE_SHIFT);
+		((pd_entry_t *)kpd_base)[i] |=
 		    pmap_bits_default[PG_RW_IDX] |
 		    pmap_bits_default[PG_V_IDX];
 	}
 	for (i = 0; i < nkpt_phys; i++) {
-		((pd_entry_t *)KPDphys)[i] = KPTphys + (i << PAGE_SHIFT);
-		((pd_entry_t *)KPDphys)[i] |=
+		((pd_entry_t *)kpd_phys)[i] = kpt_phys + (i << PAGE_SHIFT);
+		((pd_entry_t *)kpd_phys)[i] |=
 		    pmap_bits_default[PG_RW_IDX] |
 		    pmap_bits_default[PG_V_IDX];
 	}
@@ -1003,8 +1003,8 @@ create_pagetables(vm_paddr_t *firstaddr)
 	 * above in the KERNBASE area.
 	 */
 	for (i = 0; (i << PDRSHIFT) < *firstaddr; i++) {
-		((pd_entry_t *)KPDbase)[i] = i << PDRSHIFT;
-		((pd_entry_t *)KPDbase)[i] |=
+		((pd_entry_t *)kpd_base)[i] = i << PDRSHIFT;
+		((pd_entry_t *)kpd_base)[i] |=
 		    pmap_bits_default[PG_RW_IDX] |
 		    pmap_bits_default[PG_V_IDX] |
 		    pmap_bits_default[PG_PS_IDX] |
@@ -1020,7 +1020,7 @@ create_pagetables(vm_paddr_t *firstaddr)
 	 */
 	for (i = 0; i < nkpd_phys; i++) {
 		((pdp_entry_t *)KPDPphys)[NKPML4E * NPDPEPG - NKPDPE + i] =
-				KPDphys + (i << PAGE_SHIFT);
+				kpd_phys + (i << PAGE_SHIFT);
 		((pdp_entry_t *)KPDPphys)[NKPML4E * NPDPEPG - NKPDPE + i] |=
 		    pmap_bits_default[PG_RW_IDX] |
 		    pmap_bits_default[PG_V_IDX] |
@@ -1033,7 +1033,7 @@ create_pagetables(vm_paddr_t *firstaddr)
 	i = (NKPML4E - 1) * NPDPEPG + KPDPI;
 	for (j = 0; j < NPDPEPG - KPDPI; ++j) {
 		((pdp_entry_t *)KPDPphys)[i + j] =
-				KPDbase + (j << PAGE_SHIFT);
+				kpd_base + (j << PAGE_SHIFT);
 		((pdp_entry_t *)KPDPphys)[i + j] |=
 		    pmap_bits_default[PG_RW_IDX] |
 		    pmap_bits_default[PG_V_IDX] |
@@ -1714,7 +1714,7 @@ pmap_page_init(struct vm_page *m)
  * Extract the physical page address associated with the map/VA pair.
  * The page must be wired for this to work reliably.
  */
-vm_paddr_t 
+vm_paddr_t
 pmap_extract(pmap_t pmap, vm_offset_t va, void **handlep)
 {
 	vm_paddr_t rtval;
@@ -3351,7 +3351,7 @@ pmap_growkernel(vm_offset_t kstart, vm_offset_t kend)
 					~(vm_offset_t)(PAGE_SIZE * NPTEPG - 1);
 			if (kernel_vm_end - 1 >= vm_map_max(kernel_map)) {
 				kernel_vm_end = vm_map_max(kernel_map);
-				break;                       
+				break;
 			}
 		}
 	}
@@ -3414,7 +3414,7 @@ pmap_growkernel(vm_offset_t kstart, vm_offset_t kend)
 				 ~(vm_offset_t)(PAGE_SIZE * NPTEPG - 1);
 			if (kstart - 1 >= vm_map_max(kernel_map)) {
 				kstart = vm_map_max(kernel_map);
-				break;                       
+				break;
 			}
 			continue;
 		}
@@ -3445,7 +3445,7 @@ pmap_growkernel(vm_offset_t kstart, vm_offset_t kend)
 
 		if (kstart - 1 >= vm_map_max(kernel_map)) {
 			kstart = vm_map_max(kernel_map);
-			break;                       
+			break;
 		}
 	}
 
@@ -5402,7 +5402,7 @@ pmap_object_init_pt(pmap_t pmap, vm_map_entry_t entry,
 
 	if (pindex + psize > object->size) {
 		if (object->size < pindex)
-			return;		  
+			return;
 		psize = object->size - pindex;
 	}
 
@@ -5645,10 +5645,10 @@ pmap_unwire(pmap_t pmap, vm_offset_t *pva)
  * This routine is only advisory and need not do anything.
  */
 void
-pmap_copy(pmap_t dst_pmap, pmap_t src_pmap, vm_offset_t dst_addr, 
+pmap_copy(pmap_t dst_pmap, pmap_t src_pmap, vm_offset_t dst_addr,
 	  vm_size_t len, vm_offset_t src_addr)
 {
-}	
+}
 
 /*
  * pmap_zero_page:
@@ -6316,7 +6316,7 @@ pmap_mincore(pmap_t pmap, vm_offset_t addr)
 	pt_entry_t *ptep, pte;
 	vm_page_t m;
 	int val = 0;
-	
+
 	ptep = pmap_pte(pmap, addr);
 
 	if (ptep && (pte = *ptep) != 0) {
@@ -6351,7 +6351,7 @@ pmap_mincore(pmap_t pmap, vm_offset_t addr)
 			val |= MINCORE_REFERENCED_OTHER;
 			vm_page_flag_set(m, PG_REFERENCED);
 		}
-	} 
+	}
 	return val;
 }
 
