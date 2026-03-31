@@ -1807,7 +1807,6 @@ libstdc++-v3/include/c_compatibility/inttypes.h
 libstdc++-v3/include/c_compatibility/iso646.h
 libstdc++-v3/include/c_compatibility/limits.h
 libstdc++-v3/include/c_compatibility/locale.h
-libstdc++-v3/include/c_compatibility/math.h
 libstdc++-v3/include/c_compatibility/setjmp.h
 libstdc++-v3/include/c_compatibility/signal.h
 libstdc++-v3/include/c_compatibility/stdarg.h
@@ -1815,7 +1814,6 @@ libstdc++-v3/include/c_compatibility/stdbool.h
 libstdc++-v3/include/c_compatibility/stddef.h
 libstdc++-v3/include/c_compatibility/stdint.h
 libstdc++-v3/include/c_compatibility/stdio.h
-libstdc++-v3/include/c_compatibility/stdlib.h
 libstdc++-v3/include/c_compatibility/string.h
 libstdc++-v3/include/c_compatibility/time.h
 libstdc++-v3/include/c_compatibility/uchar.h
