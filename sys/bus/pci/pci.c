@@ -63,15 +63,11 @@
 #include <bus/u4b/controller/ohcireg.h>
 #include <bus/u4b/controller/uhcireg.h>
 
+#include <contrib/dev/acpica/source/include/acpi.h>
+
+#include "acpi_if.h"
 #include "pcib_if.h"
 #include "pci_if.h"
-
-#ifdef __HAVE_ACPI
-#include <contrib/dev/acpica/acpi.h>
-#include "acpi_if.h"
-#else
-#define	ACPI_PWR_FOR_SLEEP(x, y, z)
-#endif
 
 typedef void	(*pci_read_cap_t)(device_t, int, int, pcicfgregs *);
 
