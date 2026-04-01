@@ -73,6 +73,8 @@ flags_to_string(u_long flags, const char *def)
 		SAPPEND("nodump");
 	if (flags & UF_OPAQUE)
 		SAPPEND("opaque");
+	if (flags & UF_XLINK)
+		SAPPEND("xlink");
 	if (flags & SF_APPEND)
 		SAPPEND("sappnd");
 	if (flags & SF_ARCHIVED)
@@ -168,6 +170,9 @@ string_to_flags(char **stringp, u_long *setp, u_long *clrp)
 			TEST(p, "uchg", UF_IMMUTABLE);
 			TEST(p, "uchange", UF_IMMUTABLE);
 			TEST(p, "uimmutable", UF_IMMUTABLE);
+			return (1);
+		case 'x':
+			TEST(p, "xlink", UF_XLINK);
 			return (1);
 		default:
 			return (1);
