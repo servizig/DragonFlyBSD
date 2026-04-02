@@ -46,6 +46,7 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 
 #ifndef _UEFI_DEVICE_PATH_LIB_H_
 #define _UEFI_DEVICE_PATH_LIB_H_
+
 #include <Uefi.h>
 #include <Protocol/DevicePathUtilities.h>
 #include <Protocol/DebugPort.h>
@@ -184,7 +185,7 @@ typedef struct {
 
 #pragma pack()
 
-#ifdef FreeBSD		/* Remove these on FreeBSD */
+#ifndef __DragonFly__	/* Remove these on DragonFly */
 
 /**
   Returns the size of a device path in bytes.
@@ -487,7 +488,7 @@ EFIAPI
 UefiDevicePathLibConvertTextToDevicePath (
   IN CONST CHAR16 *TextDevicePath
   );
-#else
+#else /* __DragonFly__ */
 
 /*
  * Small FreeBSD shim layer. Fast and lose hacks to make this code work with FreeBSD.
@@ -635,4 +636,4 @@ guid_str(const GUID *g)
 #undef GLOBAL_REMOVE_IF_UNREFERENCED
 #define GLOBAL_REMOVE_IF_UNREFERENCED static
 
-#endif
+#endif /* !__DragonFly__ */
