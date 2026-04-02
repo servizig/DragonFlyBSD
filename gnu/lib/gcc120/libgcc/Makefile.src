@@ -27,9 +27,6 @@ CFLAGS+=	-fno-lto
 LDFLAGS+=	-flto
 .endif
 
-FLAGS_GROUPS=		sse2
-sse2_FLAGS=		-msse2
-
 # From: libgcc/config/t-eh-dw2-dip
 LIB2ADDEH=	${srcdir}/unwind-dw2.c \
 		${srcdir}/unwind-dw2-fde-dip.c \
@@ -48,7 +45,7 @@ softfp_exclude_libgcc2=	n
 
 # From: libgcc/config/i386/64/t-softfp
 softfp_extras=		fixhfti fixunshfti floattihf floatuntihf
-sse2_FLAGS_FILES+=	fixhfti.c fixunshfti.c floattihf.c floatuntihf.c
+sse2_files+=		fixhfti.c fixunshfti.c floattihf.c floatuntihf.c
 
 # From: libgcc/config/i386/t-softfp
 # {{{
@@ -65,7 +62,7 @@ softfp_extensions=	hfsf hfdf hftf hfxf sfdf sftf dftf xftf
 softfp_truncations=	tfhf xfhf dfhf sfhf tfsf dfsf tfdf tfxf
 
 softfp_extras+=		eqhf2
-sse2_FLAGS_FILES+=	extendhfsf2.c \
+sse2_files+=		extendhfsf2.c \
 			extendhfdf2.c \
 			extendhftf2.c \
 			extendhfxf2.c \

@@ -27,6 +27,10 @@ CFLAGS+=	-D_AVOID_WEAKREF
 OBJS=		${LIB2OBJS}
 SRCS=		${LIB2ADD:T} ${LIB2ADDEH:T}
 
+FLAGS_GROUPS=		sse2
+sse2_FLAGS=		-msse2
+sse2_FLAGS_FILES=	${sse2_files}
+
 # generated sources
 SRCS+=		unwind.h md-unwind-support.h gthr-default.h sfp-machine.h
 

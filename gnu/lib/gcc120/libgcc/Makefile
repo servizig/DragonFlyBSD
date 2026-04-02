@@ -34,6 +34,10 @@ CFLAGS+=	-DHIDE_EXPORTS
 OBJS=		${LIB2OBJS} ${LIB2OBJS_ST}
 SRCS=		${LIB2ADD:T}
 
+FLAGS_GROUPS=		sse2
+sse2_FLAGS=		-msse2
+sse2_FLAGS_FILES=	${sse2_files}
+
 # generated sources
 SRCS+=		gthr-default.h sfp-machine.h unwind.h
 
