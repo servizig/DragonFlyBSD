@@ -27,10 +27,24 @@
 
 .include <bsd.init.mk>
 
-# If SUBDIR_ORDERED not specified we default strongly ordering all
-# subdirectories.
-#
-SUBDIR_ORDERED?= ${SUBDIR}
+.if !defined(SUBDIR_ORDERED)
+
+# SUBDIR_ORDERED unspecified: order all subdirectories
+SUBDIR_ORDERED=	${SUBDIR}
+
+.elif !empty(SUBDIR_ORDERED)
+
+# Rearrange the subdirectories in SUBDIR according to SUBDIR_ORDERED so
+# that the order is correct for the non-parallel mode, because '.ORDER'
+# only applies to the parallel mode.
+. for entry in ${SUBDIR}
+.  if !${SUBDIR_ORDERED:M${entry}}
+__subdir+=	${entry}
+.  endif
+. endfor
+SUBDIR:=	${__subdir} ${SUBDIR_ORDERED}
+
+.endif
 
 __targets= \
 	checkdpadd clean cleandepend cleandir cleanobj \
@@ -48,9 +62,10 @@ ${__target}: _SUBDIR_${__target}
 
 _SUBDIR_${__target}: ${SUBDIR:S/^/_SUBDIR_${__target}_/}
 
+.if !empty(SUBDIR_ORDERED)
 # order subdirectories for each target, set up dependency
-#
 .ORDER: ${SUBDIR_ORDERED:S/^/_SUBDIR_${__target}_/}
+.endif
 
 # Now create the command set for each subdirectory and target
 #
