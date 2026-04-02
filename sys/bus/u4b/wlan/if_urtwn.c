@@ -342,13 +342,15 @@ static void		urtwn_pa_bias_init(struct urtwn_softc *);
 static void		urtwn_rxfilter_init(struct urtwn_softc *);
 static void		urtwn_edca_init(struct urtwn_softc *);
 static void		urtwn_write_txpower(struct urtwn_softc *, int,
-			    uint16_t[]);
+			    uint16_t[URTWN_RIDX_COUNT]);
 static void		urtwn_get_txpower(struct urtwn_softc *, int,
 			    struct ieee80211_channel *,
-			    struct ieee80211_channel *, uint16_t[]);
+			    struct ieee80211_channel *,
+			    uint16_t[URTWN_RIDX_COUNT]);
 static void		urtwn_r88e_get_txpower(struct urtwn_softc *, int,
 			    struct ieee80211_channel *,
-			    struct ieee80211_channel *, uint16_t[]);
+			    struct ieee80211_channel *,
+			    uint16_t[URTWN_RIDX_COUNT]);
 static void		urtwn_set_txpower(struct urtwn_softc *,
 			    struct ieee80211_channel *,
 			    struct ieee80211_channel *);

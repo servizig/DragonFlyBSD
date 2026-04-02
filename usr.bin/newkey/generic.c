@@ -50,7 +50,7 @@
 
 #include "externs.h"
 
-static void	adjust(char[], char *);
+static void	adjust(char[HEXKEYBYTES+1], char *);
 static BIGNUM	*itobn(long i);
 
 /*
