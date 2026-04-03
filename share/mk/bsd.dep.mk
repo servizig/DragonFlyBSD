@@ -117,9 +117,6 @@ ${_YC}: ${_YSRC}
 .if defined(SRCS)
 depend: beforedepend _dependincs ${DEPENDFILE} afterdepend
 
-# Tell bmake not to look for generated files via .PATH
-.NOPATH: ${DEPENDFILE}
-
 # Different types of sources are compiled with slightly different flags.
 # Split up the sources, and filter out headers and non-applicable flags.
 # Separate flag groups out of the sources and treat them differently.
@@ -135,6 +132,9 @@ __FLAGS_FILES:=	${__FLAGS_FILES:N${_FFILE}}
 _DEPENDFILES=	${FLAGS_GROUPS:S/^/.depend_/g}
 
 ${DEPENDFILE}: ${_DEPENDFILES}
+
+# Tell bmake not to look for generated files via .PATH
+${DEPENDFILE} ${_DEPENDFILES}: .NOPATH
 
 #
 # __FLAG_FILES is built from SRCS.  That means it will contain
