@@ -152,8 +152,7 @@ _ALL_DEPENDS=${__FLAGS_FILES:N*.[sS]:N*.c:N*.cc:N*.C:N*.cpp:N*.cpp:N*.cxx:N*.m}
 
 .for _FG in _ ${FLAGS_GROUPS}
 .depend${_FG:S/^/_/:N__}: ${${_FG}_FLAGS_FILES} ${_ALL_DEPENDS}
-	-rm -f ${.TARGET}
-	-> ${.TARGET}
+	rm -f ${.TARGET}
 .if ${${_FG}_FLAGS_FILES:M*.[csS]} != ""
 	${_MKDEPENV} CC=${MKDEPCC} ${MKDEPCMD} -f ${.TARGET} -a ${MKDEP} \
 	    ${${_FG}_FLAGS} \
