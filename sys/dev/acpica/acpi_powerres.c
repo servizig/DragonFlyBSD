@@ -311,7 +311,7 @@ acpi_pwr_switch_consumer(ACPI_HANDLE consumer, int state)
     ACPI_BUFFER			reslist_buffer;
     ACPI_OBJECT			*reslist_object;
     ACPI_STATUS			status;
-    char			*method_name, *reslist_name;
+    char			*method_name, *reslist_name = NULL;
 
     ACPI_FUNCTION_TRACE((char *)(uintptr_t)__func__);
 
@@ -330,9 +330,26 @@ acpi_pwr_switch_consumer(ACPI_HANDLE consumer, int state)
 	    panic("acpi added power consumer but can't find it");
     }
 
-    /* Check for valid transitions.  We can only go to D0 from D3. */
+    /* Stop here if we're already at the target D-state. */
+    if (pc->ac_state == state) {
+	status = AE_OK;
+	goto out;
+    }
+
+    /*
+     * Check for valid transitions.  From D3hot or D3cold, we can only go to D0.
+     * The exception to this is going from D3hot to D3cold or the other way
+     * around.  This is because they both use _PS3, so the only difference when
+     * doing these transitions is whether or not the power resources for _PR3
+     * are on for devices which support D3cold, and turning these power
+     * resources on/off is always perfectly fine (ACPI 7.3.11).
+     */
     status = AE_BAD_PARAMETER;
-    if (pc->ac_state == ACPI_STATE_D3 && state != ACPI_STATE_D0)
+    if (pc->ac_state == ACPI_STATE_D3_HOT && state != ACPI_STATE_D0 &&
+	state != ACPI_STATE_D3_COLD)
+	goto out;
+    if (pc->ac_state == ACPI_STATE_D3_COLD && state != ACPI_STATE_D0 &&
+	state != ACPI_STATE_D3_HOT)
 	goto out;
 
     /* Find transition mechanism(s) */
@@ -349,9 +366,13 @@ acpi_pwr_switch_consumer(ACPI_HANDLE consumer, int state)
 	method_name = "_PS2";
 	reslist_name = "_PR2";
 	break;
-    case ACPI_STATE_D3:
+    case ACPI_STATE_D3_HOT:
 	method_name = "_PS3";
 	reslist_name = "_PR3";
+	break;
+    case ACPI_STATE_D3_COLD:
+	method_name = "_PS3";
+	reslist_name = NULL;
 	break;
     default:
 	goto out;
@@ -372,7 +393,8 @@ acpi_pwr_switch_consumer(ACPI_HANDLE consumer, int state)
      */
     if (ACPI_FAILURE(AcpiGetHandle(consumer, method_name, &method_handle)))
 	method_handle = NULL;
-    if (ACPI_FAILURE(AcpiGetHandle(consumer, reslist_name, &reslist_handle)))
+    if (reslist_name == NULL ||
+	ACPI_FAILURE(AcpiGetHandle(consumer, reslist_name, &reslist_handle)))
 	reslist_handle = NULL;
     if (reslist_handle == NULL && method_handle == NULL) {
 	if (state == ACPI_STATE_D0) {
@@ -380,7 +402,9 @@ acpi_pwr_switch_consumer(ACPI_HANDLE consumer, int state)
 	    status = AE_OK;
 	    goto out;
 	}
-	if (state != ACPI_STATE_D3) {
+	if (state == ACPI_STATE_D3_COLD)
+	    state = ACPI_STATE_D3_HOT;
+	if (state != ACPI_STATE_D3_HOT) {
 	    ACPI_DEBUG_PRINT((ACPI_DB_OBJECTS,
 		"attempt to set unsupported state %s\n",
 		acpi_d_state_to_str(state)));

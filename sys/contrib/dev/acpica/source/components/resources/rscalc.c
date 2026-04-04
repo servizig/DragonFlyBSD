@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2021, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2025, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -480,6 +480,13 @@ AcpiRsGetAmlLength (
 
             break;
 
+        case ACPI_RESOURCE_TYPE_CLOCK_INPUT:
+
+            TotalSize = (ACPI_RS_LENGTH) (TotalSize +
+                Resource->Data.ClockInput.ResourceSource.StringLength);
+
+            break;
+
 
         case ACPI_RESOURCE_TYPE_SERIAL_BUS:
 
@@ -733,7 +740,7 @@ AcpiRsGetListLength (
             }
             break;
 
-        case ACPI_RESOURCE_NAME_SERIAL_BUS:
+        case ACPI_RESOURCE_NAME_SERIAL_BUS: {
 
             MinimumAmlResourceLength = AcpiGbl_ResourceAmlSerialBusSizes[
                 AmlResource->CommonSerialBus.Type];
@@ -741,6 +748,7 @@ AcpiRsGetListLength (
                 AmlResource->CommonSerialBus.ResourceLength -
                 MinimumAmlResourceLength;
             break;
+        }
 
         case ACPI_RESOURCE_NAME_PIN_CONFIG:
 
@@ -786,6 +794,12 @@ AcpiRsGetListLength (
                 AmlResource->PinGroupConfig.VendorOffset -
                 AmlResource->PinGroupConfig.ResSourceOffset +
                 AmlResource->PinGroupConfig.VendorLength;
+
+            break;
+
+        case ACPI_RESOURCE_NAME_CLOCK_INPUT:
+            ExtraStructBytes = AcpiRsStreamOptionLength (
+                ResourceLength, MinimumAmlResourceLength);
 
             break;
 

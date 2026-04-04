@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2021, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2025, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -431,13 +431,13 @@ AcpiRsGetAddressCommon (
     ACPI_RESOURCE           *Resource,
     AML_RESOURCE            *Aml)
 {
-    ACPI_FUNCTION_ENTRY ();
-
+    ACPI_FUNCTION_ENTRY();
 
     /* Validate the Resource Type */
 
     if ((Aml->Address.ResourceType > 2) &&
-        (Aml->Address.ResourceType < 0xC0))
+        (Aml->Address.ResourceType < 0xC0) &&
+        (Aml->Address.ResourceType != 0x0A))
     {
         return (FALSE);
     }
@@ -491,7 +491,6 @@ AcpiRsSetAddressCommon (
     ACPI_RESOURCE           *Resource)
 {
     ACPI_FUNCTION_ENTRY ();
-
 
     /* Set the Resource Type and General Flags */
 

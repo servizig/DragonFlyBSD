@@ -28,7 +28,7 @@
 .\" OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd May 29, 2020
+.Dd April 4, 2026
 .Dt IASL 8
 .Os
 .Sh NAME
@@ -78,6 +78,8 @@ Obtain the DSDT from the current system if no input file has it.
 Force the disassembler to assume the table contains valid AML.
 .It Fl dl
 Emit legacy ASL code only (no C-style operators).
+.It Fl ds Ar signature(4)
+Specify a table signature(4) (CDAT table only).
 .It Fl dv
 Set verbose option.
 .It Fl e Ar file ...
@@ -112,6 +114,8 @@ When compiling, ignore NoOp operators.
 .It Fl l
 When compiling, create mixed listing file (ASL source and AML) (*.lst).
 When disassembling, disassemble to mixed ASL and AML code.
+.It Fl ld
+Disable deterministic output.
 .It Fl li
 Create preprocessed output file (*.i).
 .It Fl lm

@@ -2799,6 +2799,7 @@ ${ACPICA_COMP_DIR}/utilities/utaddress.c	optional acpi
 ${ACPICA_COMP_DIR}/utilities/utalloc.c		optional acpi
 ${ACPICA_COMP_DIR}/utilities/utascii.c		optional acpi
 ${ACPICA_COMP_DIR}/utilities/utbuffer.c		optional acpi
+${ACPICA_COMP_DIR}/utilities/utcksum.c		optional acpi
 ${ACPICA_COMP_DIR}/utilities/utcopy.c		optional acpi
 ${ACPICA_COMP_DIR}/utilities/utdebug.c		optional acpi
 ${ACPICA_COMP_DIR}/utilities/utdecode.c		optional acpi

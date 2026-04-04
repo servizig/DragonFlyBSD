@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2021, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2025, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -364,11 +364,11 @@ AcpiPsGetArguments (
  ******************************************************************************/
 
 #ifdef _KERNEL
-#define TDTRACKER	mycpu->gd_curthread->td_tracker
-#define TDTRACKER_INC	++mycpu->gd_curthread->td_tracker
-#define TDTRACKER_DEC	--mycpu->gd_curthread->td_tracker
+#define TDTRACKER       mycpu->gd_curthread->td_tracker
+#define TDTRACKER_INC   ++mycpu->gd_curthread->td_tracker
+#define TDTRACKER_DEC   --mycpu->gd_curthread->td_tracker
 #else
-#define TDTRACKER	0
+#define TDTRACKER       0
 #define TDTRACKER_INC
 #define TDTRACKER_DEC
 #endif
@@ -393,9 +393,9 @@ AcpiPsParseLoop (
     }
     if (TDTRACKER > 5) {
 #ifdef _KERNEL
-	kprintf("AcpiPsParseLoop - Recursed too deep\n");
+        kprintf("AcpiPsParseLoop - Recursed too deep\n");
 #else
-	printf("AcpiPsParseLoop - Recursed too deep\n");
+        printf("AcpiPsParseLoop - Recursed too deep\n");
 #endif
         return_ACPI_STATUS (AE_BAD_PARAMETER);
     }
@@ -438,7 +438,7 @@ AcpiPsParseLoop (
                     }
 
                     ACPI_EXCEPTION ((AE_INFO, Status, "GetPredicate Failed"));
-		    TDTRACKER_DEC;
+                    TDTRACKER_DEC;
                     return_ACPI_STATUS (Status);
                 }
 
@@ -495,14 +495,14 @@ AcpiPsParseLoop (
 
                 if (Status == AE_CTRL_TERMINATE)
                 {
-		    TDTRACKER_DEC;
+                    TDTRACKER_DEC;
                     return_ACPI_STATUS (Status);
                 }
 
                 Status = AcpiPsCompleteOp (WalkState, &Op, Status);
                 if (ACPI_FAILURE (Status))
                 {
-		    TDTRACKER_DEC;
+                    TDTRACKER_DEC;
                     return_ACPI_STATUS (Status);
                 }
                 if (AcpiNsOpensScope (
@@ -571,7 +571,7 @@ AcpiPsParseLoop (
                 Status = AcpiPsCompleteOp (WalkState, &Op, Status);
                 if (ACPI_FAILURE (Status))
                 {
-		    TDTRACKER_DEC;
+                    TDTRACKER_DEC;
                     return_ACPI_STATUS (Status);
                 }
                 if ((WalkState->ControlState) &&
@@ -622,7 +622,7 @@ AcpiPsParseLoop (
                 Status = AcpiPsCompleteOp (WalkState, &Op, Status);
                 if (ACPI_FAILURE (Status))
                 {
-		    TDTRACKER_DEC;
+                    TDTRACKER_DEC;
                     return_ACPI_STATUS (Status);
                 }
 
@@ -710,7 +710,7 @@ AcpiPsParseLoop (
         Status = AcpiPsCompleteOp (WalkState, &Op, Status);
         if (ACPI_FAILURE (Status))
         {
-	    TDTRACKER_DEC;
+            TDTRACKER_DEC;
             return_ACPI_STATUS (Status);
         }
 

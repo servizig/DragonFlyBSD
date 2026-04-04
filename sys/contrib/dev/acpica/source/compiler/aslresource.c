@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2021, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2025, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -762,6 +762,12 @@ RsDoOneResourceDescriptor (
 
     switch (Info->DescriptorTypeOp->Asl.ParseOpcode)
     {
+
+    case PARSEOP_CLOCKINPUT:
+
+        Rnode = RsDoClockInputDescriptor(Info);
+        break;
+
     case PARSEOP_DMA:
 
         Rnode = RsDoDmaDescriptor (Info);
@@ -780,6 +786,11 @@ RsDoOneResourceDescriptor (
     case PARSEOP_DWORDMEMORY:
 
         Rnode = RsDoDwordMemoryDescriptor (Info);
+        break;
+
+    case PARSEOP_DWORDPCC:
+
+        Rnode = RsDoDwordPccDescriptor (Info);
         break;
 
     case PARSEOP_DWORDSPACE:
@@ -883,6 +894,11 @@ RsDoOneResourceDescriptor (
         Rnode = RsDoQwordMemoryDescriptor (Info);
         break;
 
+    case PARSEOP_QWORDPCC:
+
+        Rnode = RsDoQwordPccDescriptor (Info);
+        break;
+
     case PARSEOP_QWORDSPACE:
 
         Rnode = RsDoQwordSpaceDescriptor (Info);
@@ -955,6 +971,11 @@ RsDoOneResourceDescriptor (
     case PARSEOP_WORDIO:
 
         Rnode = RsDoWordIoDescriptor (Info);
+        break;
+
+    case PARSEOP_WORDPCC:
+
+        Rnode = RsDoWordPccDescriptor (Info);
         break;
 
     case PARSEOP_WORDSPACE:

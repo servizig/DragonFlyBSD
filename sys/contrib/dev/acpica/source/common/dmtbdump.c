@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2021, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2025, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -266,14 +266,7 @@ AcpiDmDumpBuffer (
         /* Done with that line. */
         /* Close the comment and insert a backslash - line continuation character */
 
-        if (Length > 16)
-        {
-            AcpiOsPrintf (" */\\");
-        }
-        else
-        {
-            AcpiOsPrintf (" */\\");
-        }
+        AcpiOsPrintf (" */\\");
 
         i += 16; /* Point to next line */
     }
@@ -384,7 +377,7 @@ AcpiDmDumpRsdp (
 
     /* Validate the first checksum */
 
-    Checksum = AcpiDmGenerateChecksum (Rsdp, sizeof (ACPI_RSDP_COMMON),
+    Checksum = AcpiUtGenerateChecksum (Rsdp, sizeof (ACPI_RSDP_COMMON),
         Rsdp->Checksum);
     if (Checksum != Rsdp->Checksum)
     {
@@ -405,7 +398,7 @@ AcpiDmDumpRsdp (
 
         /* Validate the extended checksum over entire RSDP */
 
-        Checksum = AcpiDmGenerateChecksum (Rsdp, sizeof (ACPI_TABLE_RSDP),
+        Checksum = AcpiUtGenerateChecksum (Rsdp, sizeof (ACPI_TABLE_RSDP),
             Rsdp->ExtendedChecksum);
         if (Checksum != Rsdp->ExtendedChecksum)
         {
@@ -569,7 +562,7 @@ AcpiDmDumpFadt (
 
         /* Check for FADT revision 6 fields and up (ACPI 6.0+) */
 
-        if (Table->Length > ACPI_FADT_V3_SIZE)
+        if (Table->Length > ACPI_FADT_V5_SIZE)
         {
             Status = AcpiDmDumpTable (Table->Length, 0, Table, 0,
                 AcpiDmTableInfoFadt6);
@@ -640,6 +633,11 @@ AcpiDmValidateFadtLength (
     case 5:
 
         ExpectedLength = ACPI_FADT_V5_SIZE;
+        break;
+
+    case 6:
+
+        ExpectedLength = ACPI_FADT_V6_SIZE;
         break;
 
     default:

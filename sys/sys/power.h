@@ -73,7 +73,8 @@ EVENTHANDLER_DECLARE(power_profile_change, power_profile_change_hook);
 static __inline const char *
 powerstate_to_str(int state)
 {
-	static const char * const strs[] = { "D0", "D1", "D2", "D3" };
+	static const char * const strs[] = { "D0", "D1", "D2", "D3hot",
+	    "D3cold" };
 
 	return (strs[state]);
 }

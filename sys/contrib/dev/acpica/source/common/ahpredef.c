@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2021, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2025, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -234,6 +234,7 @@ const AH_PREDEFINED_NAME    AslPredefinedInfo[] =
     AH_PREDEF ("_DMA",    "Direct Memory Access", "Returns device current resources for DMA transactions, and resource field"),
     AH_PREDEF ("_DOD",    "Display Output Devices", "Enumerate all devices attached to the display adapter"),
     AH_PREDEF ("_DOS",    "Disable Output Switching", "Sets the display output switching mode"),
+    AH_PREDEF ("_DSC",    "Deepest State for Configuration", "Returns the deepest D-state of the device to the OSPM"),
     AH_PREDEF ("_DPL",    "Device Selection Polarity", "Polarity of Device Selection signal, Resource Descriptor field"),
     AH_PREDEF ("_DRS",    "Drive Strength", "Drive Strength setting for GPIO connection, Resource Descriptor field"),
     AH_PREDEF ("_DSD",    "Device-Specific Data", "Returns a list of device property information"),
@@ -279,6 +280,7 @@ const AH_PREDEFINED_NAME    AslPredefinedInfo[] =
     AH_PREDEF ("_HOT",    "Hot Temperature", "Returns the critical temperature for sleep (entry to S4)"),
     AH_PREDEF ("_HPP",    "Hot Plug Parameters", "Returns a list of hot-plug information for a PCI device"),
     AH_PREDEF ("_HPX",    "Hot Plug Parameter Extensions", "Returns a list of hot-plug information for a PCI device. Supersedes _HPP"),
+    AH_PREDEF ("_VDM",    "Voltage Domain", "A DWORD identifier specifying the voltage domain to which the processor belongs."),
     AH_PREDEF ("_HRV",    "Hardware Revision", "Returns a hardware revision value"),
     AH_PREDEF ("_IFT",    "IPMI Interface Type", "See the Intelligent Platform Management Interface Specification"),
     AH_PREDEF ("_INI",    "Initialize", "Performs device specific initialization"),

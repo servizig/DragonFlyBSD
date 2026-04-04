@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2021, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2025, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -658,8 +658,12 @@ typedef UINT64                          ACPI_INTEGER;
 /* Pointer/Integer type conversions */
 
 #define ACPI_TO_POINTER(i)              ACPI_CAST_PTR (void, (ACPI_SIZE) (i))
+#ifndef ACPI_TO_INTEGER
 #define ACPI_TO_INTEGER(p)              ACPI_PTR_DIFF (p, (void *) 0)
+#endif
+#ifndef ACPI_OFFSET
 #define ACPI_OFFSET(d, f)               ACPI_PTR_DIFF (&(((d *) 0)->f), (void *) 0)
+#endif
 #define ACPI_PTR_TO_PHYSADDR(i)         ACPI_TO_INTEGER(i)
 
 /* Optimizations for 4-character (32-bit) ACPI_NAME manipulation */
@@ -669,12 +673,12 @@ typedef UINT64                          ACPI_INTEGER;
 #define ACPI_COPY_NAMESEG(dest,src)     (*ACPI_CAST_PTR (UINT32, (dest)) = *ACPI_CAST_PTR (UINT32, (src)))
 #else
 #define ACPI_COMPARE_NAMESEG(a,b)       (!strncmp (ACPI_CAST_PTR (char, (a)), ACPI_CAST_PTR (char, (b)), ACPI_NAMESEG_SIZE))
-#define ACPI_COPY_NAMESEG(dest,src)     (strncpy (ACPI_CAST_PTR (char, (dest)), ACPI_CAST_PTR (char, (src)), ACPI_NAMESEG_SIZE))
+#define ACPI_COPY_NAMESEG(dest,src)     (memcpy (ACPI_CAST_PTR (char, (dest)), ACPI_CAST_PTR (char, (src)), ACPI_NAMESEG_SIZE))
 #endif
 
 /* Support for the special RSDP signature (8 characters) */
 
-#define ACPI_VALIDATE_RSDP_SIG(a)       (!strncmp (ACPI_CAST_PTR (char, (a)), ACPI_SIG_RSDP, 8))
+#define ACPI_VALIDATE_RSDP_SIG(a)       (!strncmp (ACPI_CAST_PTR (char, (a)), ACPI_SIG_RSDP, (sizeof(a) < 8) ? ACPI_NAMESEG_SIZE : 8))
 #define ACPI_MAKE_RSDP_SIG(dest)        (memcpy (ACPI_CAST_PTR (char, (dest)), ACPI_SIG_RSDP, 8))
 
 /* Support for OEMx signature (x can be any character) */
@@ -686,14 +690,14 @@ typedef UINT64                          ACPI_INTEGER;
  * Can be used with AccessSize field of ACPI_GENERIC_ADDRESS and
  * ACPI_RESOURCE_GENERIC_REGISTER.
  */
-#define ACPI_ACCESS_BIT_SHIFT		2
-#define ACPI_ACCESS_BYTE_SHIFT		-1
-#define ACPI_ACCESS_BIT_MAX		(31 - ACPI_ACCESS_BIT_SHIFT)
-#define ACPI_ACCESS_BYTE_MAX		(31 - ACPI_ACCESS_BYTE_SHIFT)
-#define ACPI_ACCESS_BIT_DEFAULT		(8 - ACPI_ACCESS_BIT_SHIFT)
-#define ACPI_ACCESS_BYTE_DEFAULT	(8 - ACPI_ACCESS_BYTE_SHIFT)
-#define ACPI_ACCESS_BIT_WIDTH(size)	(1 << ((size) + ACPI_ACCESS_BIT_SHIFT))
-#define ACPI_ACCESS_BYTE_WIDTH(size)	(1 << ((size) + ACPI_ACCESS_BYTE_SHIFT))
+#define ACPI_ACCESS_BIT_SHIFT           2
+#define ACPI_ACCESS_BYTE_SHIFT          -1
+#define ACPI_ACCESS_BIT_MAX             (31 - ACPI_ACCESS_BIT_SHIFT)
+#define ACPI_ACCESS_BYTE_MAX            (31 - ACPI_ACCESS_BYTE_SHIFT)
+#define ACPI_ACCESS_BIT_DEFAULT         (8 - ACPI_ACCESS_BIT_SHIFT)
+#define ACPI_ACCESS_BYTE_DEFAULT        (8 - ACPI_ACCESS_BYTE_SHIFT)
+#define ACPI_ACCESS_BIT_WIDTH(size)     (1 << ((size) + ACPI_ACCESS_BIT_SHIFT))
+#define ACPI_ACCESS_BYTE_WIDTH(size)    (1 << ((size) + ACPI_ACCESS_BYTE_SHIFT))
 
 /*******************************************************************************
  *
@@ -737,9 +741,11 @@ typedef UINT64                          ACPI_INTEGER;
 #define ACPI_STATE_D0                   (UINT8) 0
 #define ACPI_STATE_D1                   (UINT8) 1
 #define ACPI_STATE_D2                   (UINT8) 2
-#define ACPI_STATE_D3                   (UINT8) 3
-#define ACPI_D_STATES_MAX               ACPI_STATE_D3
-#define ACPI_D_STATE_COUNT              4
+#define ACPI_STATE_D3_HOT               (UINT8) 3
+#define ACPI_STATE_D3_COLD              (UINT8) 4
+#define ACPI_STATE_D3                   ACPI_STATE_D3_COLD
+#define ACPI_D_STATES_MAX               ACPI_STATE_D3_COLD
+#define ACPI_D_STATE_COUNT              5
 
 #define ACPI_STATE_C0                   (UINT8) 0
 #define ACPI_STATE_C1                   (UINT8) 1
@@ -1331,6 +1337,12 @@ typedef struct acpi_pcc_info {
     UINT8                           *InternalBuffer;
 } ACPI_PCC_INFO;
 
+/* Special Context data for FFH Opregion (ACPI 6.5) */
+
+typedef struct acpi_ffh_info {
+    UINT64                          Offset;
+    UINT64                          Length;
+} ACPI_FFH_INFO;
 
 typedef
 ACPI_STATUS (*ACPI_ADR_SPACE_SETUP) (
@@ -1470,7 +1482,7 @@ typedef struct acpi_mem_space_context
 
 } ACPI_MEM_SPACE_CONTEXT;
 
-typedef struct acpi_data_table_space_context
+typedef struct acpi_data_table_mapping
 {
     void                            *Pointer;
 
@@ -1550,6 +1562,8 @@ typedef enum
 #define ACPI_OSI_WIN_10_RS5             0x13
 #define ACPI_OSI_WIN_10_19H1            0x14
 #define ACPI_OSI_WIN_10_20H1            0x15
+#define ACPI_OSI_WIN_11                 0x16
+#define ACPI_OSI_WIN_11_22H2            0x17
 
 
 /* Definitions of getopt */
@@ -1560,6 +1574,14 @@ typedef enum
 
 #ifndef ACPI_FALLTHROUGH
 #define ACPI_FALLTHROUGH do {} while(0)
+#endif
+
+#ifndef ACPI_FLEX_ARRAY
+#define ACPI_FLEX_ARRAY(TYPE, NAME)     TYPE NAME[0]
+#endif
+
+#ifndef ACPI_NONSTRING
+#define ACPI_NONSTRING	/* No terminating NUL character */
 #endif
 
 #endif /* __ACTYPES_H__ */

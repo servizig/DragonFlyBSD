@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2021, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2025, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -317,7 +317,7 @@ AslDetectSourceFileType (
     else
     {
         fprintf (stderr,
-            "Binary file does not contain a valid ACPI table\n");
+            "Binary file does not contain a valid standard ACPI table\n");
     }
 
     Type = ASL_INPUT_TYPE_BINARY;

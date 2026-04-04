@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2021, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2025, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -790,7 +790,7 @@ TrCreateConstantLeafOp (
 
     DbgPrint (ASL_PARSE_OUTPUT,
         "\nCreateConstantLeafOp  Ln/Col %u/%u NewOp %p  "
-        "Op %s  Value %8.8X%8.8X  \n",
+        "Op %s  Value %8.8X%8.8X\n",
         Op->Asl.LineNumber, Op->Asl.Column, Op, UtGetOpName (ParseOpcode),
         ACPI_FORMAT_UINT64 (Op->Asl.Value.Integer));
 
@@ -816,6 +816,8 @@ TrAllocateOp (
 {
     ACPI_PARSE_OBJECT       *Op;
     ACPI_PARSE_OBJECT       *LatestOp;
+
+    ACPI_FUNCTION_NAME (TrAllocateOp);
 
 
     Op = UtParseOpCacheCalloc ();
@@ -861,7 +863,7 @@ TrAllocateOp (
         }
 
         AslGbl_CommentState.LatestParseOp = Op;
-        CvDbgPrint ("TrAllocateOp=Set latest parse op to this op.\n");
+        CvDbgPrint ("%s=Set latest parse op to this op.\n",  ACPI_GET_FUNCTION_NAME);
         CvDbgPrint ("           Op->Asl.ParseOpName = %s\n",
             AslGbl_CommentState.LatestParseOp->Asl.ParseOpName);
         CvDbgPrint ("           Op->Asl.ParseOpcode = 0x%x\n", ParseOpcode);
