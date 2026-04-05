@@ -1215,7 +1215,6 @@ libstdc++-v3/Makefile.in
 libstdc++-v3/README
 libstdc++-v3/acinclude.m4
 libstdc++-v3/aclocal.m4
-libstdc++-v3/config/abi/compatibility.h
 libstdc++-v3/config/abi/post/
 libstdc++-v3/config/abi/pre/gnu-versioned-namespace.ver
 libstdc++-v3/config/abi/pre/none.ver
