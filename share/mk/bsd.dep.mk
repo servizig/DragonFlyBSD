@@ -148,7 +148,7 @@ ${DEPENDFILE} ${_DEPENDFILES}: .NOPATH
 # by the mkdep calls, i.e. all sources that are not being used directly
 # for the .depend* file.
 #
-_ALL_DEPENDS=${__FLAGS_FILES:N*.[sS]:N*.c:N*.cc:N*.C:N*.cpp:N*.cxx:N*.m}
+_ALL_DEPENDS=${__FLAGS_FILES:N*.[csS]:N*.cc:N*.C:N*.cpp:N*.cxx:N*.m}
 
 .for _FG in _ ${FLAGS_GROUPS}
 .depend${_FG:S/^/_/:N__}: ${${_FG}_FLAGS_FILES} ${_ALL_DEPENDS}
@@ -179,6 +179,9 @@ _ALL_DEPENDS=${__FLAGS_FILES:N*.[sS]:N*.c:N*.cc:N*.C:N*.cpp:N*.cxx:N*.m}
 	    ${OBJCFLAGS:M-Wno-import*} \
 	    ${.ALLSRC:M*.m}
 .endif
+	# In case that the custom ${MKDEPCMD} does not create the depend file
+	# for empty dependency.
+	>> ${.TARGET}
 .if ${_FG} == "_" && !empty(_DEPENDFILES)
 	cat ${_DEPENDFILES} >> ${.TARGET}
 .endif
