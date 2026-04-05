@@ -3964,6 +3964,8 @@ TO_REMOVE+=/usr/share/man/man4/aesni.4.gz
 TO_REMOVE+=/boot/kernel/aesni.ko
 TO_REMOVE+=/usr/include/crypto
 TO_REMOVE+=/usr/include/vfs/mfs
+TO_REMOVE+=/usr/lib/gcc120/libstd++fs.a
+TO_REMOVE+=/usr/lib/gcc120/profile/libstd++fs.a
 
 .if !defined(WANT_INSTALLER)
 TO_REMOVE+=/usr/sbin/dfuibe_installer

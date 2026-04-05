@@ -4,7 +4,7 @@ GCC_NO_INC=	yes
 SRCDIR=	${GCCDIR}/libstdc++-v3
 .PATH:	${SRCDIR}/src/filesystem
 
-LIB=		std++fs
+LIB=		stdc++fs
 
 NOSHARED=	yes
 
