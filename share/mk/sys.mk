@@ -117,8 +117,6 @@ PFLAGS		?=
 RC		?=	f77
 RFLAGS		?=
 
-SHELL		?=	sh
-
 YACC		?=	yacc
 .if defined(%POSIX)
 YFLAGS		?=
@@ -352,6 +350,10 @@ OBJFORMAT?=	elf
 
 # Tell bmake to expand -V VAR by default
 .MAKE.EXPAND_VARIABLES= yes
+
+# The SHELL macro is not used by bmake to set the command interpreter,
+# but may be used in the makefiles, so wee need a Bourne/POSIX shell.
+SHELL:=	${.SHELL:Ush}
 
 .if !defined(.PARSEDIR)
 # Not using bmake, which is aggressive about search .PATH
