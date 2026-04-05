@@ -11,22 +11,6 @@ INSTALL_PIC_ARCHIVE=	yes
 
 .PATH:	${SRCDIR}/src/c++98
 
-# for now do not let the use of -flto (-Wodr...)
-.if ${CFLAGS:M-flto}
-CFLAGS+=	-fno-lto
-LDFLAGS+=	-flto
-.endif
-
-CFLAGS+=		-I${.OBJDIR}/../../headers
-CFLAGS+=		-I${SRCDIR}/include \
-			-I${SRCDIR}/include/std \
-			-I${SRCDIR}/include/c_global \
-			-I${SRCDIR}/libsupc++
-CXXFLAGS+=		-nostdinc++
-CXXFLAGS+=		-fdiagnostics-show-location=once
-CXXFLAGS+=		-ffunction-sections -fdata-sections
-SHARED_CXXFLAGS=	-D_GLIBCXX_SHARED
-
 SRCS=	${libc__98convenience_la_SOURCES}
 
 FLAGS_GROUPS=		default deprecated gnu11 cow concept parallel implicit

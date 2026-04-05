@@ -12,23 +12,8 @@ INSTALL_PIC_ARCHIVE=	yes
 .PATH:	${GCCDIR}/libiberty
 .PATH:	${SRCDIR}/libsupc++
 
-# for now do not let the use of -flto (-Wodr...)
-.if ${CFLAGS:M-flto}
-CFLAGS+=	-fno-lto
-LDFLAGS+=	-flto
-.endif
-
-CFLAGS+=		-I${.OBJDIR}/../../headers
-CFLAGS+=		-I${SRCDIR}/include \
-			-I${SRCDIR}/include/std \
-			-I${SRCDIR}/include/c_global \
-			-I${SRCDIR}/libsupc++
 CFLAGS+=		-I${GCCDIR}/libgcc
-CXXFLAGS+=		-nostdinc++
 CXXFLAGS+=		-fno-implicit-templates
-CXXFLAGS+=		-fdiagnostics-show-location=once
-CXXFLAGS+=		-ffunction-sections -fdata-sections
-SHARED_CXXFLAGS=	-D_GLIBCXX_SHARED
 
 FLAGS_GROUPS=		gnu11 gnu14 gnu1z iberty
 gnu11_FLAGS=		-std=gnu++11

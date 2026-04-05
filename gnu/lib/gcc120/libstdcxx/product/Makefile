@@ -10,22 +10,7 @@ SHLIB_MAJOR=	9
 .PATH:	${SRCDIR}/src/c++98
 .PATH:	${SRCDIR}/src/c++11
 
-# for now do not let the use of -flto (-Wodr...)
-.if ${CFLAGS:M-flto}
-CFLAGS+=	-fno-lto
-LDFLAGS+=	-flto
-.endif
-
-CFLAGS+=	-I${.OBJDIR}/../headers
-CFLAGS+=	-I${SRCDIR}/include \
-		-I${SRCDIR}/include/std \
-		-I${SRCDIR}/include/c_global \
-		-I${SRCDIR}/libsupc++
-CXXFLAGS+=	-nostdinc++
 CXXFLAGS+=	-fno-implicit-templates
-CXXFLAGS+=	-fdiagnostics-show-location=once
-CXXFLAGS+=	-ffunction-sections -fdata-sections
-LDFLAGS+=	-Wl,-z -Wl,relro -Wl,--gc-sections
 VERSION_MAP=	${.OBJDIR}/libstdcxx.map
 
 FLAGS_GROUPS=		gnu11
