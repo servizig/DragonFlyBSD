@@ -13,7 +13,9 @@ SHLIB_MAJOR=	9
 CXXFLAGS+=	-fno-implicit-templates
 VERSION_MAP=	${.OBJDIR}/libstdcxx.map
 
-FLAGS_GROUPS=		gnu11
+FLAGS_GROUPS=		gnu98 gnu11
+gnu98_FLAGS=		-std=gnu++98
+gnu98_FLAGS_FILES=	${cxx98_sources}
 gnu11_FLAGS=		-std=gnu++11
 gnu11_FLAGS_FILES=	${cxx11_sources:S|++|xx|}
 

@@ -975,6 +975,12 @@ host_builddir=	bits
 # derived from libstdc++-v3/include/Makefile.am
 #
 
+# Non-installed host_header files.
+COMPATIBILITY_H=config/abi/compatibility.h
+GENFILES+=	${host_builddir}/${COMPATIBILITY_H:T}
+${host_builddir}/${COMPATIBILITY_H:T}: ${glibcxx_srcdir}/${COMPATIBILITY_H}
+	cp ${.ALLSRC} ${.TARGET}
+
 GENFILES+=	${host_headers_extra}
 ${host_builddir}/basic_file.h: ${glibcxx_srcdir}/${BASIC_FILE_H}
 	cp ${.ALLSRC} ${.TARGET}
