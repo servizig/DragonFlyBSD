@@ -70,5 +70,7 @@ mkdirs:
 CLEANFILES+=	${GENFILES}
 
 depend all: mkdirs copy_headers ${GENFILES}
+.ORDER: mkdirs copy_headers
+.ORDER: mkdirs ${GENFILES}
 
 .include <bsd.lib.mk>
