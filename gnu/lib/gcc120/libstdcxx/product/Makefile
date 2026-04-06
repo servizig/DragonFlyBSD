@@ -22,8 +22,9 @@ CONVARCS=	../components/libconv_supc/libsupcxxconvenience.a \
 		../components/libconv_2011/libcxx11convenience.a \
 		../components/libconv_2017/libcxx17convenience.a \
 		../components/libconv_2020/libcxx20convenience.a
-LDADD=		-Wl,--whole-archive ${CONVARCS:.a=_pic.a} -lm \
-		-Wl,--no-whole-archive
+LDADD=		-Wl,--whole-archive ${CONVARCS:.a=_pic.a} -Wl,--no-whole-archive
+LDADD+=		-lm
+DPADD=		${CONVARCS} ${LIBM}
 
 # The AR script is a nice trick, but it *cannot* handle "++" on any line.
 # To work around this incredible limitation, copy files with "++" in
