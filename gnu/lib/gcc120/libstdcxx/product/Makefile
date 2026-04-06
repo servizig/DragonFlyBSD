@@ -10,12 +10,10 @@ SHLIB_MAJOR=	9
 .PATH:	${SRCDIR}/src/c++98
 .PATH:	${SRCDIR}/src/c++11
 
-CXXFLAGS+=	-fno-implicit-templates
+CXXFLAGS+=	-std=gnu++98 -fno-implicit-templates
 VERSION_MAP=	${.OBJDIR}/libstdcxx.map
 
-FLAGS_GROUPS=		gnu98 gnu11
-gnu98_FLAGS=		-std=gnu++98
-gnu98_FLAGS_FILES=	${cxx98_sources}
+FLAGS_GROUPS=		gnu11
 gnu11_FLAGS=		-std=gnu++11
 gnu11_FLAGS_FILES=	${cxx11_sources:S|++|xx|}
 
