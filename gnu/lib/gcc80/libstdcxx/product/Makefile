@@ -30,9 +30,9 @@ gnu11_FLAGS_FILES=	${cxx11_sources:S|++|xx|}
 CONVARCS=	../components/libconv_supc/libsupcxxconvenience.a
 CONVARCS+=	../components/libconv_1998/libcxx98convenience.a
 CONVARCS+=	../components/libconv_2011/libcxx11convenience.a
-LDADD=		-Wl,--whole-archive ${CONVARCS:.a=_pic.a} -lm
-LDADD+=		-Wl,--no-whole-archive
-ARADD=		${CONVARCS} ${LIBM}
+LDADD=		-Wl,--whole-archive ${CONVARCS:.a=_pic.a} -Wl,--no-whole-archive
+LDADD+=		-lm
+DPADD=		${CONVARCS} ${LIBM}
 
 # The AR script is a nice trick, but it *cannot* handle "++" on any line
 # To work around this incredible limitation, copy files with "++" in
