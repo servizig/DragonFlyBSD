@@ -14,5 +14,4 @@ CFLAGS+=-I${ZLIBDIR} -DZ_SOLO
 CFLAGS+=-Dz_off_t=long
 .endif
 
-SRCS+=	adler32.c crc32.c deflate.c infback.c inffast.c inflate.c \
-	inftrees.c zutil.c
+SRCS+=	adler32.c crc32.c inffast.c inflate.c inftrees.c zutil.c
