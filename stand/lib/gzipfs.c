@@ -150,6 +150,18 @@ check_header(struct z_file *zf)
     return((c == -1) ? 1 : 0);
 }
 
+static void *
+zf_malloc(void *opaque __unused, unsigned items, unsigned size)
+{
+    return malloc(items * size);
+}
+
+static void
+zf_free(void *opaque __unused, void *ptr)
+{
+    free(ptr);
+}
+
 static int
 zf_open(const char *fname, struct open_file *f)
 {
@@ -206,6 +218,10 @@ zf_open(const char *fname, struct open_file *f)
 	free(zf);
 	return(EFTYPE);
     }
+
+    /* Z_SOLO requires zalloc and zfree be provided by the caller. */
+    zf->zf_zstream.zalloc = zf_malloc;
+    zf->zf_zstream.zfree = zf_free;
 
     /* Initialise the inflation engine */
     if ((error = inflateInit2(&(zf->zf_zstream), -15)) != Z_OK) {
