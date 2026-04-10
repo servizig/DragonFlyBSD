@@ -23,6 +23,7 @@ CXXFLAGS+=	-Wno-narrowing
 CXXFLAGS+=	-Wno-c++11-narrowing
 .endif
 
+# hack to force c++ compiler to compile *.c files to create library
 .for ofile in ${OBJS-libcommon}
 ${ofile}: ${ofile:.o=.c}
 	${CXX} ${STATIC_CXXFLAGS} ${CXXFLAGS} -c ${.IMPSRC} -o ${.TARGET}

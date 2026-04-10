@@ -32,6 +32,7 @@ MLINKS+= ${MFILE} g++.1
 .endif
 
 # hack to force c++ compiler to compile *.c files to create program
+MKDEPCC=	${CXX}
 .for cfile in ${SRCS}
 ${cfile:.c=.o}: ${cfile}
 	${CXX} ${STATIC_CXXFLAGS} ${CXXFLAGS} -c ${.IMPSRC} -o ${.TARGET}

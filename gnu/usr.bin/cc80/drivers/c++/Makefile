@@ -15,6 +15,7 @@ CFLAGS+=	-DCONFIGURE_SPECS="\"\"" \
 		-DDEFAULT_REAL_TARGET_MACHINE="\"${target_machine}\""
 
 # hack to force c++ compiler to compile *.c files to create program
+MKDEPCC=	${CXX}
 .for cfile in ${SRCS}
 ${cfile:.c=.o}: ${cfile}
 	${CXX} ${STATIC_CXXFLAGS} ${CXXFLAGS} -c ${.IMPSRC} -o ${.TARGET}
