@@ -3996,6 +3996,7 @@ TO_REMOVE+=/usr/share/man/man1/cpp47.1.gz
 TO_REMOVE+=/usr/share/man/man1/g++47.1.gz
 TO_REMOVE+=/usr/share/man/man1/gcc47.1.gz
 TO_REMOVE+=/usr/share/man/man1/gcov47.1.gz
+TO_REMOVE+=/usr/share/mk/bsd.cpu.gcc47.mk
 
 .if !defined(WANT_INSTALLER)
 TO_REMOVE+=/usr/sbin/dfuibe_installer
