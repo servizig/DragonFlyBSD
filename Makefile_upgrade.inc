@@ -3966,6 +3966,36 @@ TO_REMOVE+=/usr/include/crypto
 TO_REMOVE+=/usr/include/vfs/mfs
 TO_REMOVE+=/usr/lib/gcc120/libstd++fs.a
 TO_REMOVE+=/usr/lib/gcc120/profile/libstd++fs.a
+TO_REMOVE+=/usr/include/c++/4.7
+TO_REMOVE+=/usr/lib/gcc47/crtbegin.o
+TO_REMOVE+=/usr/lib/gcc47/crtbeginS.o
+TO_REMOVE+=/usr/lib/gcc47/crtend.o
+TO_REMOVE+=/usr/lib/gcc47/crtendS.o
+TO_REMOVE+=/usr/lib/gcc47/libgcc.a
+TO_REMOVE+=/usr/lib/gcc47/libgcc_eh.a
+TO_REMOVE+=/usr/lib/gcc47/libgcc_pic.a
+TO_REMOVE+=/usr/lib/gcc47/libgcov.a
+TO_REMOVE+=/usr/lib/gcc47/libgcov_pic.a
+TO_REMOVE+=/usr/lib/gcc47/libgomp.a
+TO_REMOVE+=/usr/lib/gcc47/libgomp.so
+TO_REMOVE+=/usr/lib/gcc47/libgomp.spec
+TO_REMOVE+=/usr/lib/gcc47/libssp.a
+TO_REMOVE+=/usr/lib/gcc47/libssp.so
+TO_REMOVE+=/usr/lib/gcc47/libssp_nonshared.a
+TO_REMOVE+=/usr/lib/gcc47/libstdc++.a
+TO_REMOVE+=/usr/lib/gcc47/libstdc++.so
+TO_REMOVE+=/usr/lib/gcc47/libsupc++.a
+TO_REMOVE+=/usr/lib/gcc47/plugin
+TO_REMOVE+=/usr/lib/gcc47/profile
+TO_REMOVE+=/usr/libdata/gcc47
+TO_REMOVE+=/usr/libexec/gcc47
+TO_REMOVE+=/usr/share/man/man1/CC47.1.gz
+TO_REMOVE+=/usr/share/man/man1/c++47.1.gz
+TO_REMOVE+=/usr/share/man/man1/cc47.1.gz
+TO_REMOVE+=/usr/share/man/man1/cpp47.1.gz
+TO_REMOVE+=/usr/share/man/man1/g++47.1.gz
+TO_REMOVE+=/usr/share/man/man1/gcc47.1.gz
+TO_REMOVE+=/usr/share/man/man1/gcov47.1.gz
 
 .if !defined(WANT_INSTALLER)
 TO_REMOVE+=/usr/sbin/dfuibe_installer
@@ -4003,6 +4033,10 @@ TO_REMOVE_LATE+=/lib/libprivate_crypto.so.45
 TO_REMOVE_LATE+=/lib/libprivate_crypto.so.46
 TO_REMOVE_LATE+=/lib/libprivate_ssl.so.47
 TO_REMOVE_LATE+=/lib/libprivate_ssl.so.48
+TO_REMOVE_LATE+=/usr/lib/gcc47/libgomp.so.1
+TO_REMOVE_LATE+=/usr/lib/gcc47/libssp.so.0
+TO_REMOVE_LATE+=/usr/lib/gcc47/libstdc++.so.9
+TO_REMOVE_LATE+=/usr/lib/gcc47
 
 # XXX Remove when pfsync(4) has been fixed
 TO_REMOVE+=/usr/share/man/man4/pfsync.4.gz
