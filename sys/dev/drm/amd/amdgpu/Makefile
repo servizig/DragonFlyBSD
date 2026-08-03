@@ -65,7 +65,8 @@ SRCS+= amdgpu_device.c amdgpu_kms.c \
 	amdgpu_csa.c amdgpu_rlc.c
 
 SRCS+= \
-	cik.c vi.c mxgpu_vi.c nbio_v6_1.c soc15.c emu_soc.c mxgpu_ai.c nbio_v7_0.c vega10_reg_init.c \
+	vi.c mxgpu_vi.c nbio_v6_1.c soc15.c emu_soc.c mxgpu_ai.c nbio_v7_0.c vega10_reg_init.c \
+#	cik.c vi.c mxgpu_vi.c nbio_v6_1.c soc15.c emu_soc.c mxgpu_ai.c nbio_v7_0.c vega10_reg_init.c \
 	vega20_reg_init.c nbio_v7_4.o
 
 # add DF block
@@ -86,8 +87,8 @@ SRCS+= \
 	iceland_ih.c \
 	tonga_ih.c \
 	cz_ih.c \
-	vega10_ih.c \
-	cik_ih.c
+	vega10_ih.c
+#	cik_ih.c
 
 # add PSP block
 SRCS+= \
@@ -98,15 +99,15 @@ SRCS+= \
 
 # add SMC block
 SRCS+= \
-	amdgpu_dpm.c \
-	ci_dpm.c \
-	ci_smc.c \
-	kv_dpm.c \
-	kv_smc.c
+	amdgpu_dpm.c
+#	ci_dpm.c \
+#	ci_smc.c \
+#	kv_dpm.c \
+#	kv_smc.c
 
 # add DCE block
 SRCS+= \
-	dce_v8_0.c \
+#	dce_v8_0.c \
 	dce_v10_0.c \
 	dce_v11_0.c \
 	dce_virtual.c
@@ -114,14 +115,14 @@ SRCS+= \
 # add GFX block
 SRCS+= \
 	amdgpu_gfx.c \
-	gfx_v7_0.c \
+#	gfx_v7_0.c \
 	gfx_v8_0.c \
 	gfx_v9_0.c
 
 # add async DMA block
 SRCS+= \
 	amdgpu_sdma.c \
-	cik_sdma.c \
+#	cik_sdma.c \
 	sdma_v2_4.c \
 	sdma_v3_0.c \
 	sdma_v4_0.c
@@ -129,7 +130,7 @@ SRCS+= \
 # add UVD block
 SRCS+= \
 	amdgpu_uvd.c \
-	uvd_v4_2.c \
+#	uvd_v4_2.c \
 	uvd_v5_0.c \
 	uvd_v6_0.c \
 	uvd_v7_0.c
@@ -137,7 +138,7 @@ SRCS+= \
 # add VCE block
 SRCS+= \
 	amdgpu_vce.c \
-	vce_v2_0.c \
+#	vce_v2_0.c \
 	vce_v3_0.c \
 	vce_v4_0.c
 

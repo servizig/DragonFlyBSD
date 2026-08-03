@@ -30,5 +30,8 @@ void vi_srbm_select(struct amdgpu_device *adev,
 		    u32 me, u32 pipe, u32 queue, u32 vmid);
 int vi_set_ip_blocks(struct amdgpu_device *adev);
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wredundant-decls"
 void legacy_doorbell_index_init(struct amdgpu_device *adev);
+#pragma GCC diagnostic pop
 #endif
