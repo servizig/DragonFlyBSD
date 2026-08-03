@@ -155,11 +155,6 @@ ahci_init(struct ahci_softc *sc)
 		device_printf(sc->sc_dev, "unable to reset controller\n");
 		return (1);
 	}
-	if (ahci_read(sc, AHCI_REG_GHC) & AHCI_REG_GHC_AE) {
-		device_printf(sc->sc_dev, "AE did not auto-clear!\n");
-		ahci_write(sc, AHCI_REG_GHC, 0);
-		ahci_os_sleep(250);
-	}
 
 	/*
 	 * Enable ahci (global interrupts disabled)
@@ -459,10 +454,6 @@ nomem:
 	       AHCI_PREG_IE_DHRE | AHCI_PREG_IE_SDBE;
 	if (ap->ap_sc->sc_cap & AHCI_REG_CAP_SSNTF)
 		data |= AHCI_PREG_IE_IPME;
-#ifdef AHCI_COALESCE
-	if (sc->sc_ccc_ports & (1 << port)
-		data &= ~(AHCI_PREG_IE_SDBE | AHCI_PREG_IE_DHRE);
-#endif
 	ap->ap_intmask = data;
 
 	/*
@@ -1117,17 +1108,6 @@ ahci_port_start(struct ahci_port *ap)
 		return (1);
 	}
 
-#ifdef AHCI_COALESCE
-	/*
-	 * (Re-)enable coalescing on the port.
-	 */
-	if (ap->ap_sc->sc_ccc_ports & (1 << ap->ap_num)) {
-		ap->ap_sc->sc_ccc_ports_cur |= (1 << ap->ap_num);
-		ahci_write(ap->ap_sc, AHCI_REG_CCC_PORTS,
-		    ap->ap_sc->sc_ccc_ports_cur);
-	}
-#endif
-
 	return (0);
 }
 
@@ -1145,17 +1125,6 @@ int
 ahci_port_stop(struct ahci_port *ap, int stop_fis_rx)
 {
 	u_int32_t	r;
-
-#ifdef AHCI_COALESCE
-	/*
-	 * Disable coalescing on the port while it is stopped.
-	 */
-	if (ap->ap_sc->sc_ccc_ports & (1 << ap->ap_num)) {
-		ap->ap_sc->sc_ccc_ports_cur &= ~(1 << ap->ap_num);
-		ahci_write(ap->ap_sc, AHCI_REG_CCC_PORTS,
-		    ap->ap_sc->sc_ccc_ports_cur);
-	}
-#endif
 
 	/*
 	 * Turn off ST, then wait for CR to go off.
@@ -1543,7 +1512,10 @@ retry:
 	 * Give the new power management state time to settle, then clear
 	 * pending status.
 	 */
-	ahci_os_sleep(1000);
+	if (ap->ap_sc->sc_flags & AHCI_F_FAST_COMRESET)
+		ahci_os_sleep(10);
+	else
+		ahci_os_sleep(1000);
 	ahci_flush_tfd(ap);
 	ahci_pwrite(ap, AHCI_PREG_SERR, -1);
 
@@ -1576,7 +1548,10 @@ retry:
 		break;
 	}
 	ahci_pwrite(ap, AHCI_PREG_SCTL, r);
-	ahci_os_sleep(1000);
+	if (ap->ap_sc->sc_flags & AHCI_F_FAST_COMRESET)
+		ahci_os_sleep(10);
+	else
+		ahci_os_sleep(1000);
 
 	ap->ap_flags &= ~AP_F_HARSH_REINIT;
 
@@ -1599,7 +1574,10 @@ retry:
 	r &= ~AHCI_PREG_SCTL_DET_INIT;
 	r |= AHCI_PREG_SCTL_DET_NONE;
 	ahci_pwrite(ap, AHCI_PREG_SCTL, r);
-	ahci_os_sleep(1000);
+	if (ap->ap_sc->sc_flags & AHCI_F_FAST_COMRESET)
+		ahci_os_sleep(10);
+	else
+		ahci_os_sleep(1000);
 
 	/*
 	 * Try to determine if there is a device on the port.  This operation
@@ -2510,16 +2488,6 @@ ahci_intr(void *arg)
 		return;
 	}
 	is &= sc->sc_portmask;
-
-#ifdef AHCI_COALESCE
-	/* Check coalescing interrupt first */
-	if (is & sc->sc_ccc_mask) {
-		DPRINTF(AHCI_D_INTR, "%s: command coalescing interrupt\n",
-		    DEVNAME(sc));
-		is &= ~sc->sc_ccc_mask;
-		is |= sc->sc_ccc_ports_cur;
-	}
-#endif
 
 	/*
 	 * Process interrupts for each port in a non-blocking fashion.

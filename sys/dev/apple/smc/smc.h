@@ -1,0 +1,291 @@
+/*
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Copyright (c) 2026 Abdelkader Boudih <dragonflybsd@seuros.com>
+ *
+ * Ported from FreeBSD's asmc(4) driver.
+ *
+ * DragonFlyBSD port: adapted for kmalloc/kfree, lockmgr 2-arg form,
+ * taskqueue_start_threads ncpu arg, sys/bus_resource.h, acpica paths.
+ * Added MMIO (T2) backend support.
+ */
+
+#ifndef _DEV_APPLE_SMC_SMC_H_
+#define _DEV_APPLE_SMC_SMC_H_
+
+#include "opt_apple_smc.h"
+
+#include <sys/param.h>
+#include <sys/stdint.h>
+#include <sys/bus.h>
+#include <sys/conf.h>
+#include <sys/endian.h>
+#include <sys/kernel.h>
+#include <sys/lock.h>
+#include <sys/malloc.h>
+#include <sys/module.h>
+#include <sys/sysctl.h>
+#include <sys/systm.h>
+#include <sys/taskqueue.h>
+#include <sys/rman.h>
+#include <sys/thread.h>
+
+#include <sys/bus_resource.h>
+
+#include <contrib/dev/acpica/source/include/acpi.h>
+#include <contrib/dev/acpica/source/include/accommon.h>
+
+#include <dev/acpica/acpivar.h>
+
+#include "debug.h"
+
+#define SMC_LOCK(sc)	lockmgr(&(sc)->sc_lock, LK_EXCLUSIVE)
+#define SMC_UNLOCK(sc)	lockmgr(&(sc)->sc_lock, LK_RELEASE)
+
+#define ASMC_MAXFANS		6
+#define ASMC_MAXVAL		32
+#define ASMC_KEYLEN		4
+#define ASMC_TYPELEN		4
+#define ASMC_MAX_SENSORS	64
+#define ASMC_TEMP_MAX		80
+#define ASMC_MAXRETRIES		10
+
+struct apple_smc_softc {
+	device_t		sc_dev;
+	struct lock		sc_lock;
+	int			sc_nfan;
+	int			sc_nkeys;
+	int16_t			sms_rest_x;
+	int16_t			sms_rest_y;
+	int16_t			sms_rest_z;
+	struct sysctl_oid	*sc_fan_tree[ASMC_MAXFANS + 1];
+	struct sysctl_oid	*sc_temp_tree;
+	struct sysctl_oid	*sc_sms_tree;
+	struct sysctl_oid	*sc_light_tree;
+	int			sc_rid_port;
+	int			sc_rid_irq;
+	struct resource		*sc_ioport;
+	struct resource		*sc_irq;
+	/* MMIO backend.  sc_is_mmio: MMIO window is mapped and usable (set for
+	 * iMac14,1 and newer).  sc_is_t2: RGEN==3, i.e. Apple T2 security chip
+	 * is present.  MMIO can exist without T2 (e.g. iMac14,1 has MMIO but
+	 * no T2 coprocessor). */
+	int			sc_rid_mem;
+	struct resource		*sc_iomem;
+	int			sc_is_mmio;
+	int			sc_is_t2;
+	void			*sc_cookie;
+	int			sc_sms_intrtype;
+	struct taskqueue	*sc_sms_tq;
+	struct task		sc_sms_task;
+	uint8_t			sc_sms_intr_works;
+	uint32_t		sc_kbd_bkl_level;
+	struct sysctl_oid	*sc_raw_tree;
+	char			sc_rawkey[ASMC_KEYLEN + 1];
+	uint8_t			sc_rawval[ASMC_MAXVAL];
+	uint8_t			sc_rawlen;
+	char			sc_rawtype[ASMC_TYPELEN + 1];
+	char			*sc_voltage_sensors[ASMC_MAX_SENSORS];
+	int			sc_voltage_count;
+	char			*sc_current_sensors[ASMC_MAX_SENSORS];
+	int			sc_current_count;
+	char			*sc_power_sensors[ASMC_MAX_SENSORS];
+	int			sc_power_count;
+	char			*sc_light_sensors[ASMC_MAX_SENSORS];
+	int			sc_light_count;
+	char			*sc_temp_sensors[ASMC_TEMP_MAX];
+	int			sc_temp_count;
+	char			*sc_dts_sensors[ASMC_TEMP_MAX];
+	int			sc_dts_count;
+	int			sc_tj_max;	/* Tj,max in degrees C (from MSR 0x1A2) */
+	int			sc_has_sms;
+	int			sc_has_light;
+	int			sc_light_len;
+	int			sc_has_safespeed;
+	int			sc_has_alsl;
+	int			sc_prochot_override; /* 1 = BD_PROCHOT cleared */
+	uint16_t		sc_fan_manual_mask;  /* FS! bits to reassert */
+	uint16_t		sc_fan_manual_saved; /* FS! bits before override */
+
+	/* Thermal governor state */
+	struct thread		*sc_thermal_td;
+	int			sc_thermal_enabled;
+	int			sc_thermal_stop;
+	int			sc_thermal_running;
+	int			sc_thermal_interval;	/* poll seconds */
+	int			sc_thermal_temp_low;	/* millidegrees: fan min */
+	int			sc_thermal_temp_high;	/* millidegrees: fan max */
+	int			sc_thermal_hysteresis;	/* millidegrees deadband */
+	int			sc_thermal_emergency;	/* millidegrees: force max */
+};
+
+#define ASMC_DATAPORT_READ(sc)		bus_read_1(sc->sc_ioport, 0x00)
+#define ASMC_DATAPORT_WRITE(sc, val)	bus_write_1(sc->sc_ioport, 0x00, val)
+#define ASMC_CMDPORT_READ(sc)		bus_read_1(sc->sc_ioport, 0x04)
+#define ASMC_CMDPORT_WRITE(sc, val)	bus_write_1(sc->sc_ioport, 0x04, val)
+#define ASMC_INTPORT_READ(sc)		bus_read_1(sc->sc_ioport, 0x1f)
+#define ASMC_STATUS_MASK		0x0f
+
+#define ASMC_CMDREAD		0x10
+#define ASMC_CMDWRITE		0x11
+#define ASMC_CMDGETBYINDEX	0x12
+#define ASMC_CMDGETINFO		0x13
+
+#define ASMC_STATUS_AWAIT_DATA	0x04
+#define ASMC_STATUS_DATA_READY	0x05
+#define ASMC_KEYINFO_RESPLEN	6
+#define ASMC_ATTR_FUNCTION	0x10
+#define ASMC_ATTR_WRITABLE	0x40
+#define ASMC_ATTR_READABLE	0x80
+
+#define ASMC_NKEYS		"#KEY"
+#define ASMC_KEY_REV		"REV "
+#define ASMC_KEY_FANCOUNT	"FNum"
+#define ASMC_KEY_FANMANUAL	"FS! "
+#define ASMC_KEY_FANID		"F%dID"
+#define ASMC_KEY_FANSPEED	"F%dAc"
+#define ASMC_KEY_FANMINSPEED	"F%dMn"
+#define ASMC_KEY_FANMAXSPEED	"F%dMx"
+#define ASMC_KEY_FANSAFESPEED	"F%dSf"
+#define ASMC_KEY_FANTARGETSPEED	"F%dTg"
+#define ASMC_KEY_FANMANUAL_T2	"F%dMd"
+#define ASMC_KEY_FANSAFESPEED0	"F0Sf"
+#define ASMC_SMS_INIT1		0xe0	/* expected init handshake byte 1 */
+#define ASMC_SMS_INIT2		0xf8	/* expected init handshake byte 2 */
+#define ASMC_KEY_SMS		"MOCN"	/* sudden motion sensor control */
+#define ASMC_KEY_SMS_X		"MO_X"	/* accelerometer X axis */
+#define ASMC_KEY_SMS_Y		"MO_Y"	/* accelerometer Y axis */
+#define ASMC_KEY_SMS_Z		"MO_Z"	/* accelerometer Z axis */
+#define ASMC_KEY_SMS_LOW	"MOLT"	/* low-g threshold */
+#define ASMC_KEY_SMS_HIGH	"MOHT"	/* high-g threshold */
+#define ASMC_KEY_SMS_LOW_INT	"MOLD"	/* low-g interrupt count */
+#define ASMC_KEY_SMS_HIGH_INT	"MOHD"	/* high-g interrupt count */
+#define ASMC_KEY_SMS_FLAG	"MSDW"	/* SMS enable flag */
+#define ASMC_SMS_INTFF		0x60	/* interrupt: free fall */
+#define ASMC_SMS_INTHA		0x6f	/* interrupt: high acceleration */
+#define ASMC_SMS_INTSH		0x80	/* interrupt: shock */
+#define ASMC_ALSL_INT2A		0x2a	/* ambient light sensor interrupt */
+#define ASMC_LIGHT_SHORTLEN	6	/* ALV key payload length (6-byte) */
+#define ASMC_LIGHT_LONGLEN	10	/* ALV key payload length (10-byte, newer) */
+#define ASMC_KEY_LIGHTLEFT	"ALV0"	/* ambient light sensor left */
+#define ASMC_KEY_LIGHTRIGHT	"ALV1"	/* ambient light sensor right */
+#define ASMC_KEY_LIGHTVALUE	"LKSB"	/* keyboard backlight brightness */
+#define ASMC_KEY_LIGHTSRC	"ALSL"	/* ambient light source selector */
+#define ASMC_KEY_CLAMSHELL	"MSLD"	/* lid closed flag */
+#define ASMC_KEY_AUPO		"AUPO"	/* always-up: auto power-on after shutdown */
+#define ASMC_KEY_INTOK		"NTOK"	/* interrupt acknowledge */
+#define ASMC_MMIO_DATA		0x0000
+#define ASMC_MMIO_KEY_NAME	0x0078
+#define ASMC_MMIO_DATA_LEN	0x007D
+#define ASMC_MMIO_SMC_ID	0x007E
+#define ASMC_MMIO_CMD		0x007F
+#define ASMC_MMIO_STATUS	0x4005
+#define ASMC_MMIO_MIN_SIZE	0x4006
+#define ASMC_MMIO_STATUS_READY	0x20
+#define ASMC_MMIO_MAX_WAIT	24
+#define ASMC_KEY_LDKN		"LDKN"	/* T2 firmware key generation (u8; >=2 = T2) */
+#define ASMC_KEY_BCLM		"BCLM"	/* battery charge limit (0-100%) */
+#define ASMC_KEY_CLKT		"CLKT"	/* seconds since midnight (time of day) */
+#define ASMC_KEY_CLWK		"CLWK"	/* scheduled wake time: seconds since midnight (ui16 BE); 0 = disabled */
+#define ASMC_KEY_MSSD		"MSSD"	/* last shutdown cause (signed byte) */
+#define ASMC_KEY_MSSP		"MSSP"	/* last sleep cause (signed byte) */
+#define ASMC_KEY_MSAL		"MSAL"	/* thermal alert flags; bits 0x04, 0x10, 0x20 reserved/unknown */
+#define ASMC_KEY_MSPS		"MSPS"	/* SMC power state index */
+#define ASMC_KEY_MSTS		"MSTS"	/* system thermal status */
+#define ASMC_KEY_RPLT		"RPlt"	/* board codename (8-byte ASCII) */
+#define ASMC_KEY_RGEN		"RGEN"	/* Apple chip generation (3 = T2) */
+#define ASMC_KEY_SPHT		"SPHT"	/* PROCHOT state: 0x0101 = asserted */
+#define ASMC_KEY_BATP		"BATP"	/* battery present flag (0=absent) */
+#define ASMC_KEY_BBAD		"BBAD"	/* battery bad flag (1=dead/failed) */
+#define ASMC_KEY_G3AO		"G3AO"	/* G3 (mechanical-off) auto power-on: Unix timestamp; 0=disabled */
+#define ASMC_KEY_G3WD		"G3WD"	/* G3 watchdog flag (paired with G3AO) */
+#define ASMC_KEY_AUWT		"AUWT"	/* AC wake timer: delay (seconds) before auto power-on after AC reconnect */
+#define ASMC_KEY_DPBR		"DPBR"	/* Display brightness raw value */
+#define ASMC_KEY_ENV0		"ENV0"	/* Environment/chassis state */
+#define ASMC_KEY_STFD		"STFD"	/* Software thermal throttle disable flag */
+
+#define MSR_IA32_POWER_CTL		0x1fc
+#define IA32_POWER_CTL_BD_PROCHOT	0x01
+
+/* smc_io.c */
+int	apple_smc_command(device_t, uint8_t);
+int	apple_smc_wait(device_t, uint8_t);
+int	apple_smc_key_read(device_t, const char *, uint8_t *, uint8_t);
+int	apple_smc_key_write(device_t, const char *, uint8_t *, uint8_t);
+int	apple_smc_key_getinfo(device_t, const char *, uint8_t *, char *);
+int	apple_smc_fan_count(device_t);
+int	apple_smc_fan_getvalue(device_t, const char *, int);
+int	apple_smc_fan_setvalue(device_t, const char *, int, int);
+char   *apple_smc_fan_getstring(device_t, const char *, int, uint8_t *, uint8_t);
+int	apple_smc_temp_getvalue(device_t, const char *);
+int	apple_smc_sms_read(device_t, const char *, int16_t *);
+void	apple_smc_sms_calibrate(device_t);
+void	apple_smc_sms_intr(void *);
+void	apple_smc_sms_printintr(device_t, uint8_t);
+void	apple_smc_sms_task(void *, int);
+void	apple_smc_sms_init(device_t);
+int	apple_smc_sensor_read(device_t, const char *, int *);
+int	apple_smc_key_dump_by_index(device_t, int, char *, char *, uint8_t *);
+int	apple_smc_key_search(device_t, const char *, unsigned int *);
+void	apple_smc_scan_sensor_range(device_t, unsigned int, unsigned int,
+	    char, int *, char **, int);
+int	apple_smc_sensor_type_supported(const char *);
+
+/* smc_mmio.c */
+int	apple_smc_try_enable_mmio(device_t);
+int	apple_smc_mmio_key_read(device_t, const char *, uint8_t *, uint8_t);
+int	apple_smc_mmio_key_write(device_t, const char *, uint8_t *, uint8_t);
+int	apple_smc_mmio_key_getinfo(device_t, const char *, uint8_t *, char *);
+int	apple_smc_mmio_key_getbyindex(device_t, int, char *);
+
+/* smc_sysctl.c */
+unsigned int apple_smc_get_light_control(void);
+int	apple_smc_mb_sysctl_fanid(SYSCTL_HANDLER_ARGS);
+int	apple_smc_mb_sysctl_fanspeed(SYSCTL_HANDLER_ARGS);
+int	apple_smc_mb_sysctl_fansafespeed(SYSCTL_HANDLER_ARGS);
+int	apple_smc_mb_sysctl_fanrw(SYSCTL_HANDLER_ARGS);
+int	apple_smc_mb_sysctl_fanmanual(SYSCTL_HANDLER_ARGS);
+int	apple_smc_temp_sysctl(SYSCTL_HANDLER_ARGS);
+int	apple_smc_dts_sysctl(SYSCTL_HANDLER_ARGS);
+int	apple_smc_mb_sysctl_sms(SYSCTL_HANDLER_ARGS);
+int	apple_smc_mbp_sysctl_light(SYSCTL_HANDLER_ARGS);
+int	apple_smc_mbp_sysctl_light_control(SYSCTL_HANDLER_ARGS);
+int	apple_smc_mbp_sysctl_light_left_10byte(SYSCTL_HANDLER_ARGS);
+int	apple_smc_flag_sysctl(SYSCTL_HANDLER_ARGS);
+int	apple_smc_bclm_sysctl(SYSCTL_HANDLER_ARGS);
+int	apple_smc_sensor_sysctl(SYSCTL_HANDLER_ARGS);
+int	apple_smc_cause_sysctl(SYSCTL_HANDLER_ARGS);
+int	apple_smc_msal_sysctl(SYSCTL_HANDLER_ARGS);
+int	apple_smc_clkt_sysctl(SYSCTL_HANDLER_ARGS);
+int	apple_smc_clwk_sysctl(SYSCTL_HANDLER_ARGS);
+int	apple_smc_msps_sysctl(SYSCTL_HANDLER_ARGS);
+int	apple_smc_rplt_sysctl(SYSCTL_HANDLER_ARGS);
+int	apple_smc_rgen_sysctl(SYSCTL_HANDLER_ARGS);
+int	apple_smc_raw_key_sysctl(SYSCTL_HANDLER_ARGS);
+int	apple_smc_raw_value_sysctl(SYSCTL_HANDLER_ARGS);
+int	apple_smc_raw_len_sysctl(SYSCTL_HANDLER_ARGS);
+int	apple_smc_raw_type_sysctl(SYSCTL_HANDLER_ARGS);
+int	apple_smc_raw_index_sysctl(SYSCTL_HANDLER_ARGS);
+int	apple_smc_prochot_override_sysctl(SYSCTL_HANDLER_ARGS);
+int	apple_smc_g3ao_sysctl(SYSCTL_HANDLER_ARGS);
+int	apple_smc_auwt_sysctl(SYSCTL_HANDLER_ARGS);
+int	apple_smc_dpbr_sysctl(SYSCTL_HANDLER_ARGS);
+int	apple_smc_env0_sysctl(SYSCTL_HANDLER_ARGS);
+int	apple_smc_key_getattrs(device_t, const char *, uint8_t *);
+
+/* Fan manual mode */
+int	apple_smc_fan_reassert_manual(device_t);
+void	apple_smc_fan_release_manual(device_t);
+
+/* PROCHOT state */
+bool	apple_smc_prochot_asserted(device_t);
+void	apple_smc_restore_prochot(device_t);
+
+/* smc_thermal.c */
+int	apple_smc_thermal_fans_to_max(device_t);
+int	apple_smc_thermal_start(device_t);
+void	apple_smc_thermal_stop(device_t);
+int	apple_smc_thermal_enabled_sysctl(SYSCTL_HANDLER_ARGS);
+int	apple_smc_thermal_int_sysctl(SYSCTL_HANDLER_ARGS);
+
+#endif /* !_DEV_APPLE_SMC_SMC_H_ */

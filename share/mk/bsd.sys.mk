@@ -60,7 +60,7 @@ CWARNFLAGS	+=	-Wchar-subscripts -Winline -Wnested-externs\
 			-Wredundant-decls
 .  endif
 .  if ${WARNS} >= 2 && ${WARNS} <= 6
-# Delete -Wno-pointer-sign from -Wall by default (C only).
+# Delete -Wpointer-sign from -Wall by default (C only).
 _cnowarnflags	+=	-Wno-pointer-sign
 .  endif
 .  if ${WARNS} >= 2 && ${WARNS} <= 4
@@ -83,6 +83,9 @@ _cnowarnflags	+=	-Wno-stringop-truncation
 .  endif
 .  if ${WARNS} >= 1 && ${WARNS} <= 6 && ${_gccver} >= 80
 _cnowarnflags	+=	-Wno-stringop-overflow
+.  endif
+.  if ${WARNS} >= 1 && ${WARNS} <= 6 && ${_gccver} >= 90
+_cnowarnflags	+=	-Wno-address-of-packed-member
 .  endif
 # Activate GCC's -Wunused-but-set-variable (which is in -Wall) and
 # -Wunused-but-set-parameter (which is in -Wextra) only at WARNS >= 4

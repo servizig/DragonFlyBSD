@@ -27,7 +27,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * @(#) Copyright (c) 1993 The Regents of the University of California.  All rights reserved.
  * @(#)uname.c	8.2 (Berkeley) 5/4/95
  * $FreeBSD: src/usr.bin/uname/uname.c,v 1.4.6.2 2002/10/17 07:47:29 jmallett Exp $
  */
@@ -53,11 +52,13 @@
 #define	KFLAG	0x0100
 #define	GFLAG	0x0200
 #define	GFLAG2	0x0400
+#define	BFLAG	0x0800
 
 typedef void (*get_t)(void);
 static get_t get_ident, get_machine, get_hostname, get_arch;
 static get_t get_release, get_sysname, get_version, get_pkgabi;
 static get_t get_kernvers, get_uservers;
+static get_t get_buildid;
 
 static void native_ident(void);
 static void native_machine(void);
@@ -69,6 +70,7 @@ static void native_version(void);
 static void native_pkgabi(void);
 static void native_kernvers(void);
 static void native_uservers(void);
+static void native_buildid(void);
 static void print_uname(void);
 static void setup_get(void);
 static void usage(void) __dead2;
@@ -76,6 +78,7 @@ static void usage(void) __dead2;
 static char *ident, *machine, *hostname, *arch;
 static char *release, *sysname, *version, *pkgabi;
 static char *kernvers, *uservers;
+static char *buildid;
 static int space;
 static u_int flags;
 
@@ -86,10 +89,13 @@ main(int argc, char *argv[])
 
 	setup_get();
 
-	while ((ch = getopt(argc, argv, "aiKmnprsUvP")) != -1) {
+	while ((ch = getopt(argc, argv, "abiKmnprsUvP")) != -1) {
 		switch(ch) {
 		case 'a':
 			flags |= (MFLAG | NFLAG | RFLAG | SFLAG | VFLAG);
+			break;
+		case 'b':
+			flags |= BFLAG;
 			break;
 		case 'i':
 			flags |= IFLAG;
@@ -179,6 +185,7 @@ setup_get(void)
 	CHECK_ENV("UNAME_K", &get_kernvers, native_kernvers, &kernvers);
 	CHECK_ENV("UNAME_U", &get_uservers, native_uservers, &uservers);
 	CHECK_ENV("UNAME_G", &get_pkgabi, native_pkgabi, &pkgabi);
+	CHECK_ENV("UNAME_b", &get_buildid, native_buildid, &buildid);
 }
 
 #define	PRINT_FLAG(flags,flag,var)		\
@@ -205,39 +212,38 @@ print_uname(void)
 	PRINT_FLAG(flags, KFLAG, kernvers);
 	PRINT_FLAG(flags, UFLAG, uservers);
 	PRINT_FLAG(flags, GFLAG, pkgabi);
+	PRINT_FLAG(flags, BFLAG, buildid);
 	printf("\n");
 }
 
-#define	NATIVE_SYSCTL2_GET(var,mib0,mib1)	\
-static void						\
-native_##var(void)				\
-{						\
-	int mib[] = { (mib0), (mib1) };		\
-	size_t len;				\
-	static char buf[1024];			\
-	char **varp = &(var);			\
-						\
-	len = sizeof buf;			\
-	if (sysctl(mib, NELEM(mib),		\
-	   &buf, &len, NULL, 0) == -1)		\
-		err(1, "sysctl");
+#define	NATIVE_SYSCTL2_GET(var, mib0, mib1)				\
+static void								\
+native_##var(void)							\
+{									\
+	int mib[] = { (mib0), (mib1) };					\
+	size_t len;							\
+	static char buf[1024];						\
+	char **varp = &(var);						\
+									\
+	len = sizeof buf;						\
+	if (sysctl(mib, NELEM(mib), &buf, &len, NULL, 0) == -1)		\
+		err(1, "sysctl(%s,%s)", #mib0, #mib1);
 
-#define	NATIVE_SYSCTLNAME_GET(var,name)		\
-static void						\
-native_##var(void)				\
-{						\
-	size_t len;				\
-	static char buf[1024];			\
-	char **varp = &(var);			\
-						\
-	len = sizeof buf;			\
-	if (sysctlbyname(name, &buf, &len, NULL,\
-	    0) == -1)				\
-		err(1, "sysctlbyname");
+#define	NATIVE_SYSCTLNAME_GET(var, name)				\
+static void								\
+native_##var(void)							\
+{									\
+	size_t len;							\
+	static char buf[1024];						\
+	char **varp = &(var);						\
+									\
+	len = sizeof buf;						\
+	if (sysctlbyname(name, &buf, &len, NULL, 0) == -1)		\
+		err(1, "sysctlbyname(%s)", name);
 
-#define	NATIVE_SET				\
-	*varp = buf;				\
-	return;					\
+#define	NATIVE_SET							\
+	*varp = buf;							\
+	return;								\
 }	struct __hack
 
 #define	NATIVE_BUFFER	(buf)
@@ -272,8 +278,11 @@ NATIVE_SYSCTL2_GET(arch, CTL_HW, HW_MACHINE_ARCH) {
 NATIVE_SYSCTLNAME_GET(ident, "kern.ident") {
 } NATIVE_SET;
 
-static void						\
-native_pkgabi(void)				\
+NATIVE_SYSCTLNAME_GET(buildid, "kern.build_id") {
+} NATIVE_SET;
+
+static void
+native_pkgabi(void)
 {
 	char osrel[64];
 	char mach[64];
@@ -328,6 +337,6 @@ native_uservers(void)
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: uname [-aiKmnprsUvP]\n");
+	fprintf(stderr, "usage: uname [-abiKmnprsUvP]\n");
 	exit(1);
 }

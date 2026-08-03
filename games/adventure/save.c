@@ -69,7 +69,7 @@ static const char header[] = "Adventure save file\n";
  * Map 16 plain values into 90 coded values and back.
  */
 
-static const char coding[90] =
+static const char coding[91] =
 	"Db.GOyT]7a6zpF(c*5H9oK~0[WVAg&kR)ml,2^q-1Y3v+"
 	"X/=JirZL$C>_N?:}B{dfnsxU<@MQ%8|P!4h`ESt;euwIj"
 ;
@@ -730,7 +730,7 @@ save(const char *outfile)
 #endif
 
 	sum = htonl(crc_get(&sf->crc));
-	if (savefile_binwrite(sf, &sum, sizeof(&sum))) {
+	if (savefile_binwrite(sf, &sum, sizeof(sum))) {
 		savefile_close(sf);
 		return 1;
 	}
@@ -838,7 +838,7 @@ restore(const char *infile)
 	}
 #endif
 
-	if (savefile_binread(sf, &sum, sizeof(&sum))) {
+	if (savefile_binread(sf, &sum, sizeof(sum))) {
 		savefile_close(sf);
 		return 1;
 	}

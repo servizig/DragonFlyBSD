@@ -1,0 +1,815 @@
+/*
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Copyright (c) 2026 Abdelkader Boudih <dragonflybsd@seuros.com>
+ *
+ * Ported from FreeBSD's asmc(4) driver.
+ *
+ * DragonFlyBSD port: adapted for kmalloc/kfree, lockmgr 2-arg form,
+ * taskqueue_start_threads ncpu arg, sys/bus_resource.h, acpica paths.
+ * Added MMIO (T2) backend support.
+ */
+
+/*
+ * Apple SMC — sysctl handlers.
+ *
+ * All SYSCTL_HANDLER_ARGS callbacks: fan speed, temperature, SMS axes,
+ * keyboard backlight, battery charge limit, system state keys, and
+ * the optional raw-key debug interface.
+ */
+
+#include "smc.h"
+
+#include <machine/specialreg.h>
+#include <machine/cpufunc.h>
+
+static int
+apple_smc_key_check_writable(device_t dev, const char *key)
+{
+	uint8_t attrs;
+
+	if (apple_smc_key_getattrs(dev, key, &attrs) == 0 &&
+	    (attrs & ASMC_ATTR_WRITABLE) == 0) {
+		device_printf(dev, "%s: attrs=0x%02x, not writable\n",
+		    key, attrs);
+		return (EPERM);
+	}
+	return (0);
+}
+
+/*
+ * Module-scope cached keyboard backlight level.  Shared across all device
+ * instances so suspend/resume can restore the last requested brightness even
+ * though the resume path only has a device_t and not sysctl request context.
+ */
+static unsigned int light_control = 0;
+
+/* Retrieve the cached module-level brightness value for resume restore. */
+unsigned int
+apple_smc_get_light_control(void)
+{
+	return (light_control);
+}
+
+int
+apple_smc_mb_sysctl_fanspeed(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	int fan = arg2;
+	int32_t v;
+
+	v = apple_smc_fan_getvalue(dev, ASMC_KEY_FANSPEED, fan);
+	return (sysctl_handle_int(oidp, &v, 0, req));
+}
+
+int
+apple_smc_mb_sysctl_fanid(SYSCTL_HANDLER_ARGS)
+{
+	uint8_t buf[16];
+	device_t dev = (device_t)arg1;
+	int fan = arg2;
+	char *desc;
+
+	desc = apple_smc_fan_getstring(dev, ASMC_KEY_FANID, fan,
+	    buf, sizeof(buf));
+	if (desc == NULL) {
+		return (EIO);
+	}
+	return (sysctl_handle_string(oidp, desc, 0, req));
+}
+
+int
+apple_smc_mb_sysctl_fansafespeed(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	int fan = arg2;
+	int32_t v;
+
+	v = apple_smc_fan_getvalue(dev, ASMC_KEY_FANSAFESPEED, fan);
+	return (sysctl_handle_int(oidp, &v, 0, req));
+}
+
+/*
+ * Fan speed keys that support both read and write.
+ * Index into this table is packed in arg2 bits [15:8].
+ */
+static const char *apple_smc_fan_rw_keys[] = {
+	ASMC_KEY_FANMINSPEED,		/* 0 */
+	ASMC_KEY_FANMAXSPEED,		/* 1 */
+	ASMC_KEY_FANTARGETSPEED,	/* 2 */
+};
+
+int
+apple_smc_mb_sysctl_fanrw(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	int key_idx = (arg2 >> 8) & 0xFF;
+	int fan = arg2 & 0xFF;
+	const char *key;
+	int error;
+	int32_t v;
+
+	if (key_idx >= (int)nitems(apple_smc_fan_rw_keys))
+		return (EINVAL);
+	key = apple_smc_fan_rw_keys[key_idx];
+
+	v = apple_smc_fan_getvalue(dev, key, fan);
+	error = sysctl_handle_int(oidp, &v, 0, req);
+	if (error == 0 && req->newptr != NULL) {
+		error = apple_smc_fan_setvalue(dev, key, fan, v);
+	}
+	return (error);
+}
+
+int
+apple_smc_mb_sysctl_fanmanual(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	struct apple_smc_softc *sc = device_get_softc(dev);
+	int fan = arg2;
+	int error;
+	int32_t v;
+	uint8_t buf[2];
+	uint16_t val;
+	char fmkey[5];
+
+	ksnprintf(fmkey, sizeof(fmkey), ASMC_KEY_FANMANUAL_T2, fan);
+	if (sc->sc_is_t2 &&
+	    apple_smc_key_getinfo(dev, fmkey, NULL, NULL) == 0) {
+		error = apple_smc_key_read(dev, fmkey, buf, 1);
+		if (error != 0) {
+			return (error);
+		}
+		v = buf[0] ? 1 : 0;
+		error = sysctl_handle_int(oidp, &v, 0, req);
+		if (error == 0 && req->newptr != NULL) {
+			if (v != 0 && v != 1) {
+				return (EINVAL);
+			}
+			buf[0] = (uint8_t)v;
+			error = apple_smc_key_write(dev, fmkey, buf, 1);
+		}
+		return (error);
+	}
+
+	error = apple_smc_key_read(dev, ASMC_KEY_FANMANUAL, buf, sizeof(buf));
+	if (error != 0) {
+		return (error);
+	}
+
+	val = (buf[0] << 8) | buf[1];
+	v = (val >> fan) & 0x01;
+	error = sysctl_handle_int(oidp, &v, 0, req);
+	if (error == 0 && req->newptr != NULL) {
+		if (v != 0 && v != 1) {
+			return (EINVAL);
+		}
+		error = apple_smc_key_read(dev, ASMC_KEY_FANMANUAL,
+		    buf, sizeof(buf));
+		if (error == 0) {
+			val = (buf[0] << 8) | buf[1];
+			if (v) {
+				val |= (1 << fan);
+			} else {
+				val &= ~(1 << fan);
+			}
+			buf[0] = val >> 8;
+			buf[1] = val & 0xff;
+			error = apple_smc_key_write(dev, ASMC_KEY_FANMANUAL,
+			    buf, sizeof(buf));
+		}
+	}
+	return (error);
+}
+
+int
+apple_smc_temp_sysctl(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	struct apple_smc_softc *sc = device_get_softc(dev);
+	int error;
+	int val;
+
+	if (arg2 < 0 || arg2 >= sc->sc_temp_count) {
+		return (EINVAL);
+	}
+	error = apple_smc_sensor_read(dev, sc->sc_temp_sensors[arg2], &val);
+	if (error != 0) {
+		return (error);
+	}
+	return (sysctl_handle_int(oidp, &val, 0, req));
+}
+
+int
+apple_smc_dts_sysctl(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	struct apple_smc_softc *sc = device_get_softc(dev);
+	int error, val;
+
+	if (arg2 < 0 || arg2 >= sc->sc_dts_count)
+		return (EINVAL);
+	error = apple_smc_sensor_read(dev, sc->sc_dts_sensors[arg2], &val);
+	if (error != 0)
+		return (error);
+	/* Sentinel check: a disconnected key can return 0x8x00 at runtime too. */
+	if (val <= -120000)
+		return (ENODEV);
+	/* DTS value is a negative offset from Tj,max; convert to absolute. */
+	val = sc->sc_tj_max * 1000 + val;
+	return (sysctl_handle_int(oidp, &val, 0, req));
+}
+
+int
+apple_smc_sensor_sysctl(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	struct apple_smc_softc *sc = device_get_softc(dev);
+	int error, val;
+	int sensor_type = (arg2 >> 8) & 0xFF;
+	int sensor_idx  = arg2 & 0xFF;
+	const char *key = NULL;
+
+	switch (sensor_type) {
+	case 'V':
+		if (sensor_idx < sc->sc_voltage_count) {
+			key = sc->sc_voltage_sensors[sensor_idx];
+		}
+		break;
+	case 'I':
+		if (sensor_idx < sc->sc_current_count) {
+			key = sc->sc_current_sensors[sensor_idx];
+		}
+		break;
+	case 'P':
+		if (sensor_idx < sc->sc_power_count) {
+			key = sc->sc_power_sensors[sensor_idx];
+		}
+		break;
+	case 'L':
+		if (sensor_idx < sc->sc_light_count) {
+			key = sc->sc_light_sensors[sensor_idx];
+		}
+		break;
+	default:
+		return (EINVAL);
+	}
+	if (key == NULL) {
+		return (ENOENT);
+	}
+
+	error = apple_smc_sensor_read(dev, key, &val);
+	if (error != 0) {
+		return (error);
+	}
+	return (sysctl_handle_int(oidp, &val, 0, req));
+}
+
+static int
+apple_smc_sms_axis(device_t dev, const char *key,
+    struct sysctl_oid *oidp, struct sysctl_req *req)
+{
+	int16_t val;
+	int32_t v;
+	int error;
+
+	error = apple_smc_sms_read(dev, key, &val);
+	if (error != 0) {
+		return (error);
+	}
+	v = (int32_t)val;
+	return (sysctl_handle_int(oidp, &v, 0, req));
+}
+
+static const char *apple_smc_sms_keys[] = {
+	ASMC_KEY_SMS_X,		/* 0 */
+	ASMC_KEY_SMS_Y,		/* 1 */
+	ASMC_KEY_SMS_Z,		/* 2 */
+};
+
+int
+apple_smc_mb_sysctl_sms(SYSCTL_HANDLER_ARGS)
+{
+	if (arg2 < 0 || arg2 >= (int)nitems(apple_smc_sms_keys))
+		return (EINVAL);
+	return (apple_smc_sms_axis((device_t)arg1, apple_smc_sms_keys[arg2],
+	    oidp, req));
+}
+
+static int
+apple_smc_light_sensor(device_t dev, const char *key,
+    struct sysctl_oid *oidp, struct sysctl_req *req)
+{
+	uint8_t buf[6];
+	int error;
+	int32_t v;
+
+	error = apple_smc_key_read(dev, key, buf, sizeof(buf));
+	if (error != 0) {
+		return (error);
+	}
+	v = buf[2];
+	return (sysctl_handle_int(oidp, &v, 0, req));
+}
+
+static const char *apple_smc_light_keys[] = {
+	ASMC_KEY_LIGHTLEFT,	/* 0 */
+	ASMC_KEY_LIGHTRIGHT,	/* 1 */
+};
+
+int
+apple_smc_mbp_sysctl_light(SYSCTL_HANDLER_ARGS)
+{
+	if (arg2 < 0 || arg2 >= (int)nitems(apple_smc_light_keys))
+		return (EINVAL);
+	return (apple_smc_light_sensor((device_t)arg1,
+	    apple_smc_light_keys[arg2], oidp, req));
+}
+
+int
+apple_smc_mbp_sysctl_light_left_10byte(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	uint8_t buf[10];
+	uint32_t v;
+	int error;
+
+	error = apple_smc_key_read(dev, ASMC_KEY_LIGHTLEFT, buf, sizeof(buf));
+	if (error != 0) {
+		return (error);
+	}
+	v = be32dec(&buf[6]);
+	v = v >> 8;
+	if (v > 255) {
+		v = 255;
+	}
+	return (sysctl_handle_int(oidp, &v, 0, req));
+}
+
+int
+apple_smc_mbp_sysctl_light_control(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	struct apple_smc_softc *sc = device_get_softc(dev);
+	uint8_t buf[2];
+	int error, v;
+
+	v = light_control;
+	error = sysctl_handle_int(oidp, &v, 0, req);
+	if (error == 0 && req->newptr != NULL) {
+		if (v < 0 || v > 255) {
+			return (EINVAL);
+		}
+		light_control = v;
+		sc->sc_kbd_bkl_level = v * 100 / 255;
+		buf[0] = light_control;
+		buf[1] = 0x00;
+		error = apple_smc_key_write(dev, ASMC_KEY_LIGHTVALUE, buf,
+		    sizeof(buf));
+	}
+	return (error);
+}
+
+/*
+ * Generic RW sysctl for single-byte flag keys (0 or 1).
+ * arg1 = device_t, arg2 = pointer to 4-char SMC key name.
+ */
+int
+apple_smc_flag_sysctl(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	const char *key = (const char *)(intptr_t)arg2;
+	uint8_t raw;
+	int val, error;
+
+	if (apple_smc_key_read(dev, key, &raw, 1) != 0)
+		return (EIO);
+	val = (raw != 0) ? 1 : 0;
+	error = sysctl_handle_int(oidp, &val, 0, req);
+	if (error != 0 || req->newptr == NULL)
+		return (error);
+	if (val != 0 && val != 1)
+		return (EINVAL);
+	raw = (uint8_t)val;
+	return (apple_smc_key_write(dev, key, &raw, 1) != 0 ? EIO : 0);
+}
+
+int
+apple_smc_bclm_sysctl(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	uint8_t bclm;
+	int val, error;
+
+	if (apple_smc_key_read(dev, ASMC_KEY_BCLM, &bclm, 1) != 0) {
+		return (EIO);
+	}
+	val = (int)bclm;
+	error = sysctl_handle_int(oidp, &val, 0, req);
+	if (error != 0 || req->newptr == NULL) {
+		return (error);
+	}
+	if (val < 0 || val > 100) {
+		return (EINVAL);
+	}
+	bclm = (uint8_t)val;
+	return (apple_smc_key_write(dev, ASMC_KEY_BCLM, &bclm, 1) != 0 ?
+	    EIO : 0);
+}
+
+static const char *
+apple_smc_cause_str(int8_t cause)
+{
+	switch (cause) {
+	case -128: return "power-loss";
+	case -127: return "software-powerdown";
+	case -125: return "thermtrip";
+	case -50:  return "overtemp-shutdown";
+	case -20:  return "watchdog";
+	case -15:  return "battery-low";
+	case 0:    return "unknown";
+	case 1:    return "overtemp-sleep";
+	case 3:    return "power-button";
+	case 5:    return "good-shutdown";
+	default:   return NULL;
+	}
+}
+
+static const char *apple_smc_cause_keys[] = {
+	ASMC_KEY_MSSD,		/* 0 */
+	ASMC_KEY_MSSP,		/* 1 */
+};
+
+int
+apple_smc_cause_sysctl(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	const char *key, *desc;
+	int8_t cause;
+	char buf[48];
+
+	if (arg2 < 0 || arg2 >= (int)nitems(apple_smc_cause_keys))
+		return (EINVAL);
+	key = apple_smc_cause_keys[arg2];
+
+	if (apple_smc_key_read(dev, key, (uint8_t *)&cause, 1) != 0)
+		return (EIO);
+	desc = apple_smc_cause_str(cause);
+	if (desc)
+		ksnprintf(buf, sizeof(buf), "%d (%s)", (int)cause, desc);
+	else
+		ksnprintf(buf, sizeof(buf), "%d", (int)cause);
+	return (sysctl_handle_string(oidp, buf, sizeof(buf), req));
+}
+
+int
+apple_smc_msal_sysctl(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	uint8_t msal; char buf[80];
+
+	if (apple_smc_key_read(dev, ASMC_KEY_MSAL, &msal, 1) != 0) {
+		return (EIO);
+	}
+	/*
+	 * Bits 0x04, 0x10 and 0x20 are present in observed hardware values but
+	 * are not documented here yet, so report the raw byte and decode only the
+	 * known flags.
+	 */
+	ksnprintf(buf, sizeof(buf),
+	    "0x%02x (tss=%d therm_valid=%d calib_valid=%d prochot=%d plimits=%d)",
+	    msal,
+	    (msal & 0x01) != 0, (msal & 0x02) != 0,
+	    (msal & 0x08) != 0, (msal & 0x40) != 0, (msal & 0x80) != 0);
+	return (sysctl_handle_string(oidp, buf, sizeof(buf), req));
+}
+
+int
+apple_smc_clkt_sysctl(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	uint8_t buf[4]; uint32_t secs;
+
+	if (apple_smc_key_read(dev, ASMC_KEY_CLKT, buf, 4) != 0) {
+		return (EIO);
+	}
+	secs = be32dec(buf);
+	return (sysctl_handle_32(oidp, &secs, 0, req));
+}
+
+int
+apple_smc_clwk_sysctl(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	uint8_t buf[2];
+	uint32_t secs;
+	int error;
+
+	if (apple_smc_key_read(dev, ASMC_KEY_CLWK, buf, 2) != 0)
+		return (EIO);
+
+	/* CLWK is ui16 BE; 0 = disabled. */
+	secs = be16dec(buf);
+	error = sysctl_handle_32(oidp, &secs, 0, req);
+	if (error != 0 || req->newptr == NULL)
+		return (error);
+
+	if (secs >= 86400)
+		return (EINVAL);
+
+	error = apple_smc_key_check_writable(dev, ASMC_KEY_CLWK);
+	if (error != 0)
+		return (error);
+
+	be16enc(buf, (uint16_t)secs);
+	if (apple_smc_key_write(dev, ASMC_KEY_CLWK, buf, 2) != 0)
+		return (EIO);
+
+	/* Verify write; retry as LE if readback mismatches. */
+	if (apple_smc_key_read(dev, ASMC_KEY_CLWK, buf, 2) == 0) {
+		uint16_t readback = be16dec(buf);
+		if (readback != (uint16_t)secs) {
+			le16enc(buf, (uint16_t)secs);
+			return (apple_smc_key_write(dev, ASMC_KEY_CLWK,
+			    buf, 2) != 0 ? EIO : 0);
+		}
+	}
+	return (0);
+}
+
+int
+apple_smc_msps_sysctl(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	uint8_t buf[2]; uint32_t state;
+
+	if (apple_smc_key_read(dev, ASMC_KEY_MSPS, buf, 2) != 0) {
+		return (EIO);
+	}
+	state = ((uint32_t)buf[0] << 8) | buf[1];
+	return (sysctl_handle_32(oidp, &state, 0, req));
+}
+
+int
+apple_smc_rplt_sysctl(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	uint8_t buf[9]; char name[9];
+
+	memset(buf, 0, sizeof(buf));
+	if (apple_smc_key_read(dev, ASMC_KEY_RPLT, buf, 8) != 0) {
+		return (EIO);
+	}
+	memcpy(name, buf, 8);
+	name[8] = '\0';
+	return (sysctl_handle_string(oidp, name, sizeof(name), req));
+}
+
+int
+apple_smc_rgen_sysctl(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	uint8_t gen; uint32_t val;
+
+	if (apple_smc_key_read(dev, ASMC_KEY_RGEN, &gen, 1) != 0) {
+		return (EIO);
+	}
+	val = gen;
+	return (sysctl_handle_32(oidp, &val, 0, req));
+}
+
+int
+apple_smc_raw_key_sysctl(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	struct apple_smc_softc *sc = device_get_softc(dev);
+	char newkey[ASMC_KEYLEN + 1];
+	uint8_t keylen;
+	int error;
+
+	strlcpy(newkey, sc->sc_rawkey, sizeof(newkey));
+	error = sysctl_handle_string(oidp, newkey, sizeof(newkey), req);
+	if (error || req->newptr == NULL) {
+		return (error);
+	}
+	if (strlen(newkey) != ASMC_KEYLEN) {
+		return (EINVAL);
+	}
+	if (apple_smc_key_getinfo(dev, newkey, &keylen, sc->sc_rawtype) != 0) {
+		return (ENOENT);
+	}
+	if (keylen > ASMC_MAXVAL) {
+		keylen = ASMC_MAXVAL;
+	}
+	strlcpy(sc->sc_rawkey, newkey, sizeof(sc->sc_rawkey));
+	sc->sc_rawlen = keylen;
+	memset(sc->sc_rawval, 0, sizeof(sc->sc_rawval));
+	/* Read may fail; allow setting key for subsequent write. */
+	apple_smc_key_read(dev, sc->sc_rawkey, sc->sc_rawval,
+	    sc->sc_rawlen);
+	return (0);
+}
+
+int
+apple_smc_raw_value_sysctl(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	struct apple_smc_softc *sc = device_get_softc(dev);
+	char hexbuf[ASMC_MAXVAL * 2 + 1];
+	int error, i;
+
+	if (sc->sc_rawkey[0] != '\0') {
+		error = apple_smc_key_read(dev, sc->sc_rawkey, sc->sc_rawval,
+		    sc->sc_rawlen > 0 ? sc->sc_rawlen : ASMC_MAXVAL);
+		if (error != 0) {
+			return (error);
+		}
+	}
+
+	for (i = 0; i < sc->sc_rawlen && i < ASMC_MAXVAL; i++) {
+		ksnprintf(hexbuf + i * 2, 3, "%02x", sc->sc_rawval[i]);
+	}
+	hexbuf[i * 2] = '\0';
+
+	error = sysctl_handle_string(oidp, hexbuf, sizeof(hexbuf), req);
+	if (error || req->newptr == NULL) {
+		return (error);
+	}
+	if (sc->sc_rawkey[0] == '\0') {
+		return (EINVAL);
+	}
+
+	memset(sc->sc_rawval, 0, sizeof(sc->sc_rawval));
+	for (i = 0; i < sc->sc_rawlen && hexbuf[i*2] && hexbuf[i*2+1]; i++) {
+		unsigned int val;
+		char tmp[3] = { hexbuf[i*2], hexbuf[i*2+1], 0 };
+
+		if (ksscanf(tmp, "%02x", &val) == 1) {
+			sc->sc_rawval[i] = (uint8_t)val;
+		}
+	}
+	return (apple_smc_key_write(dev, sc->sc_rawkey,
+	    sc->sc_rawval, sc->sc_rawlen) != 0 ? EIO : 0);
+}
+
+int
+apple_smc_raw_len_sysctl(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	struct apple_smc_softc *sc = device_get_softc(dev);
+	int v = sc->sc_rawlen;
+	return (sysctl_handle_int(oidp, &v, 0, req));
+}
+
+int
+apple_smc_raw_type_sysctl(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	struct apple_smc_softc *sc = device_get_softc(dev);
+	return (sysctl_handle_string(oidp, sc->sc_rawtype,
+	    sizeof(sc->sc_rawtype), req));
+}
+
+int
+apple_smc_raw_index_sysctl(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	struct apple_smc_softc *sc = device_get_softc(dev);
+	int idx = -1, error;
+	char keyname[ASMC_KEYLEN + 1];
+	uint8_t keylen;
+
+	error = sysctl_handle_int(oidp, &idx, 0, req);
+	if (error || req->newptr == NULL)
+		return (error);
+	if (idx < 0 || idx >= sc->sc_nkeys)
+		return (EINVAL);
+
+	error = apple_smc_key_dump_by_index(dev, idx, keyname,
+	    sc->sc_rawtype, &keylen);
+	if (error != 0)
+		return (EIO);
+	strlcpy(sc->sc_rawkey, keyname, sizeof(sc->sc_rawkey));
+	sc->sc_rawlen = keylen;
+	memset(sc->sc_rawval, 0, sizeof(sc->sc_rawval));
+	apple_smc_key_read(dev, sc->sc_rawkey, sc->sc_rawval, sc->sc_rawlen);
+	return (0);
+}
+
+/* G3AO sysctl handler. */
+int
+apple_smc_g3ao_sysctl(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	uint8_t buf[4];
+	uint32_t ts;
+	int error;
+
+	if (apple_smc_key_read(dev, ASMC_KEY_G3AO, buf, 4) != 0)
+		return (EIO);
+	ts = be32dec(buf);
+	error = sysctl_handle_32(oidp, &ts, 0, req);
+	if (error != 0 || req->newptr == NULL)
+		return (error);
+
+	error = apple_smc_key_check_writable(dev, ASMC_KEY_G3AO);
+	if (error != 0)
+		return (error);
+
+	be32enc(buf, ts);
+	return (apple_smc_key_write(dev, ASMC_KEY_G3AO, buf, 4) != 0 ?
+	    EIO : 0);
+}
+
+
+/* AUWT sysctl handler. */
+int
+apple_smc_auwt_sysctl(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	uint8_t buf[2];
+	uint32_t secs;
+	int error;
+
+	if (apple_smc_key_read(dev, ASMC_KEY_AUWT, buf, 2) != 0)
+		return (EIO);
+	secs = be16dec(buf);
+	error = sysctl_handle_32(oidp, &secs, 0, req);
+	if (error != 0 || req->newptr == NULL)
+		return (error);
+	if (secs > 65535)
+		return (EINVAL);
+	be16enc(buf, (uint16_t)secs);
+	return (apple_smc_key_write(dev, ASMC_KEY_AUWT, buf, 2) != 0 ?
+	    EIO : 0);
+}
+
+/* DPBR sysctl handler. */
+int
+apple_smc_dpbr_sysctl(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	uint8_t buf[2];
+	uint32_t val;
+
+	if (apple_smc_key_read(dev, ASMC_KEY_DPBR, buf, 2) != 0)
+		return (EIO);
+	val = be16dec(buf);
+	return (sysctl_handle_32(oidp, &val, 0, req));
+}
+
+/* ENV0 sysctl handler. */
+int
+apple_smc_env0_sysctl(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	uint8_t val;
+	uint32_t v;
+
+	if (apple_smc_key_read(dev, ASMC_KEY_ENV0, &val, 1) != 0)
+		return (EIO);
+	v = val;
+	return (sysctl_handle_32(oidp, &v, 0, req));
+}
+
+
+int
+apple_smc_prochot_override_sysctl(SYSCTL_HANDLER_ARGS)
+{
+	device_t dev = (device_t)arg1;
+	struct apple_smc_softc *sc = device_get_softc(dev);
+	int val, error;
+	uint64_t msr;
+
+	val = sc->sc_prochot_override;
+	error = sysctl_handle_int(oidp, &val, 0, req);
+	if (error || req->newptr == NULL)
+		return (error);
+
+	if (val != 0 && val != 1)
+		return (EINVAL);
+	if (val == sc->sc_prochot_override)
+		return (0);
+
+	if (rdmsr_safe(MSR_IA32_POWER_CTL, &msr) != 0)
+		return (EIO);
+
+	if (val)
+		msr &= ~(uint64_t)IA32_POWER_CTL_BD_PROCHOT;
+	else
+		msr |= IA32_POWER_CTL_BD_PROCHOT;
+
+	if (wrmsr_safe(MSR_IA32_POWER_CTL, msr) != 0)
+		return (EIO);
+
+	if (!val) {
+		if (sc->sc_thermal_running) {
+			sc->sc_thermal_enabled = 0;
+			apple_smc_thermal_fans_to_max(dev);
+		}
+		apple_smc_fan_release_manual(dev);
+	}
+
+	sc->sc_prochot_override = val;
+	return (0);
+}

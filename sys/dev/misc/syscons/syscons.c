@@ -714,9 +714,14 @@ scopen(struct dev_open_args *ap)
     int error;
 
     /*
-     * Disallow access to disk volumes if RESTRICTEDROOT
+     * Disallow root access to ttyv* console device if RESTRICTEDROOT
+     * because root cred will match inside jails and its too dangerous
+     * for that.
+     *
+     * However, we have to specify __SYSCAP_NOROOTTEST to allow non-root
+     * accesses when using RESTRICTROOT (when creds match).
      */
-    if (caps_priv_check_self(SYSCAP_RESTRICTEDROOT))
+    if (caps_priv_check(ap->a_cred, SYSCAP_RESTRICTEDROOT | __SYSCAP_NOROOTTEST))
 	return (EPERM);
 
     lwkt_gettoken(&vga_token);

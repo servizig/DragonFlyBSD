@@ -99,8 +99,8 @@ static int slot_printf(struct sdhci_slot *slot, const char * fmt, ...)
 #define	SDHCI_UNLOCK(_slot)		lockmgr(&(_slot)->lock, LK_RELEASE)
 #define SDHCI_LOCK_INIT(_slot)		lockinit(&(_slot)->lock, "sdhci", 0, LK_CANRECURSE)
 #define SDHCI_LOCK_DESTROY(_slot)	lockuninit(&(_slot)->lock);
-#define SDHCI_ASSERT_LOCKED(_slot)	KKASSERT(lockstatus(&(_slot)->lock, curthread) != 0);
-#define SDHCI_ASSERT_UNLOCKED(_slot)	KKASSERT(lockstatus(&(_slot)->lock, curthread) == 0);
+#define SDHCI_ASSERT_LOCKED(_slot)	KKASSERT(lockowned(&(_slot)->lock));
+#define SDHCI_ASSERT_UNLOCKED(_slot)	KKASSERT(!lockowned(&(_slot)->lock));
 
 #define	SDHCI_DEFAULT_MAX_FREQ	50
 
@@ -1305,6 +1305,15 @@ sdhci_start_data(struct sdhci_slot *slot, struct mmc_data *data)
 	if ((slot->quirks & SDHCI_QUIRK_32BIT_DMA_SIZE) &&
 	    ((data->len) & 0x3)) {
 		slot->flags &= ~SDHCI_USE_SDMA;
+		slot->flags &= ~SDHCI_USE_ADMA2;
+	}
+	/*
+	 * On some controllers, ADMA2 only works for transferring multiples of
+	 * the block size. So fall back to PIO if data->len is not a multiple
+	 * of 512.
+	 */
+	if ((slot->quirks & SDHCI_QUIRK_ADMA2_ONLY_BLOCKS) &&
+	    (data->len % 512) != 0) {
 		slot->flags &= ~SDHCI_USE_ADMA2;
 	}
 	/* Load DMA buffer. */

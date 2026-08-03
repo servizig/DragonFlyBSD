@@ -826,22 +826,31 @@ failed:
 "   program version(s) netid(s)                         service     owner\n");
 		for (rs = rs_head; rs; rs = rs->next) {
 			char *p = buf;
+			char *end = p + sizeof(buf);
+			int n;
 
 			printf("%10ld  ", rs->prog);
+
 			for (vl = rs->vlist; vl; vl = vl->next) {
-				sprintf(p, "%d", vl->vers);
-				p = p + strlen(p);
-				if (vl->next)
-					sprintf(p++, ",");
+				n = snprintf(p, end - p, "%d%s", vl->vers,
+					     vl->next ? "," : "");
+				if (n < 0 || n + p >= end)
+					break;
+				p += n;
 			}
 			printf("%-10s", buf);
+
 			buf[0] = '\0';
+			p = buf;
 			for (nl = rs->nlist; nl; nl = nl->next) {
-				strcat(buf, nl->netid);
-				if (nl->next)
-					strcat(buf, ",");
+				n = snprintf(p, end - p, "%s%s", nl->netid,
+					     nl->next ? "," : "");
+				if (n < 0 || n + p >= end)
+					break;
+				p += n;
 			}
 			printf("%-32s", buf);
+
 			rpc = getrpcbynumber(rs->prog);
 			if (rpc)
 				printf(" %-11s", rpc->r_name);
@@ -938,7 +947,7 @@ rpcbaddrlist(char *netid, int argc, char **argv)
 			re = &head->rpcb_entry_map;
 			printf("%10u%3u    ",
 				parms.r_prog, parms.r_vers);
-			sprintf(buf, "%s/%s/%s ",
+			snprintf(buf, sizeof(buf), "%s/%s/%s ",
 				re->r_nc_protofmly, re->r_nc_proto,
 				re->r_nc_semantics == NC_TPI_CLTS ? "clts" :
 				re->r_nc_semantics == NC_TPI_COTS ? "cots" :

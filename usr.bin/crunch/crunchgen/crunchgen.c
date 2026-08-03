@@ -943,7 +943,7 @@ gen_output_cfile(void)
 		fprintf(outcf, "%s\n", *cp);
 
 	for (p = progs; p != NULL; p = p->next)
-		fprintf(outcf, "extern int _crunched_%s_stub();\n", p->ident);
+		fprintf(outcf, "extern int _crunched_%s_stub(int, char **, char **);\n", p->ident);
 
 	fprintf(outcf, "\nstatic const struct stub entry_points[] = {\n");
 	for (p = progs; p != NULL; p = p->next) {
@@ -1096,7 +1096,6 @@ top_makefile_rules(FILE *outmk)
 	    execfname, execfname);
 	fprintf(outmk, "\t\t${CRUNCHED_OBJS} ${LIBS_INT} ${LIBS}\n");
 	fprintf(outmk, ".endif\n");
-	fprintf(outmk, "\tstrip %s\n", execfname);
 	fprintf(outmk, "realclean: clean subclean\n");
 	fprintf(outmk, "clean:\n\trm -f %s *.lo *.o *_stub.c\n", execfname);
 	fprintf(outmk, "subclean: ${SUBCLEAN_TARGETS}\n");
@@ -1173,14 +1172,10 @@ prog_makefile_rules(FILE *outmk, prog_t *p)
 	fprintf(outmk, "%s_stub.c:\n", p->name);
 	fprintf(outmk, "\techo \""
 	    "extern int main(int, char **, char **); "
+	    "int _crunched_%s_stub(int, char **, char **); "
 	    "int _crunched_%s_stub(int argc, char **argv, char **envp)"
 	    "{return main(argc,argv,envp);}\" >%s_stub.c\n",
-	    p->ident, p->name);
-	fprintf(outmk, "%s_stub.o: %s_stub.c\n",
-	    p->name, p->name);
-	fprintf(outmk, "\t${CC} ${CFLAGS:N-flto*} -c %s_stub.c -o %s_stub.o",
-	    p->name, p->name);
-	fprintf(outmk, "\n");
+	    p->ident, p->ident, p->name);
 	fprintf(outmk, "%s.lo: %s_stub.o ${%s_OBJPATHS}",
 	    p->name, p->name, p->ident);
 	if (p->libs_int)

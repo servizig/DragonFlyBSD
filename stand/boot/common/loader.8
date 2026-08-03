@@ -25,7 +25,7 @@
 .\"
 .\" $FreeBSD: src/sys/boot/common/loader.8,v 1.57 2003/06/29 20:57:55 brueffer Exp $
 .\"
-.Dd August 22, 2025
+.Dd July 5, 2026
 .Dt LOADER 8
 .Os
 .Sh NAME
@@ -642,6 +642,11 @@ will be used.
 This variable should not be used if
 .Tn I/O APIC
 use is disabled.
+.It Va hw.isa.pnp_disabled
+If set to 1, skip the ISA PnP isolation scan.
+The scan takes several seconds on systems with no ISA PnP hardware,
+such as virtual machines.
+Default is 0.
 .It Va hw.physmem
 Limit the amount of physical memory the system will use.
 By default the size is in bytes, but the
@@ -674,6 +679,12 @@ The default is 10 (hz) to dissuade casual use.
 If you are doing real work
 with emergency interrupt polling mode enabled, it is recommended
 that you use a frequency between 100hz and 300hz.
+.It Va kern.intr_config_hook_delay_ms
+Specify how long to linger, in milliseconds, after the interrupt-driven
+device configuration hooks have finished but before mounting the root
+file system
+(default is 5000 if unspecified).
+It may be set to 0 to skip the delay entirely.
 .It Va kern.maxusers
 Set the size of a number of statically allocated system tables; see
 .Xr tuning 7
@@ -751,9 +762,13 @@ Overrides the compile-time set value of
 .Va TCBHASHSIZE
 or the preset default of 512.
 Must be a power of 2.
-.It Va vfs.root.wakedelay
-Specify an additional delay (default is 2 seconds if unspecified)
+.It Va vfs.root.wakedelay_ms
+Specify an additional delay in milliseconds
+(default is 2000 if unspecified)
 before trying to mount root.
+This supersedes the seconds-based
+.Va vfs.root.wakedelay
+tunable, which it replaces.
 .It Va vfs.root.mountfrom
 Specify root file system.
 A semicolon separated list of file systems to try

@@ -346,6 +346,9 @@ fetches all source distributions required to build the whole of
 .Pp
 Any existing distfiles which do not match the expected
 signature will be re-fetched.
+.It Cm list-only Op Ar ports/everything
+Generate a list of all likely build dependencies required to build
+the specified targets.  The output is written to the file "build.txt"
 .It Cm upgrade-system
 NOT CURRENTLY IMPLEMENTED.
 Incrementally build and upgrade your locally
@@ -492,6 +495,8 @@ Hooks are run via
 This hook triggers when the overall build process starts.
 .It Pa hook_run_end
 This hook is called when the overall build process ends.
+.It Pa hook_pkg_started
+This hook triggers when a port starts building.
 .It Pa hook_pkg_success
 For each successful port built this hook will trigger.
 .It Pa hook_pkg_failure
@@ -540,8 +545,8 @@ The number of ports that where ignored and, hence, not built
 The number of ports that were skipped in the build (only for
 .Pa hook_run_end ) .
 .It Ev RESULT
-The result (success, failure, ignored, skipped) for the build of an individual
-port (only for
+The result (started, success, failure, ignored, skipped) for the build of an
+individual port (only for
 .Pa hook_pkg_* ) .
 .It Ev ORIGIN
 The origin of a port (only for
@@ -686,7 +691,6 @@ for modest compression and very fast compression and decompression.
 Due to the way the builder works, package dependencies are freshly
 installed into the chroot slot for each package being built, so
 decompression time matters.
-.Pp
 .El
 .Sh EXIT STATUS
 .Ex -std

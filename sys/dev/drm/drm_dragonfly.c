@@ -147,12 +147,32 @@ void drm_init_pdev(device_t dev, struct pci_dev **pdev)
 	(*pdev)->bus->number = pci_get_bus(dev);
 }
 
+static void
+drm_release_pdev_irq(struct pci_dev *pdev)
+{
+	if (pdev->_irqr != NULL) {
+		bus_release_resource(pdev->dev.bsddev, SYS_RES_IRQ,
+		    pdev->_irqrid, pdev->_irqr);
+		pdev->_irqr = NULL;
+	}
+	if (pdev->_irq_type == PCI_INTR_TYPE_MSI) {
+		pci_release_msi(pdev->dev.bsddev);
+		pdev->_irq_type = 0;
+	}
+}
+
 void drm_fini_pdev(struct pci_dev **pdev)
 {
+	if (*pdev == NULL)
+		return;
+
+	drm_release_pdev_irq((*pdev)->bus->self);
 	kfree((*pdev)->bus->self);
 	kfree((*pdev)->bus);
 
+	drm_release_pdev_irq(*pdev);
 	kfree(*pdev);
+	*pdev = NULL;
 }
 
 void drm_print_pdev(struct pci_dev *pdev)
@@ -178,7 +198,7 @@ static int drm_alloc_resource(struct drm_device *dev, int resource)
 	struct resource *res;
 	int rid;
 
-	KKASSERT(lockstatus(&dev->struct_mutex, curthread) != 0);
+	KKASSERT(lockowned(&dev->struct_mutex));
 
 	if (resource >= DRM_MAX_PCI_RESOURCE) {
 		DRM_ERROR("Resource %d too large\n", resource);
@@ -269,6 +289,8 @@ int drm_device_detach(device_t kdev)
 	lockuninit(&dev->event_lock);
 	lockuninit(&dev->struct_mutex.lock);
 #endif
+
+	drm_fini_pdev(&dev->pdev);
 
 	return 0;
 }

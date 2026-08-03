@@ -130,9 +130,7 @@ kgdb_trgt_open(char *filename, int from_tty)
 	kgdb_dmesg();
 
 	gdbarch_info_init (&info);
-#if defined (__i386__)
-	info.bfd_arch_info = bfd_scan_arch ("i386");
-#elif defined (__x86_64__)
+#if defined (__x86_64__)
 	info.bfd_arch_info = bfd_scan_arch ("i386:x86-64");
 #else
 #error platform not recognized

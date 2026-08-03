@@ -63,12 +63,16 @@ _alloc_safe_mem(size_t req_sz, const char *file, int line)
 	if ((mem = malloc(alloc_sz)) == NULL)
 		return NULL;
 
+	/*
+	 * Initialize the memory before mlock(const void *, ...) to suppress
+	 * -Wmaybe-uninitialized false positive given by GCC 12.5.
+	 */
+	memset(mem, 0, alloc_sz);
+
 	if (mlock(mem, alloc_sz) < 0) {
 		free(mem);
 		return NULL;
 	}
-
-	memset(mem, 0, alloc_sz);
 
 	hdr = (struct safe_mem_hdr *)mem;
 	tail = (struct safe_mem_tail *)(mem + alloc_sz - sizeof(*tail));

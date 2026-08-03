@@ -196,7 +196,7 @@ struct cam_eb {
 #define	CAM_EB_RUNQ_SCHEDULED	0x01
 	u_int32_t	     refcount;
 	u_int		     generation;
-	int		     counted_to_config;	/* busses_to_config */
+	int		     counted_to_config;	/* buses_to_config */
 };
 
 struct cam_path {
@@ -1445,6 +1445,7 @@ xpt_init(void *dummy)
 	struct cam_path *path;
 	struct cam_devq *devq;
 	cam_status status;
+	int error;
 
 	TAILQ_INIT(&xsoftc.xpt_busses);
 	TAILQ_INIT(&cam_simq);
@@ -1489,10 +1490,10 @@ xpt_init(void *dummy)
 	xpt_sim->max_ccbs = 16;
 
 	lockmgr(&xsoftc.xpt_lock, LK_EXCLUSIVE);
-	if ((status = xpt_bus_register(xpt_sim, /*bus #*/0)) != CAM_SUCCESS) {
+	if ((error = xpt_bus_register(xpt_sim, /*bus #*/0)) != CAM_SUCCESS) {
 		lockmgr(&xsoftc.xpt_lock, LK_RELEASE);
-		kprintf("xpt_init: xpt_bus_register failed with status %#x,"
-		       " failing attach\n", status);
+		kprintf("xpt_init: xpt_bus_register failed with errno %d,"
+		       " failing attach\n", error);
 		return (EINVAL);
 	}
 
@@ -4293,7 +4294,7 @@ xpt_release_ccb(union ccb *free_ccb)
  * information specified by the user.  Once interrupt services are
  * availible, the bus will be probed.
  */
-int32_t
+int
 xpt_bus_register(struct cam_sim *sim, u_int32_t bus)
 {
 	struct cam_eb *new_bus;
@@ -4356,7 +4357,7 @@ xpt_bus_register(struct cam_sim *sim, u_int32_t bus)
  * This routine is typically called prior to cam_sim_free() (e.g. see
  * dev/usbmisc/umass/umass.c)
  */
-int32_t
+int
 xpt_bus_deregister(path_id_t pathid)
 {
 	struct cam_path bus_path;
@@ -4373,7 +4374,7 @@ xpt_bus_deregister(path_id_t pathid)
 	status = xpt_compile_path(&bus_path, NULL, pathid,
 				  CAM_TARGET_WILDCARD, CAM_LUN_WILDCARD);
 	if (status != CAM_REQ_CMP)
-		return (status);
+		return (ENOMEM);
 
 	/*
 	 * This should clear out all pending requests and timeouts, but
@@ -4482,7 +4483,7 @@ again:
 	/* Release the ref we got when the bus was registered */
 	cam_sim_release(ccbsim, 0);
 
-	return (CAM_REQ_CMP);
+	return (CAM_SUCCESS);
 }
 
 /*
@@ -7007,8 +7008,8 @@ xpt_start_tags(struct cam_path *path)
 	xpt_free_ccb(&crs->ccb_h);
 }
 
-static int busses_to_config;
-static int busses_to_reset;
+static int buses_to_config;
+static int buses_to_reset;
 
 static int
 xptconfigbuscountfunc(struct cam_eb *bus, void *arg)
@@ -7033,7 +7034,7 @@ xptconfigbuscountfunc(struct cam_eb *bus, void *arg)
 
 		cpi = &xpt_alloc_ccb()->cpi;
 
-		atomic_add_int(&busses_to_config, 1);
+		atomic_add_int(&buses_to_config, 1);
 		bus->counted_to_config = 1;
 		xpt_compile_path(&path, NULL, bus->path_id,
 				 CAM_TARGET_WILDCARD, CAM_LUN_WILDCARD);
@@ -7043,13 +7044,13 @@ xptconfigbuscountfunc(struct cam_eb *bus, void *arg)
 		can_negotiate = cpi->hba_inquiry;
 		can_negotiate &= (PI_WIDE_32|PI_WIDE_16|PI_SDTR_ABLE);
 		if ((cpi->hba_misc & PIM_NOBUSRESET) == 0 && can_negotiate)
-			busses_to_reset++;
+			buses_to_reset++;
 		xpt_release_path(&path);
 		xpt_free_ccb(&cpi->ccb_h);
 	} else
 	if (bus->counted_to_config == 0 && bus->path_id == CAM_XPT_PATH_ID) {
 		/* this is our dummy periph/bus */
-		atomic_add_int(&busses_to_config, 1);
+		atomic_add_int(&buses_to_config, 1);
 		bus->counted_to_config = 1;
 	}
 
@@ -7159,8 +7160,8 @@ xpt_config(void *arg)
 	 */
 	xpt_for_all_busses(xptconfigbuscountfunc, NULL);
 
-	kprintf("CAM: Configuring %d busses\n", busses_to_config - 1);
-	if (busses_to_reset > 0 && scsi_delay >= 2000) {
+	kprintf("CAM: Configuring %d busses\n", buses_to_config - 1);
+	if (buses_to_reset > 0 && scsi_delay >= 2000) {
 		kprintf("Waiting %d seconds for SCSI "
 			"devices to settle\n",
 			scsi_delay/1000);
@@ -7198,7 +7199,7 @@ xpt_finishconfig_task(void *context, int pending)
 
 	kprintf("CAM: finished configuring all busses\n");
 
-	if (busses_to_config == 0) {
+	if (buses_to_config == 0) {
 		/* Register all the peripheral drivers */
 		/* XXX This will have to change when we have loadable modules */
 		p_drv = periph_drivers;
@@ -7228,7 +7229,7 @@ xpt_uncount_bus (struct cam_eb *bus)
 
 	if (bus->counted_to_config) {
 		bus->counted_to_config = 0;
-		if (atomic_fetchadd_int(&busses_to_config, -1) == 1) {
+		if (atomic_fetchadd_int(&buses_to_config, -1) == 1) {
 			task = kmalloc(sizeof(struct xpt_task), M_CAMXPT,
 				       M_INTWAIT | M_ZERO);
 			TASK_INIT(&task->task, 0, xpt_finishconfig_task, task);

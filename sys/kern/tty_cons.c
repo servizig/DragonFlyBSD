@@ -175,7 +175,7 @@ cninit(void)
 		    (best_cp == NULL || cp->cn_pri > best_cp->cn_pri))
 			best_cp = cp;
 	}
-	
+
 	/*
 	 * If no console, give up.
 	 */
@@ -265,7 +265,7 @@ sysctl_kern_consmute(SYSCTL_HANDLER_ARGS)
 	if((error == 0) && (cn_tab != NULL) && (req->newptr != NULL)) {
 		if(ocn_mute && !cn_mute) {
 			/*
-			 * going from muted to unmuted.. open the physical dev 
+			 * going from muted to unmuted.. open the physical dev
 			 * if the console has been openned
 			 */
 			cninit_finish();
@@ -278,7 +278,7 @@ sysctl_kern_consmute(SYSCTL_HANDLER_ARGS)
 			if ( error != 0) cnuninit();
 		} else if (!ocn_mute && cn_mute) {
 			/*
-			 * going from unmuted to muted.. close the physical dev 
+			 * going from unmuted to muted.. close the physical dev
 			 * if it's only open via /dev/console
 			 */
 			if (cn_is_open) {
@@ -289,7 +289,7 @@ sysctl_kern_consmute(SYSCTL_HANDLER_ARGS)
 				cnuninit();
 		}
 		if (error != 0) {
-			/* 
+			/*
 	 		 * back out the change if there was an error
 			 */
 			cn_mute = ocn_mute;
@@ -340,7 +340,7 @@ cnopen(struct dev_open_args *ap)
 	int retval = 0;
 
 	/*
-	 * Disallow access to disk volumes if RESTRICTEDROOT
+	 * Disallow access to /dev/console if RESTRICTEDROOT
 	 */
 	if (caps_priv_check_self(SYSCAP_RESTRICTEDROOT))
 		return (EPERM);
@@ -507,7 +507,7 @@ cnkqfilter(struct dev_kqfilter_args *ap)
 }
 
 /*
- * These synchronous functions are primarily used the kernel needs to 
+ * These synchronous functions are primarily used the kernel needs to
  * access the keyboard (e.g. when running the debugger), or output data
  * directly to the console.
  */

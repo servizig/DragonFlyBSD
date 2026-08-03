@@ -570,11 +570,6 @@ cuse_client_send_command_locked(struct cuse_client_command *pccmd,
 
 	if (ioflag & IO_NDELAY)
 		cuse_fflags |= CUSE_FFLAG_NONBLOCK;
-#ifndef __LP64__
-	HEY! IF WE HAVE 32 BIT BINARY COMPAT WE NEED TO CHECK FOR IT
-	if (SV_CURPROC_FLAG(SV_ILP32))
-		cuse_fflags |= CUSE_FFLAG_COMPAT32;
-#endif
 	pccmd->sub.fflags = cuse_fflags;
 	pccmd->sub.data_pointer = data_ptr;
 	pccmd->sub.argument = arg;
@@ -2018,7 +2013,7 @@ cuse_client_kqfilter_read_event(struct knote *kn, long hint)
 
 	pcc = (struct cuse_client *)kn->kn_hook;
 
-	KKASSERT(lockstatus(&pcc->server->mtx, curthread) != 0);
+	KKASSERT(lockowned(&pcc->server->mtx));
 
 	return ((pcc->cflags & CUSE_CLI_KNOTE_NEED_READ) ? 1 : 0);
 }
@@ -2030,7 +2025,7 @@ cuse_client_kqfilter_write_event(struct knote *kn, long hint)
 
 	pcc = (struct cuse_client *)kn->kn_hook;
 
-	KKASSERT(lockstatus(&pcc->server->mtx, curthread) != 0);
+	KKASSERT(lockowned(&pcc->server->mtx));
 
 	return ((pcc->cflags & CUSE_CLI_KNOTE_NEED_WRITE) ? 1 : 0);
 }

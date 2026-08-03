@@ -425,11 +425,6 @@ SRCS=	gimple-loop-interchange.cc wide-int.cc wide-int-print.cc
 SRCS+=	unique-ptr-tests.cc
 .endif
 
-# for gimple-ssa-sprintf.c
-.if ${CCVER:Mgcc47}
-CXXFLAGS+=	-Wno-pragmas
-.endif
-
 # for tree-ssa-structalias.c, tree-vect-stmts.c
 .if ${CCVER:Mgcc*} && ${CCVER:S/gcc//} >= 80
 CXXFLAGS+=	-Wno-narrowing
@@ -438,8 +433,8 @@ CXXFLAGS+=	-Wno-c++11-narrowing
 .endif
 
 # hack to force c++ compiler to compile *.c files to create library
-.for cfile in ${BACKEND_OBJS}
-${cfile}: ${cfile:.o=.c}
+.for ofile in ${BACKEND_OBJS}
+${ofile}: ${ofile:.o=.c}
 	${CXX} ${STATIC_CXXFLAGS} ${CXXFLAGS} -c ${.IMPSRC} -o ${.TARGET}
 .endfor
 

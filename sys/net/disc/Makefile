@@ -3,8 +3,6 @@
 KMOD=   if_disc
 SRCS=   if_disc.c opt_inet.h opt_inet6.h
 
-NBPF?=	1
-
 .if !defined(KERNBUILDDIR)
 opt_inet.h:
 	echo "#define INET 1" > ${.TARGET}

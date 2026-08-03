@@ -1,10 +1,11 @@
 # $FreeBSD: head/rescue/rescue/Makefile 252356 2013-06-28 21:00:08Z davide $
 #	@(#)Makefile	8.1 (Berkeley) 6/2/93
 
-# To include '../Makefine.inc' for use in <bsd.crunchgen.mk>
-.include <bsd.init.mk>
-
 PROG= rescue.libcrypto
+
+# TODO: remove this after a period of time when most people have done a *full*
+# buildworld + installworld, because crunchgen(1) is a cross tool.
+WARNS=	2
 
 # Programs from 'bin'
 #
@@ -37,6 +38,7 @@ CRUNCH_INTLIB_telnet= ${.CURDIR}/../../lib/libtelnet/libtelnet.a
 CRUNCH_SRCDIRS+= sbin
 CRUNCH_PATH_sbin= ${.CURDIR}/../..
 CRUNCH_PROGS_sbin=	\
+	fsck_hammer2	\
 	md5		\
 	hammer		\
 	hammer2		\

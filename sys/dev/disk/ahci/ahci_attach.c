@@ -59,9 +59,13 @@ static int	ahci_nvidia_mcp_attach(device_t);
 static int	ahci_pci_attach(device_t);
 static int	ahci_pci_detach(device_t);
 
+static int	ahci_samsung_apple_attach(device_t dev);
+
 static const struct ahci_device ahci_devices[] = {
 	{ PCI_VENDOR_VIATECH,	PCI_PRODUCT_VIATECH_VT8251_SATA,
 	    ahci_vt8251_attach, ahci_pci_detach, "ViaTech-VT8251-SATA" },
+	{ PCI_VENDOR_SAMSUNG,	PCI_PRODUCT_SAMSUNG_APPLE_AHCI,
+	    ahci_samsung_apple_attach, ahci_pci_detach, "Samsung-Apple-PCIe-SSD" },
 	{ PCI_VENDOR_ATI,	PCI_PRODUCT_ATI_SB600_SATA,
 	    ahci_ati_sb600_attach, ahci_pci_detach, "ATI-SB600-SATA" },
 	{ PCI_VENDOR_NVIDIA,	PCI_PRODUCT_NVIDIA_MCP65_AHCI_2,
@@ -107,7 +111,10 @@ static const struct ahci_pciid ahci_msi_blacklist[] = {
 	{ PCI_VENDOR_NVIDIA,	PCI_PRODUCT_NVIDIA_MCP65_AHCI_5, 0xa2 },
 	{ PCI_VENDOR_NVIDIA,	PCI_PRODUCT_NVIDIA_MCP65_AHCI_6, 0xa2 },
 	{ PCI_VENDOR_NVIDIA,	PCI_PRODUCT_NVIDIA_MCP65_AHCI_7, 0xa2 },
-	{ PCI_VENDOR_NVIDIA,	PCI_PRODUCT_NVIDIA_MCP65_AHCI_8, 0xa2 }
+	{ PCI_VENDOR_NVIDIA,	PCI_PRODUCT_NVIDIA_MCP65_AHCI_8, 0xa2 },
+
+	/* Samsung Apple PCIe SSD: MSI fires once at init then goes silent */
+	{ PCI_VENDOR_SAMSUNG,	PCI_PRODUCT_SAMSUNG_APPLE_AHCI, -1 }
 };
 
 static int	ahci_msi_enable = 1;
@@ -196,6 +203,15 @@ ahci_nvidia_mcp_attach(device_t dev)
 	struct ahci_softc *sc = device_get_softc(dev);
 
 	sc->sc_flags |= AHCI_F_IGN_FR;
+	return (ahci_pci_attach(dev));
+}
+
+static int
+ahci_samsung_apple_attach(device_t dev)
+{
+	struct ahci_softc *sc = device_get_softc(dev);
+
+	sc->sc_flags |= AHCI_F_IGN_FR | AHCI_F_IGN_CR | AHCI_F_FAST_COMRESET;
 	return (ahci_pci_attach(dev));
 }
 
@@ -465,48 +481,13 @@ ahci_pci_attach(device_t dev)
 
 	pi = ahci_read(sc, AHCI_REG_PI);
 	DPRINTF(AHCI_D_VERBOSE, "%s: ports implemented: 0x%08x\n",
-	    DEVNAME(sc), pi);
+	    device_get_nameunit(sc->sc_dev), pi);
 
 	sc->sc_ipm_disable = AHCI_PREG_SCTL_IPM_NOPARTIAL |
 			     AHCI_PREG_SCTL_IPM_NOSLUMBER;
 	if (sc->sc_cap2 & AHCI_REG_CAP2_SDS)
 		sc->sc_ipm_disable |= AHCI_PREG_SCTL_IPM_NODEVSLP;
 
-#ifdef AHCI_COALESCE
-	/* Naive coalescing support - enable for all ports. */
-	if (cap & AHCI_REG_CAP_CCCS) {
-		u_int16_t		ccc_timeout = 20;
-		u_int8_t		ccc_numcomplete = 12;
-		u_int32_t		ccc_ctl;
-
-		/* disable coalescing during reconfiguration. */
-		ccc_ctl = ahci_read(sc, AHCI_REG_CCC_CTL);
-		ccc_ctl &= ~0x00000001;
-		ahci_write(sc, AHCI_REG_CCC_CTL, ccc_ctl);
-
-		sc->sc_ccc_mask = 1 << AHCI_REG_CCC_CTL_INT(ccc_ctl);
-		if (pi & sc->sc_ccc_mask) {
-			/* A conflict with the implemented port list? */
-			printf("%s: coalescing interrupt/implemented port list "
-			    "conflict, PI: %08x, ccc_mask: %08x\n",
-			    DEVNAME(sc), pi, sc->sc_ccc_mask);
-			sc->sc_ccc_mask = 0;
-			goto noccc;
-		}
-
-		/* ahci_port_start will enable each port when it starts. */
-		sc->sc_ccc_ports = pi;
-		sc->sc_ccc_ports_cur = 0;
-
-		/* program thresholds and enable overall coalescing. */
-		ccc_ctl &= ~0xffffff00;
-		ccc_ctl |= (ccc_timeout << 16) | (ccc_numcomplete << 8);
-		ahci_write(sc, AHCI_REG_CCC_CTL, ccc_ctl);
-		ahci_write(sc, AHCI_REG_CCC_PORTS, 0);
-		ahci_write(sc, AHCI_REG_CCC_CTL, ccc_ctl | 1);
-	}
-noccc:
-#endif
 	/*
 	 * Allocate per-port resources
 	 *

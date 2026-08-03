@@ -19,13 +19,11 @@ CLEANFILES+=	cxx11-ios_failure.*.s*
 
 CXXFLAGS+=		-std=gnu++11 -fno-implicit-templates
 
-FLAGS_GROUPS=		implicit char8 supcxx
+FLAGS_GROUPS=		implicit char8
 implicit_FLAGS=		-fimplicit-templates
 implicit_FLAGS_FILES=	hashtable_c++0x.cc
 char8_FLAGS=		-fchar8_t
 char8_FLAGS_FILES=	codecvt.cc limits.cc
-supcxx_FLAGS=		-I${SRCDIR}/libsupc++
-supcxx_FLAGS_FILES=	thread.cc
 
 # Derived from libstdc++-v3/src/c++11/Makefile.am:
 # Rewrite the type info for __ios_failure.

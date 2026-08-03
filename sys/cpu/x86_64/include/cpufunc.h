@@ -132,6 +132,12 @@ clflush(u_long addr)
 }
 
 static __inline void
+clts(void)
+{
+	__asm __volatile("clts");
+}
+
+static __inline void
 cpuid_count(u_int ax, u_int cx, u_int *p)
 {
 	__asm __volatile("cpuid"

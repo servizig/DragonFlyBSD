@@ -180,6 +180,8 @@ send_link_on(int fd, int node)
 	asyreq = (struct fw_asyreq *)malloc(sizeof(struct fw_asyreq_t) + 12);
 	asyreq->req.len = 12;
 	asyreq->req.type = FWASREQNODE;
+	asyreq->pkt.mode.ld[1] = 0;
+	asyreq->pkt.mode.ld[2] = 0;
 	asyreq->pkt.mode.common.tcode = FWTCODE_PHY;
 	asyreq->pkt.mode.ld[1] |= (1 << 30) | ((node & 0x3f) << 24);
 	asyreq->pkt.mode.ld[2] = ~asyreq->pkt.mode.ld[1];

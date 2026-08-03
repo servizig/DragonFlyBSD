@@ -73,10 +73,6 @@ CTASSERT(WG_KEY_SIZE >= NOISE_SYMMETRIC_KEY_LEN);
 #define DEFAULT_MTU		(ETHERMTU - 80)
 #define MAX_MTU			(IF_MAXMTU - 80)
 
-#ifndef ENOKEY
-#define ENOKEY			ENOENT
-#endif
-
 /*
  * mbuf flags to clear after in-place encryption/decryption, so that the
  * mbuf can be reused for re-entering the network stack or delivering to
@@ -2336,7 +2332,7 @@ wg_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 			      (void *)&mtod(m, struct ip *)->ip_dst :
 			      (void *)&mtod(m, struct ip6_hdr *)->ip6_dst));
 	if (__predict_false(peer == NULL)) {
-		ret = ENOKEY;
+		ret = ENETUNREACH;
 		goto error;
 	}
 	if (__predict_false(peer->p_endpoint.e_remote.r_sa.sa_family
@@ -2400,9 +2396,11 @@ wg_ioctl_get(struct wg_softc *sc, struct wg_data_io *data, bool privileged)
 
 	/* Determine the required data size. */
 	size = sizeof(struct wg_interface_io);
-	size += sizeof(struct wg_peer_io) * sc->sc_peers_num;
-	TAILQ_FOREACH(peer, &sc->sc_peers, p_entry)
-		size += sizeof(struct wg_aip_io) * peer->p_aips_num;
+	if (privileged) {
+		size += sizeof(struct wg_peer_io) * sc->sc_peers_num;
+		TAILQ_FOREACH(peer, &sc->sc_peers, p_entry)
+			size += sizeof(struct wg_aip_io) * peer->p_aips_num;
+	}
 
 	/* Return the required size for userland allocation. */
 	if (data->wgd_size < size) {
@@ -2436,6 +2434,9 @@ wg_ioctl_get(struct wg_softc *sc, struct wg_data_io *data, bool privileged)
 	}
 
 	peer_count = 0;
+	if (!privileged)
+		goto skip_peers;
+
 	peer_p = &iface_p->i_peers[0];
 	TAILQ_FOREACH(peer, &sc->sc_peers, p_entry) {
 		bzero(&peer_o, sizeof(peer_o));
@@ -2495,8 +2496,9 @@ wg_ioctl_get(struct wg_softc *sc, struct wg_data_io *data, bool privileged)
 		peer_count++;
 	}
 	KKASSERT(peer_count == sc->sc_peers_num);
-	iface_o.i_peers_count = peer_count;
 
+skip_peers:
+	iface_o.i_peers_count = peer_count;
 	ret = copyout(&iface_o, iface_p, sizeof(iface_o));
 
 out:
@@ -2507,18 +2509,100 @@ out:
 }
 
 static int
-wg_ioctl_set(struct wg_softc *sc, struct wg_data_io *data)
+wg_ioctl_set_peer(struct wg_softc *sc, const struct wg_peer_io *peer_p,
+		  const struct wg_peer_io *peer_o)
 {
-	struct wg_interface_io	*iface_p, iface_o;
-	struct wg_peer_io	*peer_p, peer_o;
-	struct wg_aip_io	*aip_p, aip_o;
+	const struct wg_aip_io	*aip_p;
+	struct wg_aip_io	 aip_o;
+	struct wg_peer		*peer;
+	struct noise_remote	*remote;
+	uint8_t			 public[WG_KEY_SIZE];
+	size_t			 i;
+	bool			 new_peer;
+	int			 ret;
+
+	ret = 0;
+	peer = NULL;
+	new_peer = false;
+
+	/* Ignore peer that does not have public key. */
+	if ((peer_o->p_flags & WG_PEER_HAS_PUBLIC) == 0)
+		return (0);
+	/* Ignore peer that has the same public key. */
+	if (noise_local_keys(sc->sc_local, public, NULL) &&
+	    memcmp(public, peer_o->p_public, WG_KEY_SIZE) == 0)
+		return (0);
+
+	/* Lookup peer, or create if it doesn't exist. */
+	remote = noise_remote_lookup(sc->sc_local, peer_o->p_public);
+	if (remote != NULL) {
+		peer = noise_remote_arg(remote);
+		if (peer_o->p_flags & WG_PEER_REMOVE) {
+			wg_peer_destroy(peer);
+			peer = NULL;
+		}
+	} else if ((peer_o->p_flags & (WG_PEER_REMOVE | WG_PEER_UPDATE)) == 0) {
+		new_peer = true;
+		peer = wg_peer_create(sc, peer_o->p_public, &ret);
+	}
+	if (peer == NULL)
+		goto out;
+
+	if (peer_o->p_flags & WG_PEER_HAS_ENDPOINT) {
+		ret = wg_peer_set_sockaddr(peer, &peer_o->p_sa);
+		if (ret != 0)
+			goto out;
+	}
+	if (peer_o->p_flags & WG_PEER_HAS_PSK)
+		noise_remote_set_psk(peer->p_remote, peer_o->p_psk);
+	if (peer_o->p_flags & WG_PEER_HAS_PKA)
+		wg_timers_set_persistent_keepalive(peer, peer_o->p_pka);
+	if (peer_o->p_flags & WG_PEER_SET_DESCRIPTION) {
+		strlcpy(peer->p_description, peer_o->p_description,
+			sizeof(peer->p_description));
+	}
+
+	if ((peer_o->p_flags & WG_PEER_REPLACE_AIPS) && !new_peer)
+		wg_aip_remove_all(sc, peer);
+
+	for (i = 0; i < peer_o->p_aips_count; i++) {
+		aip_p = &peer_p->p_aips[i];
+		if ((ret = copyin(aip_p, &aip_o, sizeof(aip_o))) != 0)
+			goto out;
+		ret = wg_aip_add(sc, peer, aip_o.a_af, &aip_o.a_addr,
+				 aip_o.a_cidr);
+		if (ret != 0)
+			goto out;
+	}
+
+	if (sc->sc_ifp->if_link_state == LINK_STATE_UP)
+		wg_peer_send_staged(peer);
+
+	peer = NULL; /* Successfully added or updated. */
+
+out:
+	if (peer != NULL && new_peer)
+		wg_peer_destroy(peer);
+	if (remote != NULL)
+		noise_remote_put(remote);
+
+	return (ret);
+}
+
+static int
+wg_ioctl_set(struct wg_softc *sc, const struct wg_data_io *data)
+{
+	const struct wg_interface_io *iface_p;
+	const struct wg_peer_io	*peer_p;
+	const struct wg_aip_io	*aip_p;
+	struct wg_interface_io	 iface_o;
+	struct wg_peer_io	 peer_o;
 	struct wg_peer		*peer;
 	struct noise_remote	*remote;
 	uint8_t			 public[WG_KEY_SIZE], private[WG_KEY_SIZE];
-	size_t			 i, j;
+	size_t			 i;
 	int			 ret;
 
-	remote = NULL;
 	lockmgr(&sc->sc_lock, LK_EXCLUSIVE);
 
 	iface_p = data->wgd_interface;
@@ -2574,81 +2658,18 @@ wg_ioctl_set(struct wg_softc *sc, struct wg_data_io *data)
 		if ((ret = copyin(peer_p, &peer_o, sizeof(peer_o))) != 0)
 			goto error;
 
-		/* Peer must have public key. */
-		if ((peer_o.p_flags & WG_PEER_HAS_PUBLIC) == 0)
-			goto next_peer;
-		/* Ignore peer that has the same public key. */
-		if (noise_local_keys(sc->sc_local, public, NULL) &&
-		    memcmp(public, peer_o.p_public, WG_KEY_SIZE) == 0)
-			goto next_peer;
+		ret = wg_ioctl_set_peer(sc, peer_p, &peer_o);
+		if (ret != 0)
+			goto error;
 
-		/* Lookup peer, or create if it doesn't exist. */
-		remote = noise_remote_lookup(sc->sc_local, peer_o.p_public);
-		if (remote != NULL) {
-			peer = noise_remote_arg(remote);
-		} else {
-			if (peer_o.p_flags & (WG_PEER_REMOVE | WG_PEER_UPDATE))
-				goto next_peer;
-
-			peer = wg_peer_create(sc, peer_o.p_public, &ret);
-			if (peer == NULL)
-				goto error;
-
-			/* No allowed IPs to remove for a new peer. */
-			peer_o.p_flags &= ~WG_PEER_REPLACE_AIPS;
-		}
-
-		if (peer_o.p_flags & WG_PEER_REMOVE) {
-			wg_peer_destroy(peer);
-			goto next_peer;
-		}
-
-		if (peer_o.p_flags & WG_PEER_HAS_ENDPOINT) {
-			ret = wg_peer_set_sockaddr(peer, &peer_o.p_sa);
-			if (ret != 0)
-				goto error;
-		}
-		if (peer_o.p_flags & WG_PEER_HAS_PSK)
-			noise_remote_set_psk(peer->p_remote, peer_o.p_psk);
-		if (peer_o.p_flags & WG_PEER_HAS_PKA)
-			wg_timers_set_persistent_keepalive(peer, peer_o.p_pka);
-		if (peer_o.p_flags & WG_PEER_SET_DESCRIPTION)
-			strlcpy(peer->p_description, peer_o.p_description,
-				sizeof(peer->p_description));
-
-		if (peer_o.p_flags & WG_PEER_REPLACE_AIPS)
-			wg_aip_remove_all(sc, peer);
-
-		for (j = 0; j < peer_o.p_aips_count; j++) {
-			aip_p = &peer_p->p_aips[j];
-			if ((ret = copyin(aip_p, &aip_o, sizeof(aip_o))) != 0)
-				goto error;
-			ret = wg_aip_add(sc, peer, aip_o.a_af, &aip_o.a_addr,
-					 aip_o.a_cidr);
-			if (ret != 0)
-				goto error;
-		}
-
-		if (sc->sc_ifp->if_link_state == LINK_STATE_UP)
-			wg_peer_send_staged(peer);
-
-	next_peer:
-		if (remote != NULL) {
-			noise_remote_put(remote);
-			remote = NULL;
-		}
 		aip_p = &peer_p->p_aips[peer_o.p_aips_count];
-		peer_p = (struct wg_peer_io *)aip_p;
+		peer_p = (const struct wg_peer_io *)aip_p;
 	}
 
 error:
-	if (remote != NULL)
-		noise_remote_put(remote);
 	lockmgr(&sc->sc_lock, LK_RELEASE);
 	explicit_bzero(&iface_o, sizeof(iface_o));
 	explicit_bzero(&peer_o, sizeof(peer_o));
-	explicit_bzero(&aip_o, sizeof(aip_o));
-	explicit_bzero(public, sizeof(public));
 	explicit_bzero(private, sizeof(private));
 	return (ret);
 }
@@ -2668,18 +2689,18 @@ wg_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data, struct ucred *cred)
 
 	switch (cmd) {
 	case SIOCSWG:
+	case SIOCGWG:
+		wgd = (struct wg_data_io *)data;
 		ret = caps_priv_check(cred, SYSCAP_RESTRICTEDROOT);
-		if (ret == 0) {
-			wgd = (struct wg_data_io *)data;
-			ret = wg_ioctl_set(sc, wgd);
+		privileged = (ret == 0);
+		if (cmd == SIOCSWG) {
+			if (privileged)
+				ret = wg_ioctl_set(sc, wgd);
+		} else {
+			ret = wg_ioctl_get(sc, wgd, privileged);
 		}
 		break;
-	case SIOCGWG:
-		privileged =
-		    (caps_priv_check(cred, SYSCAP_RESTRICTEDROOT) == 0);
-		wgd = (struct wg_data_io *)data;
-		ret = wg_ioctl_get(sc, wgd, privileged);
-		break;
+
 	/* Interface IOCTLs */
 	case SIOCSIFADDR:
 		/*

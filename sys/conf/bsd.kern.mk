@@ -11,18 +11,27 @@ CSTD?=		gnu11
 
 CWARNFLAGS?=	-Wall -Wredundant-decls -Wnested-externs -Wstrict-prototypes \
 		-Wmissing-prototypes -Wpointer-arith -Wcast-qual \
-		-Wold-style-definition -Wmissing-include-dirs \
-		-Wno-pointer-sign -Winit-self -Wundef
+		-Wold-style-definition -Wmissing-include-dirs -Winit-self \
+		-Wundef
 
+_cnowarnflags=	-Wno-pointer-sign
+
+_gccver=	0
 .if ${CCVER:Mgcc*}
-# All flags inside this block are gcc-specific except for --param
-# Since inline-limit wasn't recognized, and since --param squawks on clang
-# when it isn't used, it was shift to GCC compilers only.
-CFLAGS+=	-Wold-style-declaration \
-		-finline-limit=${INLINE_LIMIT} \
-		--param inline-unit-growth=100 \
-		--param large-function-growth=1000
-CWARNFLAGS+=	-Wno-unused-but-set-variable
+_gccver=	${CCVER:S/gcc//}
+.endif
+
+.if ${_gccver} > 0
+CWARNFLAGS+=	-Wold-style-declaration
+_cnowarnflags+=	-Wno-unused-but-set-variable
+.endif
+.if ${_gccver} >= 90
+_cnowarnflags+=	-Wno-address-of-packed-member
+.endif
+
+# Add -Wno-foo flags last
+.if !defined(WARNS_AUDIT)
+CWARNFLAGS+=	${_cnowarnflags}
 .endif
 
 
