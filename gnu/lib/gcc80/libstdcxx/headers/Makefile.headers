@@ -702,9 +702,9 @@ experimental_bits_headers = \
 	${experimental_bits_srcdir}/string_view.tcc \
 	${experimental_bits_filesystem_headers}
 
+# !ENABLE_FILESYSTEM_TS
 experimental_filesystem_headers =
-
-experimental_bits_filesystem_headers=
+experimental_bits_filesystem_headers =
 
 c_base_headers = \
 	${c_base_srcdir}/cassert \
@@ -734,10 +734,13 @@ c_base_headers = \
 	${c_base_srcdir}/cwchar \
 	${c_base_srcdir}/cwctype
 
+# GLIBCXX_C_HEADERS_C_GLOBAL
 c_compatibility_headers = \
 	${c_compatibility_srcdir}/complex.h \
 	${c_compatibility_srcdir}/fenv.h \
-	${c_compatibility_srcdir}/tgmath.h
+	${c_compatibility_srcdir}/tgmath.h \
+	${c_compatibility_srcdir}/math.h \
+	${c_compatibility_srcdir}/stdlib.h
 
 debug_headers = \
 	${debug_srcdir}/array \

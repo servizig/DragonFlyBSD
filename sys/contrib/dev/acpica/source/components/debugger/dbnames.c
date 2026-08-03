@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2021, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2025, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -776,7 +776,12 @@ AcpiDbWalkForFields (
     ACPI_FREE (Buffer.Pointer);
 
     Buffer.Length = ACPI_ALLOCATE_LOCAL_BUFFER;
-    AcpiEvaluateObject (ObjHandle, NULL, NULL, &Buffer);
+    Status = AcpiEvaluateObject (ObjHandle, NULL, NULL, &Buffer);
+    if (ACPI_FAILURE (Status))
+    {
+        AcpiOsPrintf ("Could Not evaluate object %p\n", ObjHandle);
+        return (AE_OK);
+    }
 
     /*
      * Since this is a field unit, surround the output in braces
@@ -885,6 +890,9 @@ AcpiDbDisplayObjects (
     if (!ObjTypeArg)
     {
         ObjectInfo = ACPI_ALLOCATE_ZEROED (sizeof (ACPI_OBJECT_INFO));
+
+        if (!ObjectInfo)
+                return (AE_NO_MEMORY);
 
         /* Walk the namespace from the root */
 

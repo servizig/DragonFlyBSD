@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2021, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2025, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -231,6 +231,7 @@ AcpiRsDumpDescriptor (
     ACPI_RSDUMP_INFO        *Table);
 
 
+#ifdef ACPI_DEBUGGER
 /*******************************************************************************
  *
  * FUNCTION:    AcpiRsDumpResourceList
@@ -360,7 +361,7 @@ AcpiRsDumpIrqList (
             PrtElement, PrtElement->Length);
     }
 }
-
+#endif
 
 /*******************************************************************************
  *

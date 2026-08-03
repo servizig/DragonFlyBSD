@@ -198,6 +198,7 @@ SRCS=	\
 	utascii.c \
 	utbuffer.c \
 	utcache.c \
+	utcksum.c \
 	utcopy.c \
 	utdebug.c \
 	utdecode.c \

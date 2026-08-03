@@ -62,9 +62,6 @@ CXX_LINK	?=	${CXX}
 NXCXX		?=	${NXENV} ${CXX}
 NXCXX_LINK	?=	${NXENV} ${CXX_LINK}
 CXXFLAGS	?=	${CXXINCLUDES} ${CFLAGS:N-std=*:N-Wnested-externs:N-W*-prototypes:N-Wno-pointer-sign:N-Wold-style-definition}
-.if !defined(SYSBUILD) && defined(.MAKE.BUILT.BY) && ${.MAKE.BUILT.BY:Mgcc47}
-CXXFLAGS	+=	-D_GLIBCXX_USE_CXX11_ABI=0
-.endif
 
 CPP		?=	cpp
 
@@ -99,7 +96,7 @@ LD		?=	ld
 NXLD		?=	${NXENV} ${LD}
 LDFLAGS		?=
 NXCFLAGS	?=	${CROSS_CFLAGS} ${CFLAGS:N-mtune*:N-mcpu*:N-march*:N-flto}
-NXCXXFLAGS	?=	${CROSS_CFLAGS} ${CFLAGS:N-mtune*:N-mcpu*:N-march*:N-flto:N-std=*}
+NXCXXFLAGS	?=	${CROSS_CFLAGS} ${CXXFLAGS:N-mtune*:N-mcpu*:N-march*:N-flto}
 NXLDLIBS	?=	${LDLIBS}
 NXLDFLAGS	?=	-static ${LDFLAGS}
 
@@ -116,8 +113,6 @@ PFLAGS		?=
 
 RC		?=	f77
 RFLAGS		?=
-
-SHELL		?=	sh
 
 YACC		?=	yacc
 .if defined(%POSIX)
@@ -213,35 +208,44 @@ MACHINE_PLATFORM!=/sbin/sysctl -n hw.platform
 	chmod a+x ${.TARGET}
 
 .c:
-	${CC} ${_${.IMPSRC:T}_FLAGS} ${CFLAGS} ${LDFLAGS} ${.IMPSRC} ${LDLIBS} -o ${.TARGET}
+	${CC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${CFLAGS} ${_${.IMPSRC:T}_FLAGS:N-I*} \
+	    ${LDFLAGS} ${.IMPSRC} ${LDLIBS} -o ${.TARGET}
 
 .c.o:
-	${CC} ${_${.IMPSRC:T}_FLAGS} ${CFLAGS} -c ${.IMPSRC}
+	${CC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${CFLAGS} ${_${.IMPSRC:T}_FLAGS:N-I*} \
+	    -c ${.IMPSRC}
 
 .cc .cpp .cxx .C:
-	${CXX} ${_${.IMPSRC:T}_FLAGS} ${CXXFLAGS} ${LDFLAGS} ${.IMPSRC} ${LDLIBS} -o ${.TARGET}
+	${CXX} ${_${.IMPSRC:T}_FLAGS:M-I*} ${CXXFLAGS} ${_${.IMPSRC:T}_FLAGS:N-I*} \
+	    ${LDFLAGS} ${.IMPSRC} ${LDLIBS} -o ${.TARGET}
 
 .cc.o .cpp.o .cxx.o .C.o:
-	${CXX} ${_${.IMPSRC:T}_FLAGS} ${CXXFLAGS} -c ${.IMPSRC}
+	${CXX} ${_${.IMPSRC:T}_FLAGS:M-I*} ${CXXFLAGS} ${_${.IMPSRC:T}_FLAGS:N-I*} \
+	    -c ${.IMPSRC}
 
 .m.o:
-	${OBJC} ${_${.IMPSRC:T}_FLAGS} ${OBJCFLAGS} -c ${.IMPSRC}
+	${OBJC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${OBJCFLAGS} \
+	    ${_${.IMPSRC:T}_FLAGS:N-I*} -c ${.IMPSRC}
 
 .p.o:
-	${PC} ${_${.IMPSRC:T}_FLAGS} ${PFLAGS} -c ${.IMPSRC}
+	${PC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${PFLAGS} ${_${.IMPSRC:T}_FLAGS:N-I*} \
+	    -c ${.IMPSRC}
 
 .e .r .F .f:
-	${FC} ${_${.IMPSRC:T}_FLAGS} ${RFLAGS} ${EFLAGS} ${FFLAGS} ${LDFLAGS} \
-	    ${.IMPSRC} ${LDLIBS} -o ${.TARGET}
+	${FC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${RFLAGS} ${EFLAGS} ${FFLAGS} \
+	    ${_${.IMPSRC:T}_FLAGS:N-I*} ${LDFLAGS} ${.IMPSRC} ${LDLIBS} \
+	    -o ${.TARGET}
 
 .e.o .r.o .F.o .f.o:
-	${FC} ${_${.IMPSRC:T}_FLAGS} ${RFLAGS} ${EFLAGS} ${FFLAGS} -c ${.IMPSRC}
+	${FC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${RFLAGS} ${EFLAGS} ${FFLAGS} \
+	    ${_${.IMPSRC:T}_FLAGS:N-I*} -c ${.IMPSRC}
 
 .S.o:
-	${CC} ${_${.IMPSRC:T}_FLAGS} ${CFLAGS} -c ${.IMPSRC}
+	${CC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${CFLAGS} ${_${.IMPSRC:T}_FLAGS:N-I*} \
+	    -c ${.IMPSRC}
 
 .s.o:
-	${AS} ${_${.IMPSRC:T}_FLAGS} ${AFLAGS} -o ${.TARGET} ${.IMPSRC}
+	${AS} ${AFLAGS} ${_${.IMPSRC:T}_FLAGS} -o ${.TARGET} ${.IMPSRC}
 
 # XXX not -j safe
 .y.o:
@@ -257,10 +261,12 @@ MACHINE_PLATFORM!=/sbin/sysctl -n hw.platform
 # .no == native object file, for helper code when cross building.
 #
 .c.no:
-	${NXCC} ${_${.IMPSRC:T}_FLAGS} ${NXCFLAGS:N-flto} -c ${.IMPSRC} -o ${.TARGET}
+	${NXCC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${NXCFLAGS:N-flto} \
+	    ${_${.IMPSRC:T}_FLAGS:N-I*} -c ${.IMPSRC} -o ${.TARGET}
 
 .cc.no .C.no .cpp.no .cxx.no:
-	${NXCXX} ${_${.IMPSRC:T}_FLAGS} ${NXCXXFLAGS:N-flto} -c ${.IMPSRC} -o ${.TARGET}
+	${NXCXX} ${_${.IMPSRC:T}_FLAGS:M-I*} ${NXCXXFLAGS:N-flto} \
+	    ${_${.IMPSRC:T}_FLAGS:N-I*} -c ${.IMPSRC} -o ${.TARGET}
 
 .y.no:
 	${YACC} ${YFLAGS} ${.IMPSRC}
@@ -273,7 +279,8 @@ MACHINE_PLATFORM!=/sbin/sysctl -n hw.platform
 	rm -f ${.TARGET}.c
 
 .no.nx .c.nx:
-	${NXCC} ${_${.IMPSRC:T}_FLAGS} ${NXCFLAGS} ${NXLDFLAGS} ${.IMPSRC} \
+	${NXCC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${NXCFLAGS} \
+	    ${_${.IMPSRC:T}_FLAGS:N-I*} ${NXLDFLAGS} ${.IMPSRC} \
 	    ${NXLDLIBS} -o ${.TARGET}
 
 # XXX not -j safe
@@ -285,11 +292,14 @@ MACHINE_PLATFORM!=/sbin/sysctl -n hw.platform
 	${LEX} -t ${LFLAGS} ${.IMPSRC} > ${.TARGET}
 
 .s.out .c.out .o.out:
-	${CC} ${_${.IMPSRC:T}_FLAGS} ${CFLAGS} ${LDFLAGS} ${.IMPSRC} ${LDLIBS} -o ${.TARGET}
+	${CC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${CFLAGS} \
+	    ${_${.IMPSRC:T}_FLAGS:N-I*} ${LDFLAGS} ${.IMPSRC} ${LDLIBS} \
+	    -o ${.TARGET}
 
 .f.out .F.out .r.out .e.out:
-	${FC} ${_${.IMPSRC:T}_FLAGS} ${EFLAGS} ${RFLAGS} ${FFLAGS} ${LDFLAGS} \
-	    ${.IMPSRC} ${LDLIBS} -o ${.TARGET}
+	${FC} ${_${.IMPSRC:T}_FLAGS:M-I*} ${EFLAGS} ${RFLAGS} ${FFLAGS} \
+	    ${_${.IMPSRC:T}_FLAGS:N-I*} ${LDFLAGS} ${.IMPSRC} ${LDLIBS} \
+	    -o ${.TARGET}
 	rm -f ${.PREFIX}.o
 
 # XXX not -j safe
@@ -315,7 +325,10 @@ MACHINE_PLATFORM!=/sbin/sysctl -n hw.platform
 # that no longer can bootstrap itself.
 
 # Private helper for handling alternative compilers and Makefile.inc1 tester.
-WORLD_ALTCOMPILER?= gcc47
+# This variable is used to choose the one or more alternative compilers to
+# build for world.  If set to "all", then all available alternative compilers
+# are built.
+WORLD_ALTCOMPILER?= gcc120
 
 # Include global user settings.
 __MAKE_CONF?=/etc/make.conf
@@ -349,6 +362,10 @@ OBJFORMAT?=	elf
 
 # Tell bmake to expand -V VAR by default
 .MAKE.EXPAND_VARIABLES= yes
+
+# The SHELL macro is not used by bmake to set the command interpreter,
+# but may be used in the makefiles, so wee need a Bourne/POSIX shell.
+SHELL:=	${.SHELL:Ush}
 
 .if !defined(.PARSEDIR)
 # Not using bmake, which is aggressive about search .PATH

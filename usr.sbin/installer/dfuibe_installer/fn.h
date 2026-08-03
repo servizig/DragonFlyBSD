@@ -56,7 +56,6 @@ void		 fn_get_passphrase(struct i_fn_args *, int);
 
 void 		 fn_root_passwd(struct i_fn_args *);
 void 		 fn_add_user(struct i_fn_args *);
-void		 fn_select_services(struct i_fn_args *);
 
 int		 mount_target_system(struct i_fn_args *);
 
@@ -101,5 +100,6 @@ void		 fn_install_os(struct i_fn_args *);
 /* Global variables */
 
 extern struct	config_vars *rc_conf;
+extern struct	config_vars *resolv_conf;
 
 #endif /* !__FN_H_ */

@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2021, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2025, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -185,6 +185,7 @@ Usage (
     ACPI_OPTION ("-vd",             "Display compiler build date and time");
     ACPI_OPTION ("-vo",             "Enable optimization comments");
     ACPI_OPTION ("-vs",             "Disable signon");
+    ACPI_OPTION ("-ld",             "Disable deterministic output");
 
     printf ("\nHelp:\n");
     ACPI_OPTION ("-h",              "This message");
@@ -262,6 +263,7 @@ Usage (
     ACPI_OPTION ("",                "  (Obtain DSDT from current system if no input file)");
     ACPI_OPTION ("-df",             "Force disassembler to assume table contains valid AML");
     ACPI_OPTION ("-dl",             "Emit legacy ASL code only (no C-style operators)");
+    ACPI_OPTION ("-ds <signature(4)>", "Specify a table signature(4) (CDAT table only)");
     ACPI_OPTION ("-e  <f1 f2 ...>", "Include ACPI table(s) for external symbol resolution");
     ACPI_OPTION ("-fe <file>",      "Specify external symbol declaration file");
     ACPI_OPTION ("-in",             "Ignore NoOp opcodes");

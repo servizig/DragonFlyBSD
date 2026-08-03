@@ -37,7 +37,6 @@ MAN=	accept_filter.9 \
 	copy.9 \
 	CPUMASK.9 \
 	crit_enter.9 \
-	crypto.9 \
 	DB_COMMAND.9 \
 	DECLARE_MODULE.9 \
 	DELAY.9 \
@@ -173,6 +172,7 @@ MAN=	accept_filter.9 \
 	tvtohz.9 \
 	uio.9 \
 	usbdi.9 \
+	unr.9 \
 	vcount.9 \
 	vflush.9 \
 	VFS.9 \
@@ -445,23 +445,6 @@ MLINKS+=crit_enter.9 crit_enter_gd.9 \
 	crit_enter.9 crit_exit.9 \
 	crit_enter.9 crit_exit_gd.9 \
 	crit_enter.9 crit_exit_id.9
-MLINKS+=crypto.9 crypto_dispatch.9 \
-	crypto.9 crypto_done.9 \
-	crypto.9 crypto_find_device_byhid.9 \
-	crypto.9 crypto_find_driver.9 \
-	crypto.9 crypto_freereq.9 \
-	crypto.9 crypto_freesession.9 \
-	crypto.9 crypto_getcaps.9 \
-	crypto.9 crypto_get_driverid.9 \
-	crypto.9 crypto_getreq.9 \
-	crypto.9 crypto_kdispatch.9 \
-	crypto.9 crypto_kdone.9 \
-	crypto.9 crypto_kregister.9 \
-	crypto.9 crypto_newsession.9 \
-	crypto.9 crypto_register.9 \
-	crypto.9 crypto_unblock.9 \
-	crypto.9 crypto_unregister.9 \
-	crypto.9 crypto_unregister_all.9
 MLINKS+=DB_COMMAND.9 DB_COMMAND_FLAG.9 \
 	DB_COMMAND.9 DB_SHOW_COMMAND.9
 MLINKS+=devclass_add_driver.9 devclass_delete_driver.9 \
@@ -520,7 +503,8 @@ MLINKS+=hashinit.9 hashdestroy.9 \
 	hashinit.9 hashinit_ext.9 \
 	hashinit.9 phashinit.9 \
 	hashinit.9 phashinit_ext.9
-MLINKS+=idr.9 idr_destroy.9 \
+MLINKS+=idr.9 idr_alloc.9 \
+	idr.9 idr_destroy.9 \
 	idr.9 idr_find.9 \
 	idr.9 idr_for_each.9 \
 	idr.9 idr_get_new.9 \
@@ -1067,6 +1051,11 @@ MLINKS+=usbdi.9 usb_fifo_alloc_buffer.9 \
 	usbdi.9 usbd_xfer_softc.9 \
 	usbdi.9 usbd_xfer_state.9 \
 	usbdi.9 usbd_xfer_status.9
+MLINKS+=unr.9 alloc_unr.9 \
+	unr.9 alloc_unrl.9 \
+	unr.9 delete_unrhdr.9 \
+	unr.9 free_unr.9 \
+	unr.9 new_unrhdr.9
 MLINKS+=vcount.9 count_dev.9
 MLINKS+=vhold.9 vdrop.9
 MLINKS+=vn_lock.9 vn_islocked.9 \

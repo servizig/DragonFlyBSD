@@ -24,32 +24,32 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $FreeBSD: src/sbin/gpt/add.c,v 1.15 2006/10/04 18:20:25 marcel Exp $
- * $DragonFly: src/sbin/gpt/add.c,v 1.6 2008/07/17 01:15:59 dillon Exp $
  */
 
-#include <sys/types.h>
+#include <sys/param.h>
 
 #include <err.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#include "map.h"
 #include "gpt.h"
 
 static uuid_t type;
-static off_t block, size;
-static unsigned int entry = NOENTRY;
+static off_t block, size, alignment;
+static unsigned int entry = MAP_NOENTRY;
+static const char *name;
 
 static void
 usage_add(void)
 {
-
 	fprintf(stderr,
-	    "usage: %s [-b lba] [-i index] [-s count] [-t uuid] device ...\n",
-	    getprogname());
+		"usage: %s [-a alignment] [-b block] [-i index] [-l label] "
+		"[-s size] [-t uuid/alias] device ...\n",
+		getprogname());
 	exit(1);
 }
 
@@ -63,37 +63,40 @@ add(int fd)
 	struct gpt_ent *ent;
 	unsigned int i;
 
-	gpt = map_find(MAP_TYPE_PRI_GPT_HDR);
+	if (alignment == 0)
+		alignment = (off_t)1024 * 1024 / secsz; /* 1MB */
+
+	gpt = map_find(MAP_TYPE_GPT_PRI_HDR);
 	if (gpt == NULL) {
 		warnx("%s: error: no primary GPT header; run create or recover",
 		    device_name);
 		return;
 	}
 
-	tpg = map_find(MAP_TYPE_SEC_GPT_HDR);
+	tpg = map_find(MAP_TYPE_GPT_SEC_HDR);
 	if (tpg == NULL) {
 		warnx("%s: error: no secondary GPT header; run recover",
 		    device_name);
 		return;
 	}
 
-	tbl = map_find(MAP_TYPE_PRI_GPT_TBL);
-	lbt = map_find(MAP_TYPE_SEC_GPT_TBL);
+	tbl = map_find(MAP_TYPE_GPT_PRI_TBL);
+	lbt = map_find(MAP_TYPE_GPT_SEC_TBL);
 	if (tbl == NULL || lbt == NULL) {
 		warnx("%s: error: run recover -- trust me", device_name);
 		return;
 	}
 
 	hdr = gpt->map_data;
-	if (entry != NOENTRY && entry > le32toh(hdr->hdr_entries)) {
+	if (entry != MAP_NOENTRY && entry > le32toh(hdr->hdr_entries)) {
 		warnx("%s: error: index %u out of range (%u max)", device_name,
 		    entry, le32toh(hdr->hdr_entries));
 		return;
 	}
 
-	if (entry != NOENTRY) {
+	if (entry != MAP_NOENTRY) {
 		i = entry;
-		ent = (void*)((char*)tbl->map_data + i *
+		ent = (void *)((char *)tbl->map_data + i *
 		    le32toh(hdr->hdr_entsz));
 		if (!uuid_is_nil(&ent->ent_type, NULL)) {
 			warnx("%s: error: entry at index %u is not free",
@@ -104,7 +107,7 @@ add(int fd)
 		/* Find empty slot in GPT table. */
 		ent = NULL;
 		for (i = 0; i < le32toh(hdr->hdr_entries); i++) {
-			ent = (void*)((char*)tbl->map_data + i *
+			ent = (void *)((char *)tbl->map_data + i *
 			    le32toh(hdr->hdr_entsz));
 			if (uuid_is_nil(&ent->ent_type, NULL))
 				break;
@@ -116,7 +119,7 @@ add(int fd)
 		}
 	}
 
-	map = map_alloc(block, size);
+	map = map_alloc(block, size, alignment);
 	if (map == NULL) {
 		warnx("%s: error: no space available on device", device_name);
 		return;
@@ -125,6 +128,8 @@ add(int fd)
 	uuid_enc_le(&ent->ent_type, &type);
 	ent->ent_lba_start = htole64(map->map_start);
 	ent->ent_lba_end = htole64(map->map_start + map->map_size - 1LL);
+	if (name != NULL)
+		utf8_to_utf16(name, ent->ent_name, NELEM(ent->ent_name));
 
 	hdr->hdr_crc_table = htole32(crc32(tbl->map_data,
 	    le32toh(hdr->hdr_entries) * le32toh(hdr->hdr_entsz)));
@@ -140,6 +145,8 @@ add(int fd)
 	uuid_enc_le(&ent->ent_type, &type);
 	ent->ent_lba_start = htole64(map->map_start);
 	ent->ent_lba_end = htole64(map->map_start + map->map_size - 1LL);
+	if (name != NULL)
+		utf8_to_utf16(name, ent->ent_name, NELEM(ent->ent_name));
 
 	hdr->hdr_crc_table = htole32(crc32(lbt->map_data,
 	    le32toh(hdr->hdr_entries) * le32toh(hdr->hdr_entsz)));
@@ -156,20 +163,100 @@ void
 add_defaults(int fd)
 {
 	entry = 0;
-	size = 524288;
-	if (parse_uuid("EFI System", &type) != 0) {
-		fprintf(stderr, "Unable to lookup uuid 'EFI System'\n");
-		exit(1);
-	}
+	size = (off_t)256 * 1024 * 1024 / secsz; /* 256MB */
+	type = (uuid_t)GPT_ENT_TYPE_EFI;
 	add(fd);
 
 	entry = 1;
-	size = 0;
-	if (parse_uuid("DragonFly Label64", &type) != 0) {
-		fprintf(stderr, "Unable to lookup uuid 'DragonFly Label64'\n");
-		exit(1);
-	}
+	size = 0; /* all free space */
+	type = (uuid_t)GPT_ENT_TYPE_DRAGONFLY_LABEL64;
 	add(fd);
+}
+
+static int64_t
+parse_number(const char *s)
+{
+	int64_t v;
+	char *suffix;
+
+	v = (int64_t)strtol(s, &suffix, 0);
+	if (suffix == s)
+		return (-1);
+	if (*suffix == '\0')
+		return (v);
+	if (suffix[1] != '\0')
+		return (-1);
+
+	switch (*suffix) {
+	case 'g':
+	case 'G':
+		v *= 1024;
+		/* FALLTHROUGH */
+	case 'm':
+	case 'M':
+		v *= 1024;
+		/* FALLTHROUGH */
+	case 'k':
+	case 'K':
+		v *= 1024;
+		break;
+	default:
+		return (-1);
+	}
+
+	return (v);
+}
+
+static int64_t
+parse_size(const char *s, bool *is_sector)
+{
+	int64_t v;
+	char *suffix;
+
+	v = (int64_t)strtol(s, &suffix, 0);
+	if (suffix == s)
+		return (-1);
+	if (*suffix == '\0') {
+		*is_sector = true;
+		return (v);
+	}
+	if (suffix[1] != '\0')
+		return (-1);
+
+	switch (*suffix) {
+	case 's':
+	case 'S':
+		*is_sector = true;
+		break;
+	case 'p':
+	case 'P':
+		v *= 1024;
+		/* FALLTHROUGH */
+	case 't':
+	case 'T':
+		v *= 1024;
+		/* FALLTHROUGH */
+	case 'g':
+	case 'G':
+		v *= 1024;
+		/* FALLTHROUGH */
+	case 'm':
+	case 'M':
+		v *= 1024;
+		/* FALLTHROUGH */
+	case 'k':
+	case 'K':
+		v *= 1024;
+		/* FALLTHROUGH */
+	case 'b':
+	case 'B':
+		*is_sector = false;
+		break;
+	default:
+		return (-1);
+	}
+
+	return (v);
 }
 
 int
@@ -177,37 +264,52 @@ cmd_add(int argc, char *argv[])
 {
 	char *p;
 	int ch, fd;
+	bool is_sector;
+	int64_t v;
 
-	/* Get the migrate options */
-	while ((ch = getopt(argc, argv, "b:i:s:t:")) != -1) {
+	is_sector = false;
+	type = (uuid_t)GPT_ENT_TYPE_DRAGONFLY_LABEL64;
+
+	while ((ch = getopt(argc, argv, "a:b:hi:l:s:t:")) != -1) {
 		switch(ch) {
+		case 'a':
+			if (alignment > 0)
+				errx(1, "-a alignment already specified");
+			v = parse_number(optarg);
+			if (v < 0)
+				errx(1, "invalid alignment: %s", optarg);
+			alignment = (off_t)v;
+			break;
 		case 'b':
 			if (block > 0)
-				usage_add();
+				errx(1, "-b block already specified");
 			block = strtoll(optarg, &p, 10);
 			if (*p != 0 || block < 1)
-				usage_add();
+				errx(1, "invalid block: %s", optarg);
 			break;
 		case 'i':
-			if (entry != NOENTRY)
-				usage_add();
+			if (entry != MAP_NOENTRY)
+				errx(1, "-i index already specified");
 			entry = strtoul(optarg, &p, 10);
-			if (*p != 0 || entry == NOENTRY)
-				usage_add();
+			if (*p != 0 || entry == MAP_NOENTRY)
+				errx(1, "invalid entry: %s", optarg);
+			break;
+		case 'l':
+			name = optarg;
 			break;
 		case 's':
 			if (size > 0)
-				usage_add();
-			size = strtoll(optarg, &p, 10);
-			if (*p != 0 || size < 1)
-				usage_add();
+				errx(1, "-s size already specified");
+			v = parse_size(optarg, &is_sector);
+			if (v < 0)
+				errx(1, "invalid size: %s", optarg);
+			size = (off_t)v;
 			break;
 		case 't':
-			if (!uuid_is_nil(&type, NULL))
-				usage_add();
 			if (parse_uuid(optarg, &type) != 0)
-				usage_add();
+				errx(1, "invalid type: %s", optarg);
 			break;
+		case 'h':
 		default:
 			usage_add();
 		}
@@ -216,20 +318,26 @@ cmd_add(int argc, char *argv[])
 	if (argc == optind)
 		usage_add();
 
-	/* Create DragonFly 64 bit label partitions by default. */
-	if (uuid_is_nil(&type, NULL)) {
-		uint32_t status;
-
-		uuid_name_lookup(&type, "DragonFly Label64", &status);
-		if (status != uuid_s_ok)
-			err(1, "unable to find uuid for 'DragonFly Label64'");
-	}
-
 	while (optind < argc) {
 		fd = gpt_open(argv[optind++]);
 		if (fd == -1) {
 			warn("unable to open device '%s'", device_name);
 			continue;
+		}
+
+		if (alignment > 0) {
+			if (alignment % secsz != 0)
+				warnx("alignment (%ju) not multiple of "
+				      "sector size (%u)",
+				      (uintmax_t)alignment, secsz);
+			alignment = (alignment + secsz - 1) / secsz;
+		}
+		if (size > 0 && !is_sector) {
+			if (size % secsz != 0)
+				warnx("size (%ju) not multiple of "
+				      "sector size (%u)",
+				      (uintmax_t)size, secsz);
+			size = (size + secsz - 1) / secsz;
 		}
 
 		add(fd);

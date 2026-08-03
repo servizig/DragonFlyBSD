@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2021, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2025, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -472,7 +472,7 @@ AcpiTbParseFadt (
      * Validate the FADT checksum before we copy the table. Ignore
      * checksum error as we want to try to get the DSDT and FACS.
      */
-    (void) AcpiTbVerifyChecksum (Table, Length);
+    (void) AcpiUtVerifyChecksum (Table, Length);
 
     /* Create a local copy of the FADT in common ACPI 2.0+ format */
 
@@ -489,24 +489,19 @@ AcpiTbParseFadt (
         ACPI_TABLE_ORIGIN_INTERNAL_PHYSICAL, NULL, FALSE, TRUE,
         &AcpiGbl_DsdtIndex);
 
-    /* If Hardware Reduced flag is set, there is no FACS */
-
-    if (!AcpiGbl_ReducedHardware)
+    if (AcpiGbl_FADT.Facs)
     {
-        if (AcpiGbl_FADT.Facs)
-        {
-            AcpiTbInstallStandardTable (
-                (ACPI_PHYSICAL_ADDRESS) AcpiGbl_FADT.Facs,
-                ACPI_TABLE_ORIGIN_INTERNAL_PHYSICAL, NULL, FALSE, TRUE,
-                &AcpiGbl_FacsIndex);
-        }
-        if (AcpiGbl_FADT.XFacs)
-        {
-            AcpiTbInstallStandardTable (
-                (ACPI_PHYSICAL_ADDRESS) AcpiGbl_FADT.XFacs,
-                ACPI_TABLE_ORIGIN_INTERNAL_PHYSICAL, NULL, FALSE, TRUE,
-                &AcpiGbl_XFacsIndex);
-        }
+        AcpiTbInstallStandardTable (
+            (ACPI_PHYSICAL_ADDRESS) AcpiGbl_FADT.Facs,
+            ACPI_TABLE_ORIGIN_INTERNAL_PHYSICAL, NULL, FALSE, TRUE,
+            &AcpiGbl_FacsIndex);
+    }
+    if (AcpiGbl_FADT.XFacs)
+    {
+        AcpiTbInstallStandardTable (
+            (ACPI_PHYSICAL_ADDRESS) AcpiGbl_FADT.XFacs,
+            ACPI_TABLE_ORIGIN_INTERNAL_PHYSICAL, NULL, FALSE, TRUE,
+            &AcpiGbl_XFacsIndex);
     }
 }
 

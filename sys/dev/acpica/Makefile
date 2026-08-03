@@ -53,7 +53,7 @@ SRCS+=	rsaddr.c rscalc.c rscreate.c rsdump.c rsdumpinfo.c rsinfo.c rsio.c
 SRCS+=	rsirq.c rslist.c rsmemory.c rsmisc.c rsserial.c rsutils.c
 SRCS+=	rsxface.c tbdata.c tbfadt.c tbfind.c tbinstal.c tbprint.c
 SRCS+=	tbutils.c tbxface.c tbxfload.c tbxfroot.c
-SRCS+=	utalloc.c utascii.c utbuffer.c utaddress.c utcopy.c
+SRCS+=	utalloc.c utascii.c utbuffer.c utaddress.c utcksum.c utcopy.c
 SRCS+=	utdebug.c utdecode.c utdelete.c uterror.c uteval.c utexcep.c
 SRCS+=	utglobal.c uthex.c utids.c utinit.c utlock.c
 SRCS+=	utmath.c utmisc.c utmutex.c utnonansi.c
@@ -75,7 +75,7 @@ SRCS+=  OsdCache.c OsdDebug.c
 SRCS+=  OsdHardware.c OsdInterrupt.c OsdMemory.c OsdSchedule.c
 SRCS+=  OsdStream.c OsdSynch.c OsdTable.c OsdEnvironment.c
 SRCS+=  opt_acpi.h opt_ddb.h opt_ktr.h
-SRCS+=  device_if.h bus_if.h pci_if.h pcib_if.h isa_if.h acpi_if.h
+SRCS+=  device_if.h bus_if.h pcib_if.h isa_if.h acpi_if.h
 SRCS+=  acpi_quirks.h acpi_wmi_if.h cpu_if.h
 
 .if !defined(KERNBUILDDIR)

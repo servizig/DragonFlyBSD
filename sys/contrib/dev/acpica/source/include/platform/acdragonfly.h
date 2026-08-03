@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2003, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2025, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -166,7 +166,10 @@
 #define COMPILER_DEPENDENT_INT64        int64_t
 #define COMPILER_DEPENDENT_UINT64       uint64_t
 
+#define ACPI_OFFSET(d, f)               __offsetof(d, f)
 #define ACPI_STRUCT_INIT(field, value)  .field = value
+#define ACPI_TO_INTEGER(p)              ((uintptr_t)(p))
+
 #define ACPI_USE_DO_WHILE_0
 #define ACPI_USE_SYSTEM_CLIBRARY
 
@@ -228,6 +231,11 @@ struct acpicache;
 
 #ifndef _STANDALONE
 #define ACPI_USE_STANDARD_HEADERS
+#endif
+
+#ifdef ACPI_USE_STANDARD_HEADERS
+#include <stddef.h>
+#include <unistd.h>
 #endif
 
 #define ACPI_CAST_PTHREAD_T(pthread)    ((ACPI_THREAD_ID) ACPI_TO_INTEGER (pthread))

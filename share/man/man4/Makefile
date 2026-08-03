@@ -18,7 +18,6 @@ MAN=	aac.4 \
 	adv.4 \
 	adw.4 \
 	ae.4 \
-	aesni.4 \
 	age.4 \
 	agp.4 \
 	ahci.4 \
@@ -67,10 +66,10 @@ MAN=	aac.4 \
 	ciss.4 \
 	clockmod.4 \
 	cmx.4 \
+	corecstat.4 \
 	corepower.4 \
 	coretemp.4 \
 	cpuctl.4 \
-	crypto.4 \
 	cue.4 \
 	cxm.4 \
 	da.4 \
@@ -186,6 +185,7 @@ MAN=	aac.4 \
 	mrsas.4 \
 	msk.4 \
 	mtio.4 \
+	mtw.4 \
 	multicast.4 \
 	mxge.4 \
 	my.4 \
@@ -384,6 +384,7 @@ MAN=	aac.4 \
 	virtio_blk.4 \
 	virtio_random.4 \
 	virtio_scsi.4 \
+	vkbd.4 \
 	vlan.4 \
 	vmbus.4 \
 	vmx.4 \
@@ -432,8 +433,8 @@ MLINKS+=bktr.4 brooktree.4
 MLINKS+=bnx.4 if_bnx.4
 MLINKS+=bridge.4 if_bridge.4
 MLINKS+=bwn.4 if_bwn.4
+MLINKS+=carp.4 if_carp.4
 MLINKS+=cdce.4 if_cdce.4
-MLINKS+=crypto.4 cryptodev.4
 MLINKS+=cue.4 if_cue.4
 MLINKS+=dc.4 if_dc.4
 MLINKS+=disc.4 if_disc.4

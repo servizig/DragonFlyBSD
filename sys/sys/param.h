@@ -258,9 +258,16 @@
  * 600511 - remove <timers.h>
  * 600512 - remove obsolete DSO_COMPATMBR from <sys/disk.h>
  * 600513 - add F_MAXFD and support POSIX O_CLOFORK
+ * 600514 - libusb(3) added libusb_get_version(), libusb_get_port_number(),
+ *          and libusb_set_auto_detach_kernel_driver().
+ * 600515 - remove /dev/crypto pseudo-device / cryptodev(4)
+ * 600516 - remove in-kernel crypto(9) framework, aesni(4) and
+ *          /usr/include/crypto
+ * 600517 - add DSO_NOMBR to <sys/disk.h>
+ * 600518 - remove DSO_NOMBR from <sys/disk.h>
  */
 #undef __DragonFly_version
-#define __DragonFly_version 600513	/* propagated to newvers */
+#define __DragonFly_version 600518	/* propagated to newvers */
 
 #include <sys/_null.h>
 

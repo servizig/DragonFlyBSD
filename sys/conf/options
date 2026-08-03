@@ -509,7 +509,6 @@ KTR_ENTRIES			opt_global.h
 KTR_ALL				opt_ktr.h
 KTR_ACPI_EC			opt_ktr.h
 KTR_CTXSW			opt_ktr.h
-KTR_DMCRYPT			opt_ktr.h
 KTR_ETHERNET			opt_ktr.h
 KTR_HAMMER			opt_ktr.h
 KTR_IFQ				opt_ktr.h
@@ -667,3 +666,15 @@ SYSCTL_DEBUG		opt_sysctl.h
 # Obsolete options (will be removed in the future)
 #
 NDISAPI			opt_dontuse.h
+
+UBSEC_DEBUG		opt_dontuse.h
+UBSEC_RNDTEST		opt_dontuse.h
+UBSEC_NO_RNG		opt_dontuse.h
+
+HIFN_DEBUG		opt_dontuse.h
+HIFN_RNDTEST		opt_dontuse.h
+HIFN_NO_RNG		opt_dontuse.h
+
+SAFE_DEBUG		opt_dontuse.h
+SAFE_RNDTEST		opt_dontuse.h
+SAFE_NO_RNG		opt_dontuse.h

@@ -81,6 +81,34 @@ int use_hammer;		/* 0=UFS 1=HAMMER 2=HAMMER2 */
 int use_uefi;
 int during_install;
 
+/*** LOCAL FUNCTIONS ***/
+
+static void
+save_vars(struct i_fn_args *a)
+{
+	int ok;
+
+	/* Update rc.conf and resolv.conf. */
+	ok = config_vars_write(rc_conf, CONFIG_TYPE_SH,
+			       "%s%setc/rc.conf", a->os_root, a->cfg_root);
+	if (!ok) {
+		inform(a->c, _("Couldn't write %s%setc/rc.conf."),
+		       a->os_root, a->cfg_root);
+	}
+	ok = config_vars_write(resolv_conf, CONFIG_TYPE_RESOLV,
+			       "%s%setc/resolv.conf", a->os_root, a->cfg_root);
+	if (!ok) {
+		inform(a->c, _("Couldn't write %s%setc/resolv.conf."),
+		       a->os_root, a->cfg_root);
+	}
+
+	/* Clear out the in-memory config vars. */
+	config_vars_free(rc_conf);
+	config_vars_free(resolv_conf);
+	rc_conf = config_vars_new();
+	resolv_conf = config_vars_new();
+}
+
 /*** STATES ***/
 
 /*
@@ -273,8 +301,8 @@ state_welcome(struct i_fn_args *a)
 		state = state_utilities_menu;
 	} else if (strcmp(dfui_response_get_action_id(r), "exit") == 0) {
 		state = NULL;
-        } else if (strcmp(dfui_response_get_action_id(r), "configure_netboot") == 0) {
-                state = state_setup_remote_installation_server;
+	} else if (strcmp(dfui_response_get_action_id(r), "configure_netboot") == 0) {
+		state = state_setup_remote_installation_server;
 	} else if (strcmp(dfui_response_get_action_id(r), "reboot") == 0) {
 		state = state_reboot;
 	}
@@ -391,8 +419,6 @@ state_configure_menu(struct i_fn_args *a)
 		}
 	}
 
-	a->cfg_root = "mnt";
-
 	if (during_install == 0) {
 		switch (dfui_be_present_dialog(a->c, _("Select file system"),
 		    _("HAMMER2|HAMMER1|UFS|Return to Welcome Menu"),
@@ -421,11 +447,14 @@ state_configure_menu(struct i_fn_args *a)
 		}
 	}
 
+	a->cfg_root = "mnt";
 	if (!mount_target_system(a)) {
 		inform(a->c, _("Target system could not be mounted."));
 		state = state_welcome;
 		return;
 	}
+
+	a->cfg_root = "mnt/";
 
 	snprintf(msg_buf[0], sizeof(msg_buf[0]),
 	    _("The options on this menu allow you to configure a "
@@ -450,7 +479,7 @@ state_configure_menu(struct i_fn_args *a)
 		    "a", "set_kbdmap",
 		    _("Set keyboard map"),
 		    _("Set what kind of keyboard layout you have"), "",
-		    "a", "root_passwd",	_("Set root password"),
+		    "a", "root_passwd", _("Set root password"),
 		    _("Set the password that the root (superuser) account will use"), "",
 		    "a", "add_user", _("Add a user"),
 		    _("Add a user to the system"), "",
@@ -459,10 +488,6 @@ state_configure_menu(struct i_fn_args *a)
 		    "a", "assign_hostname_domain",
 		    _("Configure hostname and domain"),
 		    _("Configure the hostname and domain for this system"), "",
-		    /*
-		    "a", "select_services", "Select Services",
-		    "Enable/Disable system services (servers, daemons, etc.)", "",
-		    */
 		    "a", "set_vidfont",
 		    _("Set console font"),
 		    _("Set how the characters on your video console look"), "",
@@ -479,8 +504,6 @@ state_configure_menu(struct i_fn_args *a)
 		if (!dfui_be_present(a->c, f, &r))
 			abort_backend();
 
-		/* XXX set up a */
-		a->cfg_root = "mnt/";
 		if (strcmp(dfui_response_get_action_id(r), "root_passwd") == 0) {
 			fn_root_passwd(a);
 		} else if (strcmp(dfui_response_get_action_id(r), "add_user") == 0) {
@@ -489,8 +512,6 @@ state_configure_menu(struct i_fn_args *a)
 			fn_assign_ip(a);
 		} else if (strcmp(dfui_response_get_action_id(r), "assign_hostname_domain") == 0) {
 			fn_assign_hostname_domain(a);
-		} else if (strcmp(dfui_response_get_action_id(r), "select_services") == 0) {
-			fn_select_services(a);
 		} else if (strcmp(dfui_response_get_action_id(r), "set_kbdmap") == 0) {
 			fn_set_kbdmap(a);
 		} else if (strcmp(dfui_response_get_action_id(r), "set_vidfont") == 0) {
@@ -510,17 +531,7 @@ state_configure_menu(struct i_fn_args *a)
 		dfui_response_free(r);
 	}
 
-	/*
-	 * Before unmounting the system, write out any changes to rc.conf.
-	 */
-	config_vars_write(rc_conf, CONFIG_TYPE_SH,
-	    "%s%setc/rc.conf", a->os_root, a->cfg_root);
-
-	/*
-	 * Clear out configuration variable table in memory.
-	 */
-	config_vars_free(rc_conf);
-	rc_conf = config_vars_new();
+	save_vars(a);
 
 	/*
 	 * Finally, unmount the system we mounted on /mnt and remove mappings.
@@ -598,6 +609,8 @@ state_environment_menu(struct i_fn_args *a)
 	int done = 0;
 	char msg_buf[2][1024];
 
+	a->cfg_root = "";
+
 	snprintf(msg_buf[0], sizeof(msg_buf[0]),
 	    _("On this menu you will find utilities to help you "
 	    "set up your Live CD environment.\n\nNote "
@@ -651,8 +664,6 @@ state_environment_menu(struct i_fn_args *a)
 		if (!dfui_be_present(a->c, f, &r))
 			abort_backend();
 
-		/* Set up a */
-		a->cfg_root = "";
 		if (strcmp(dfui_response_get_action_id(r), "set_kbdmap") == 0) {
 			fn_set_kbdmap(a);
 		} else if (strcmp(dfui_response_get_action_id(r), "set_vidfont") == 0) {
@@ -675,6 +686,8 @@ state_environment_menu(struct i_fn_args *a)
 		dfui_form_free(f);
 		dfui_response_free(r);
 	}
+
+	save_vars(a);
 }
 
 void
@@ -815,40 +828,40 @@ state_diskutil_menu(struct i_fn_args *a)
 void
 state_begin_upgrade(struct i_fn_args *a)
 {
-        //struct dfui_form *f = NULL;
-        //struct dfui_response *r = NULL;
-        //int done = 0;
+	//struct dfui_form *f = NULL;
+	//struct dfui_response *r = NULL;
+	//int done = 0;
 
-        if (storage_get_selected_disk(a->s) == NULL || storage_get_selected_slice(a->s) == NULL) {
+	if (storage_get_selected_disk(a->s) == NULL || storage_get_selected_slice(a->s) == NULL) {
 		if (!survey_storage(a)) {
 			inform(a->c, _("Errors occurred while probing "
 			    "the system for its storage capabilities."));
 		}
 
-                a->short_desc = _("Select the disk containing the installation that you would like to upgrade.");
-                a->cancel_desc = _("Return to Welcome Menu");
-                fn_select_disk(a);
-                if (!a->result || storage_get_selected_disk(a->s) == NULL) {
-                        state = state_welcome;
-                        return;
-                }
+		a->short_desc = _("Select the disk containing the installation that you would like to upgrade.");
+		a->cancel_desc = _("Return to Welcome Menu");
+		fn_select_disk(a);
+		if (!a->result || storage_get_selected_disk(a->s) == NULL) {
+			state = state_welcome;
+			return;
+		}
 
-                a->short_desc = _("Select the primary partition containing the installation you would like to upgrade.");
-                a->cancel_desc = _("Return to Welcome Menu");
-                fn_select_slice(a);
+		a->short_desc = _("Select the primary partition containing the installation you would like to upgrade.");
+		a->cancel_desc = _("Return to Welcome Menu");
+		fn_select_slice(a);
 
-                if (!a->result || storage_get_selected_slice(a->s) == NULL) {
-                        state = state_welcome;
-                        return;
-                }
-        }
+		if (!a->result || storage_get_selected_slice(a->s) == NULL) {
+			state = state_welcome;
+			return;
+		}
+	}
 
-        a->cfg_root = "mnt";
-        if (!mount_target_system(a)) {
-                inform(a->c, _("Target system could not be mounted."));
-                state = state_welcome;
-                return;
-        }
+	a->cfg_root = "mnt";
+	if (!mount_target_system(a)) {
+		inform(a->c, _("Target system could not be mounted."));
+		state = state_welcome;
+		return;
+	}
 }
 
 /*
@@ -1402,110 +1415,108 @@ state_reboot(struct i_fn_args *a)
 void
 state_setup_remote_installation_server(struct i_fn_args *a)
 {
-        FILE *p;
-        struct commands *cmds;
-        struct dfui_form *f;
+	FILE *p;
+	struct commands *cmds;
+	struct dfui_form *f;
 	struct dfui_action *k;
-        struct dfui_response *r;
-        char *word;
-        char interface[256];
-        char line[256];
+	struct dfui_response *r;
+	char *word;
+	char interface[256];
+	char line[256];
 
-        switch (dfui_be_present_dialog(a->c, _("Enable Netboot Installation Services?"),
-            _("Enable NetBoot Installation Services|No thanks"),
-            _("NetBoot Installation Services allows this machine to become "
-            "a Installation Server that will allow the clients to boot over the network "
+	switch (dfui_be_present_dialog(a->c, _("Enable Netboot Installation Services?"),
+	    _("Enable NetBoot Installation Services|No thanks"),
+	    _("NetBoot Installation Services allows this machine to become "
+	    "a Installation Server that will allow the clients to boot over the network "
 	    "via PXE and start the Installation Environment."
 	    "\n\n*NOTE!*  This will assign the IP Address of 10.1.0.1/24 to the selected interface."
             "\n\nWould you like to provision this machine to serve up the LiveCD/Installer?"))) {
-		case 1:
-			/*
-			 * Get interface list.
-			 */
-			p = popen("/sbin/ifconfig -l", "r");
-			/* XXX it's possible (though extremely unlikely) this will fail. */
-			while (fgets(line, 255, p) != NULL)
-				line[strlen(line) - 1] = '\0';
-			pclose(p);
+	case 1:
+		/*
+		 * Get interface list.
+		 */
+		p = popen("/sbin/ifconfig -l", "r");
+		/* XXX it's possible (though extremely unlikely) this will fail. */
+		while (fgets(line, 255, p) != NULL)
+			line[strlen(line) - 1] = '\0';
+		pclose(p);
 
-			f = dfui_form_create(
-			    "assign_ip",
-			    _("Setup NetBoot Installation Environment"),
-			    _("Please select which interface you would like to configure:"),
-			    "",
-			    "p",        "role", "menu",
-			    NULL
-			);
+		f = dfui_form_create(
+		    "assign_ip",
+		    _("Setup NetBoot Installation Environment"),
+		    _("Please select which interface you would like to configure:"),
+		    "",
+		    "p",        "role", "menu",
+		    NULL
+		);
 
-			/* Loop through array. */
-			word = strtok(line, " \t");
-			while (word != NULL) {
-				dfui_form_action_add(f, word,
-				    dfui_info_new(word, "", ""));
-				word = strtok(NULL, " ");
-			}
+		/* Loop through array. */
+		word = strtok(line, " \t");
+		while (word != NULL) {
+			dfui_form_action_add(f, word,
+			    dfui_info_new(word, "", ""));
+			word = strtok(NULL, " ");
+		}
 
-			k = dfui_form_action_add(f, "cancel",
-			    dfui_info_new("Cancel", "", ""));
-			dfui_action_property_set(k, "accelerator", "ESC");
+		k = dfui_form_action_add(f, "cancel",
+		    dfui_info_new("Cancel", "", ""));
+		dfui_action_property_set(k, "accelerator", "ESC");
 
-			if (!dfui_be_present(a->c, f, &r))
-				abort_backend();
+		if (!dfui_be_present(a->c, f, &r))
+			abort_backend();
 
-			strlcpy(interface, dfui_response_get_action_id(r), 256);
+		strlcpy(interface, dfui_response_get_action_id(r), 256);
 
-			if (strcmp(dfui_response_get_action_id(r), "cancel") == 0) {
-				dfui_form_free(f);
-				dfui_response_free(r);
-				return;
-			}
-
-			/*
-			 *
-			 * Issues the necessary commands to setup the remote boot environment
-			 *
-			 */
-			cmds = commands_new();
-			command_add(cmds, "%s%s %s 10.1.0.1 netmask 255.255.255.0",
-			    a->os_root, cmd_name(a, "IFCONFIG"), interface);
-			command_add(cmds, "%s%s -p %stftpdroot",
-			    a->os_root, cmd_name(a, "MKDIR"), a->tmp);
-			command_add(cmds, "%s%s %sboot/pxeboot %stftpdroot",
-			    a->os_root, cmd_name(a, "CP"), a->os_root, a->tmp);
-			command_add(cmds, "%s%s %s -ro -alldirs -maproot=root: -network 10.1.0.0 -mask 255.255.255.0 >> %setc/exports",
-			    a->os_root, cmd_name(a, "ECHO"), a->os_root, a->os_root);
-			command_add(cmds, "%s%s tftp dgram udp wait root %s%s tftpd -l -s %stftpdroot >> %setc/inetd.conf",
-			    a->os_root, cmd_name(a, "ECHO"),
-			    a->os_root, cmd_name(a, "TFTPD"),
-			    a->tmp, a->os_root);
-			command_add(cmds, "%s%s",
-			    a->os_root, cmd_name(a, "INETD"));
-			command_add(cmds, "%s%s %svar/db/dhcpd.leases",
-			    a->os_root, cmd_name(a, "TOUCH"), a->os_root);
-			command_add(cmds, "%s%s -cf /etc/dhcpd.conf >/dev/null 2>&1",
-			    a->os_root, cmd_name(a, "DHCPD"));
-			command_add(cmds, "%s%s >/dev/null 2>&1",
-			    a->os_root, cmd_name(a, "RPCBIND"));
-			command_add(cmds, "%s%s -ln >/dev/null 2>&1",
-			    a->os_root, cmd_name(a, "MOUNTD"));
-			command_add(cmds, "%s%s -u -t -n 6 >/dev/null 2>&1",
-			    a->os_root, cmd_name(a, "NFSD"));
-
-			if (commands_execute(a, cmds)) {
-				inform(a->c, _("NetBoot installation services are now started."));
-			} else {
-				inform(a->c, _("A failure occurred while provisioning the NetBoot environment.  Please check the logs."));
-			}
-
-			commands_free(cmds);
+		if (strcmp(dfui_response_get_action_id(r), "cancel") == 0) {
 			dfui_form_free(f);
 			dfui_response_free(r);
+			return;
+		}
 
-			break;
-		case 2:
+		/*
+		 *
+		 * Issues the necessary commands to setup the remote boot environment
+		 *
+		 */
+		cmds = commands_new();
+		command_add(cmds, "%s%s %s 10.1.0.1 netmask 255.255.255.0",
+		    a->os_root, cmd_name(a, "IFCONFIG"), interface);
+		command_add(cmds, "%s%s -p %stftpdroot",
+		    a->os_root, cmd_name(a, "MKDIR"), a->tmp);
+		command_add(cmds, "%s%s %sboot/pxeboot %stftpdroot",
+		    a->os_root, cmd_name(a, "CP"), a->os_root, a->tmp);
+		command_add(cmds, "%s%s %s -ro -alldirs -maproot=root: -network 10.1.0.0 -mask 255.255.255.0 >> %setc/exports",
+		    a->os_root, cmd_name(a, "ECHO"), a->os_root, a->os_root);
+		command_add(cmds, "%s%s tftp dgram udp wait root %s%s tftpd -l -s %stftpdroot >> %setc/inetd.conf",
+		    a->os_root, cmd_name(a, "ECHO"),
+		    a->os_root, cmd_name(a, "TFTPD"),
+		    a->tmp, a->os_root);
+		command_add(cmds, "%s%s",
+		    a->os_root, cmd_name(a, "INETD"));
+		command_add(cmds, "%s%s %svar/db/dhcpd.leases",
+		    a->os_root, cmd_name(a, "TOUCH"), a->os_root);
+		command_add(cmds, "%s%s -cf /etc/dhcpd.conf >/dev/null 2>&1",
+		    a->os_root, cmd_name(a, "DHCPD"));
+		command_add(cmds, "%s%s >/dev/null 2>&1",
+		    a->os_root, cmd_name(a, "RPCBIND"));
+		command_add(cmds, "%s%s -ln >/dev/null 2>&1",
+		    a->os_root, cmd_name(a, "MOUNTD"));
+		command_add(cmds, "%s%s -u -t -n 6 >/dev/null 2>&1",
+		    a->os_root, cmd_name(a, "NFSD"));
 
-			break;
+		if (commands_execute(a, cmds)) {
+			inform(a->c, _("NetBoot installation services are now started."));
+		} else {
+			inform(a->c, _("A failure occurred while provisioning the NetBoot environment.  Please check the logs."));
+		}
 
+		commands_free(cmds);
+		dfui_form_free(f);
+		dfui_response_free(r);
+
+		break;
+	case 2:
+		break;
 	}
 
 	state = state_welcome;
@@ -1521,6 +1532,7 @@ flow(int transport, char *rendezvous, char *os_root,
 	struct i_fn_args *a;
 
 	rc_conf = config_vars_new();
+	resolv_conf = config_vars_new();
 
 	if ((a = i_fn_args_new(os_root, DEFAULT_INSTALLER_TEMP,
 			       DEFAULT_CMDNAMES_FILE, transport,
@@ -1552,6 +1564,7 @@ flow(int transport, char *rendezvous, char *os_root,
 		state(a);
 
 	config_vars_free(rc_conf);
+	config_vars_free(resolv_conf);
 
 	i_fn_args_free(a);
 

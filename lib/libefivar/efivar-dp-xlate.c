@@ -74,7 +74,7 @@ find_slice_by_efimedia(char *buf, char **dev)
 	uuid_t guid;
 	struct gpt_ent *ent;
 
-	len = 1024;
+	len = sizeof(disks);
 	if (sysctlbyname("kern.disks", disks, &len, NULL, 0) < 0)
 		return -1;
 	disk_ptr = disks;
@@ -91,7 +91,7 @@ find_slice_by_efimedia(char *buf, char **dev)
 		if (fd == -1)
 			continue;
 		for (m = map_first(); m != NULL; m = m->map_next) {
-			if (m->map_index == NOENTRY ||
+			if (m->map_index == MAP_NOENTRY ||
 			    m->map_type != MAP_TYPE_GPT_PART)
 				continue;
 			ent = m->map_data;
@@ -146,7 +146,7 @@ efi_hd_to_unix(const_efidp dp, char **dev, char **relpath, char **abspath)
 		return (EINVAL);
 
 	/*
-	 * Format this node. We're going to look for it as a efimedia
+	 * Format this node. We're going to look for it as an efimedia
 	 * attribute of some geom node. Once we find that node, we use it
 	 * as the device it comes from, at least provisionally.
 	 */
@@ -292,7 +292,7 @@ errout:
  *
  * Extract the path from the File path node(s). translate any \ file separators
  * to /. Append the result to the mount point. Copy the resulting path into
- * *path.  Stat that path. If it is not found, return the errorr from stat.
+ * *path.  Stat that path. If it is not found, return the error from stat.
  *
  * Finally, check to make sure the resulting path is still on the same
  * device. If not, return ENODEV.
@@ -390,7 +390,7 @@ efivar_device_path_to_unix_path(const_efidp dp, char **dev, char **relpath, char
  *		return ENXIO
  *	Create a media device path node.
  *	append the relative path from the mountpoint to the media device node
- * 		as a file path.
+ *		as a file path.
  *
  * For paths matching the second form:
  *	find the EFI partition corresponding to the root fileystem.
@@ -435,7 +435,7 @@ find_slice_efimedia(const char *slice)
 	uuid_t guid;
 	struct gpt_ent *ent;
 
-	len = 1024;
+	len = sizeof(disks);
 	if (sysctlbyname("kern.disks", disks, &len, NULL, 0) < 0)
 		return (NULL);
 	disk_ptr = disks;
@@ -450,7 +450,6 @@ find_slice_efimedia(const char *slice)
 		if (strncmp(slice, disk, strlen(disk)) == 0) {
 			snprintf(disk_path, sizeof(disk_path), "%s%s",
 			    _PATH_DEV, disk);
-			/* XXX should base be 36 here? */
 			sliceno = strtoul(slice + sizeof(disk) + 1, &ep, 10);
 			if (*ep != 0)
 				return (NULL);
@@ -463,7 +462,7 @@ find_slice_efimedia(const char *slice)
 	if (fd == -1)
 		return (NULL);
 	for (m = map_first(); m != NULL; m = m->map_next) {
-		if (m->map_index == NOENTRY ||
+		if (m->map_index == MAP_NOENTRY ||
 		    m->map_type != MAP_TYPE_GPT_PART)
 			continue;
 		if (m->map_index == sliceno) {
@@ -637,7 +636,7 @@ int
 efivar_unix_path_to_device_path(const char *path, efidp *dp)
 {
 	char *modpath = NULL, *cp;
-	int rv = ENOMEM;
+	int rv;
 
 	/*
 	 * Fail early for clearly bogus things
@@ -651,7 +650,8 @@ efivar_unix_path_to_device_path(const char *path, efidp *dp)
 	 */
 	modpath = strdup(path);
 	if (modpath == NULL)
-		goto out;
+		return (ENOMEM);
+
 	for (cp = modpath; *cp; cp++)
 		if (*cp == '\\')
 			*cp = '/';
@@ -663,8 +663,6 @@ efivar_unix_path_to_device_path(const char *path, efidp *dp)
 	else						/* Handle /a/b/c */
 		rv = path_to_dp(modpath, dp);
 
-out:
 	free(modpath);
-
 	return (rv);
 }

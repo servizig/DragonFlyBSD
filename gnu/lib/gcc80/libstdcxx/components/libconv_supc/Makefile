@@ -1,5 +1,5 @@
 RELUP=	/../..
-.include "../../../Makefile.inc"
+.include "../../Makefile.inc"
 SRCDIR=	${GCCDIR}/libstdc++-v3
 .include "Makefile.src"
 
@@ -18,7 +18,6 @@ CFLAGS+=	-fno-lto
 LDFLAGS+=	-flto
 .endif
 
-CFLAGS+=		-I${.OBJDIR}
 CFLAGS+=		-I${GCCDIR}/libgcc
 CXXFLAGS+=		-fno-implicit-templates
 CXXFLAGS+=		-fdiagnostics-show-location=once
@@ -37,7 +36,8 @@ gnu1z_FLAGS=		-std=gnu++1z
 gnu1z_FLAGS_FILES=	del_opsa.cc del_opvsa.cc \
 			del_opa.cc del_opant.cc del_opva.cc del_opvant.cc \
 			new_opa.cc new_opant.cc new_opva.cc new_opvant.cc
-mangle_FLAGS=		-DHAVE_CONFIG_H -DIN_GLIBCPP_V3
+mangle_FLAGS=		-DHAVE_CONFIG_H -DIN_GLIBCPP_V3 \
+			-I${.OBJDIR} -I${GCCDIR}/include
 mangle_FLAGS_FILES=	cp-demangle.c
 
 SRCS=			${libsupc__convenience_la_SOURCES}
@@ -45,7 +45,11 @@ SRCS=			${libsupc__convenience_la_SOURCES}
 unwind.h: unwind-generic.h
 	cp ${.ALLSRC} ${.TARGET}
 
-GENHD=		unwind.h
+# Copy the config.h for cp-demangle.c
+config.h: ${CCDIR}/support-libs/libiberty/config.h
+	cp ${.ALLSRC} ${.TARGET}
+
+GENHD=		unwind.h config.h
 CLEANFILES=	${GENHD}
 beforedepend:	${GENHD}
 

@@ -1,6 +1,3 @@
-/* ex:ts=4
- */
-
 /*	$NetBSD: gencat.c,v 1.18 2003/10/27 00:12:43 lukem Exp $	*/
 
 /*
@@ -22,7 +19,7 @@
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
  * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS 
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
  * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
@@ -132,7 +129,7 @@ main(int argc, char **argv)
 {
 	int     ofd, ifd;
 	char	*catfile = NULL;
-	int     c;
+	int     c, stdin_read;
 
 #define DEPRECATEDMSG	1
 
@@ -164,11 +161,26 @@ main(int argc, char **argv)
 	}
 	catfile = *argv++;
 
+	stdin_read = 0;
 	for (; *argv; argv++) {
-		if ((ifd = open(*argv, O_RDONLY)) < 0)
+		/*
+		 * gencat(1) is a bootstrap tool, so dealing with "/dev/stdin"
+		 * specially makes it work within a chroot without devfs.
+		 */
+		if (strcmp(*argv, "-") == 0 ||
+		    strcmp(*argv, "/dev/stdin") == 0) {
+			if (stdin_read)
+				err(1, "stdin already read");
+			stdin_read = 1;
+			ifd = STDIN_FILENO;
+		} else {
+			ifd = open(*argv, O_RDONLY);
+		}
+		if (ifd < 0)
 			err(1, "Unable to read %s", *argv);
 		MCParse(ifd);
-		close(ifd);
+		if (ifd != STDIN_FILENO)
+			close(ifd);
 	}
 
 	if ((ofd = open(catfile, O_WRONLY | O_TRUNC | O_CREAT, 0666)) < 0)
@@ -305,7 +317,7 @@ getmsg(int fd, char *cptr, char quote)
 
 	if (quote && *cptr == quote) {
 		++cptr;
-	} 
+	}
 
 	clen = strlen(cptr) + 1;
 	if (clen > msglen) {

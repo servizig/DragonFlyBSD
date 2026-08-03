@@ -26,22 +26,14 @@
  * $FreeBSD: src/sbin/gpt/map.c,v 1.6 2005/08/31 01:47:19 marcel Exp $
  */
 
-#include <sys/param.h>
 #include <err.h>
-#include <stdio.h>
 #include <stdlib.h>
 
 #include "map.h"
 
-#define ROUNDTO 2048	// must be a power of two
-#define ROUNDDOWN(x) rounddown2(x - 1, ROUNDTO)
-#define ROUNDUP(x) (ROUNDDOWN(x) + ROUNDTO)
-
-int lbawidth;
-
 static map_t *mediamap;
 
-map_t *
+static map_t *
 mkmap(off_t start, off_t size, int type)
 {
 	map_t *m;
@@ -49,11 +41,12 @@ mkmap(off_t start, off_t size, int type)
 	m = malloc(sizeof(*m));
 	if (m == NULL)
 		return (NULL);
+
 	m->map_start = start;
 	m->map_size = size;
 	m->map_next = m->map_prev = NULL;
 	m->map_type = type;
-	m->map_index = NOENTRY;
+	m->map_index = MAP_NOENTRY;
 	m->map_data = NULL;
 	return (m);
 }
@@ -70,16 +63,20 @@ map_add(off_t start, off_t size, int type, void *data)
 		return (NULL);
 
 	if (n->map_start + n->map_size < start + size) {
-		warnx("error: bogus map");
-		return (0);
+		warnx("error: map entry doesn't fit media: "
+		      "new_start + new_size < start + size "
+		      "(%ju + %ju < %ju + %ju)",
+		      (uintmax_t)n->map_start, (uintmax_t)n->map_size,
+		      (uintmax_t)start, (uintmax_t)size);
+		return (NULL);
 	}
 
 	if (n->map_start == start && n->map_size == size) {
 		if (n->map_type != MAP_TYPE_UNUSED) {
 			if (n->map_type != MAP_TYPE_MBR_PART ||
 			    type != MAP_TYPE_GPT_PART) {
-				warnx("warning: partition(%llu,%llu) mirrored",
-				    (long long)start, (long long)size);
+				warnx("warning: partition(%ju,%ju) mirrored",
+				      (uintmax_t)start, (uintmax_t)size);
 			}
 		}
 		n->map_type = type;
@@ -90,8 +87,9 @@ map_add(off_t start, off_t size, int type, void *data)
 	if (n->map_type != MAP_TYPE_UNUSED) {
 		if (n->map_type != MAP_TYPE_MBR_PART ||
 		    type != MAP_TYPE_GPT_PART) {
-			warnx("error: bogus map");
-			return (0);
+			warnx("error: bogus map: current=%d, new=%d",
+			      n->map_type, type);
+			return (NULL);
 		}
 		n->map_type = MAP_TYPE_UNUSED;
 	}
@@ -122,6 +120,9 @@ map_add(off_t start, off_t size, int type, void *data)
 		p->map_size -= size;
 	} else {
 		p = mkmap(n->map_start, start - n->map_start, n->map_type);
+		if (p == NULL)
+			return (NULL);
+
 		n->map_start += p->map_size + m->map_size;
 		n->map_size -= (p->map_size + m->map_size);
 		p->map_prev = n->map_prev;
@@ -138,31 +139,48 @@ map_add(off_t start, off_t size, int type, void *data)
 	return (m);
 }
 
+/*
+ * Try to allocate a new partition from the free space.
+ *
+ * If <start> is zero, use the first region that has enough free space.
+ * If <size> is zero, use all the free space in the matched region.
+ * If <alignment> is given, align both the <start> and <size>.
+ */
 map_t *
-map_alloc(off_t start, off_t size)
+map_alloc(off_t start, off_t size, off_t alignment)
 {
-	off_t delta;
+	off_t delta, msize;
 	map_t *m;
 
-	if (start == 0 && size != 0)
-		size = ROUNDUP(size);
+	if (alignment > 1) {
+		start = (start + alignment - 1) / alignment * alignment;
+		size = (size + alignment - 1) / alignment * alignment;
+	}
+
 	for (m = mediamap; m != NULL; m = m->map_next) {
 		if (m->map_type != MAP_TYPE_UNUSED || m->map_start < 2)
 			continue;
 		if (start != 0 && m->map_start > start)
 			return (NULL);
-		delta = (start != 0) ? start - m->map_start : ROUNDUP(m->map_start) - m->map_start;
-		if (size == 0 || m->map_size - delta >= size) {
-			if (m->map_size - delta <= 0)
-				continue;
-			if (size == 0) {
-				size = m->map_size - delta;
-				if (start == 0)
-					size = ROUNDDOWN(size);
-			}
-			return (map_add(m->map_start + delta, size,
-				    MAP_TYPE_GPT_PART, NULL));
-		}
+
+		if (start != 0)
+			delta = start - m->map_start;
+		else if (alignment > 1)
+			delta = ((m->map_start + alignment - 1) /
+				 alignment * alignment) - m->map_start;
+		else
+			delta = 0;
+		if (m->map_size <= delta)
+			continue;
+
+		msize = (size != 0) ? size : m->map_size - delta;
+		if (alignment > 1)
+			msize = msize / alignment * alignment;
+		if (msize == 0 || msize + delta > m->map_size)
+			continue;
+
+		return map_add(m->map_start + delta, msize,
+			       MAP_TYPE_GPT_PART, NULL);
 	}
 
 	return (NULL);
@@ -196,29 +214,27 @@ map_last(void)
 	return (m);
 }
 
+/*
+ * Get the number of free blocks after position <start>.
+ */
 off_t
-map_free(off_t start, off_t size)
+map_free(off_t start)
 {
 	map_t *m;
 
 	m = mediamap;
-
 	while (m != NULL && m->map_start + m->map_size <= start)
 		m = m->map_next;
 	if (m == NULL || m->map_type != MAP_TYPE_UNUSED)
 		return (0LL);
-	if (size)
-		return ((m->map_start + m->map_size >= start + size) ? 1 : 0);
 	return (m->map_size - (start - m->map_start));
 }
 
-void
+int
 map_init(off_t size)
 {
-	char buf[32];
-
 	mediamap = mkmap(0LL, size, MAP_TYPE_UNUSED);
-	lbawidth = sprintf(buf, "%llu", (long long)size);
-	if (lbawidth < 5)
-		lbawidth = 5;
+	if (mediamap == NULL)
+		return (-1);
+	return (0);
 }

@@ -42,8 +42,8 @@ __RCSID("$NetBSD: dr_5.c,v 1.14 2009/03/14 22:52:52 dholland Exp $");
 #include "extern.h"
 
 void
-subtract(struct ship *from, struct ship *fromcap, int totalfrom, int *crewfrom,
-	 int pcfrom)
+subtract(struct ship *from, struct ship *fromcap, int totalfrom,
+	 int crewfrom[3], int pcfrom)
 {
 	int n;
 
@@ -66,8 +66,8 @@ subtract(struct ship *from, struct ship *fromcap, int totalfrom, int *crewfrom,
 }
 
 int
-mensent(struct ship *from, struct ship *to, int *crew, struct ship **captured,
-	int *pc, int isdefense)
+mensent(struct ship *from, struct ship *to, int crew[3],
+	struct ship **captured, int *pc, int isdefense)
 {					/* returns # of crew squares sent */
 	int men = 0;
 	int n;

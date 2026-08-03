@@ -4,10 +4,10 @@ OPENRESOLV
 Original source can be downloaded from:
 https://github.com/NetworkConfiguration/openresolv
 
-file = openresolv-3.14.0.tar.xz
-date = 2025 March 26
-size = 22144
-SHA256 = 58fddad27dddfc659b57c6492f28c064eb926b7ccafbf3e4a6a537dba3a3bf2a
+file = openresolv-3.17.3
+date = 2025 December 13
+size = 25664
+SHA256 = 55d5c9d6f168df59a6dd22afca8c4b15c9149a9c5422c474a8eded35786c5767
 
 The source is imported via a Makefile target rather than by hand.
 There is no README.DELETED for this import as it's all automated.

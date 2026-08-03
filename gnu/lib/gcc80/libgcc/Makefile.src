@@ -46,9 +46,6 @@ CFLAGS+=	-fno-lto
 LDFLAGS+=	-flto
 .endif
 
-#stack_FLAGS=		-D__LIBGCC_TRAMPOLINE_SIZE__=${TRAMPSIZE}
-#stack_FLAGS_FILES=	enable-execute-stack.c
-
 FLAG_GROUPS=		raise
 raise_FLAGS=		-fexceptions -fnon-call-exceptions
 raise_FLAGS_FILES=	${LIB2_DIVMOD_FUNCS:S/$/.c/}

@@ -83,6 +83,12 @@ SYSCTL_INT(_vm, OID_AUTO, max_proc_mmap, CTLFLAG_RW, &max_proc_mmap, 0, "");
 int vkernel_enable;
 SYSCTL_INT(_vm, OID_AUTO, vkernel_enable, CTLFLAG_RW, &vkernel_enable, 0, "");
 
+/* VPAGETABLE debugging */
+static long vpagetable_mmap_count = 0;
+SYSCTL_LONG(_vm, OID_AUTO, vpagetable_mmap, CTLFLAG_RW,
+	    &vpagetable_mmap_count, 0, "Number of MAP_VPAGETABLE mappings created");
+extern int debug_vpagetable;
+
 /*
  * sstk_args(int incr)
  *
@@ -163,11 +169,21 @@ kern_mmap(struct vmspace *vms, caddr_t uaddr, size_t ulen,
 	}
 
 	/*
-	 * Virtual page table support has been removed and now always
-	 * returns EOPNOTSUPP.
+	 * Virtual page tables cannot be used with MAP_STACK.  Apart from
+	 * it not making any sense, the aux union is used by both
+	 * types.
+	 *
+	 * Because the virtual page table is stored in the backing object
+	 * and might be updated by the kernel, the mapping must be R+W.
 	 */
-	if (flags & MAP_VPAGETABLE)
-		return (EOPNOTSUPP);
+	if (flags & MAP_VPAGETABLE) {
+		if (vkernel_enable == 0)
+			return (EOPNOTSUPP);
+		if (flags & MAP_STACK)
+			return (EINVAL);
+		if ((prot & (PROT_READ|PROT_WRITE)) != (PROT_READ|PROT_WRITE))
+			return (EINVAL);
+	}
 
 	/*
 	 * Align the file position to a page boundary,
@@ -1074,13 +1090,10 @@ sys_mlockall(struct sysmsg *sysmsg, const struct mlockall_args *uap)
 
 done:
 	RB_FOREACH(entry, vm_map_rb_tree, &map->rb_root) {
-		if ((entry->eflags & MAP_ENTRY_USER_WIRED) == 0)
-			continue;
-
-		entry->eflags &= ~MAP_ENTRY_USER_WIRED;
-		entry->wired_count--;
-		if (entry->wired_count == 0)
+		if (entry->eflags & MAP_ENTRY_USER_WIRED) {
+			entry->eflags &= ~MAP_ENTRY_USER_WIRED;
 			vm_fault_unwire(map, entry);
+		}
 	}
 
 	vm_map_unlock(map);
@@ -1140,9 +1153,7 @@ retry:
 	
 		/* Drop wired count, if it hits zero, unwire the entry */
 		entry->eflags &= ~MAP_ENTRY_USER_WIRED;
-		entry->wired_count--;
-		if (entry->wired_count == 0)
-			vm_fault_unwire(map, entry);
+		vm_fault_unwire(map, entry);
 	}
 
 	vm_map_unlock(map);
@@ -1451,6 +1462,18 @@ vm_mmap(vm_map_t map, vm_offset_t *addr, vm_size_t size, vm_prot_t prot,
 	} else if (flags & MAP_STACK) {
 		rv = vm_map_stack(map, addr, size, flags,
 				  prot, maxprot, docow);
+	} else if (flags & MAP_VPAGETABLE) {
+		++vpagetable_mmap_count;
+		if (debug_vpagetable) {
+			kprintf("MAP_VPAGETABLE: addr=%lx size=%lx pid=%d\n",
+				*addr, size,
+				(curproc ? curproc->p_pid : -1));
+		}
+		rv = vm_map_find(map, object, NULL,
+				 foff, addr, size,
+				 align, fitit,
+				 VM_MAPTYPE_VPAGETABLE, VM_SUBSYS_MMAP,
+				 prot, maxprot, docow);
 	} else {
 		rv = vm_map_find(map, object, NULL,
 				 foff, addr, size,

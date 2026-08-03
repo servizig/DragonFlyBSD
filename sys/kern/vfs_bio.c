@@ -848,7 +848,7 @@ bremfree_locked(struct buf *bp)
 }
 
 /*
- * This version of bread issues any required I/O asyncnronously and
+ * This version of bread issues any required I/O asynchronously and
  * makes a callback on completion.
  *
  * The callback must check whether BIO_DONE is set in the bio and issue
@@ -2587,7 +2587,7 @@ findblk(struct vnode *vp, off_t loffset, int flags)
 		 * (only FINDBLK_NBLOCK can cause the lock to fail).
 		 */
 		if (BUF_LOCK(bp, lkflags)) {
-			atomic_subtract_int(&bp->b_refs, 1);
+			atomic_add_int(&bp->b_refs, -1);
 			/* bp = NULL; not needed */
 			return(NULL);
 		}
@@ -2607,7 +2607,7 @@ findblk(struct vnode *vp, off_t loffset, int flags)
 				bkvasync_all(bp);
 			break;
 		}
-		atomic_subtract_int(&bp->b_refs, 1);
+		atomic_add_int(&bp->b_refs, -1);
 		BUF_UNLOCK(bp);
 	}
 
@@ -2615,7 +2615,7 @@ findblk(struct vnode *vp, off_t loffset, int flags)
 	 * Success
 	 */
 	if ((flags & FINDBLK_REF) == 0)
-		atomic_subtract_int(&bp->b_refs, 1);
+		atomic_add_int(&bp->b_refs, -1);
 	return(bp);
 }
 

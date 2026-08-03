@@ -24,6 +24,7 @@ SRCS+=	\
 	tbxfroot.c \
 	utascii.c \
 	utbuffer.c \
+	utcksum.c \
 	utdebug.c \
 	utexcep.c \
 	utglobal.c \

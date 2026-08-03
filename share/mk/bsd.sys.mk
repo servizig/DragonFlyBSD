@@ -24,6 +24,11 @@ CFLAGS		+= -std=iso9899:1999
 CFLAGS		+= -std=${CSTD}
 .endif
 
+_gccver=	0
+.if ${_WCCVER:Mgcc*}
+_gccver=	${_WCCVER:S/gcc//}
+.endif
+
 # Explicitly clear _cnowarnflags (should not be used in Makefiles).
 _cnowarnflags=
 
@@ -34,7 +39,7 @@ _cnowarnflags=
 . if defined(WARNS)
 .  if ${WARNS} >= 1
 CWARNFLAGS	+=	-Wmissing-include-dirs -Wsystem-headers
-.   if !defined(NO_WERROR) && (${_WCCVER} == "gcc47" || ${_WCCVER} == "gcc80")
+.   if !defined(NO_WERROR) && ${_WCCVER} == "gcc80"
 CWARNFLAGS	+=	-Werror
 .   endif
 .  endif
@@ -72,14 +77,14 @@ _cnowarnflags	+=	-Wno-uninitialized
 _cnowarnflags	+=	-Wno-unused-parameter
 .  endif
 # Delete -Wformat-* family that give little benefits, same for stringop.
-.  if ${WARNS} >= 2 && ${WARNS} <= 6 && ${_WCCVER:Mgcc8*}
+.  if ${WARNS} >= 2 && ${WARNS} <= 6 && ${_gccver} >= 80
 _cnowarnflags	+=	-Wno-format-overflow -Wno-format-truncation
 _cnowarnflags	+=	-Wno-stringop-truncation
 .  endif
-.  if ${WARNS} >= 1 && ${WARNS} <= 6 && ${_WCCVER:Mgcc8*}
+.  if ${WARNS} >= 1 && ${WARNS} <= 6 && ${_gccver} >= 80
 _cnowarnflags	+=	-Wno-stringop-overflow
 .  endif
-# Activate gcc47's -Wunused-but-set-variable (which is in -Wall) and
+# Activate GCC's -Wunused-but-set-variable (which is in -Wall) and
 # -Wunused-but-set-parameter (which is in -Wextra) only at WARNS >= 4
 # (which is the level when also -Wunused-parameter comes into play).
 .  if ${WARNS} >= 2 && ${WARNS} <= 3 && ${_WCCVER:Mgcc*}
@@ -88,19 +93,11 @@ _cnowarnflags	+=	-Wno-unused-but-set-variable
 .  if ${WARNS} == 3 && ${_WCCVER:Mgcc*}
 _cnowarnflags	+=	-Wno-unused-but-set-parameter
 .  endif
-.  if ${WARNS} == 3 && (${_WCCVER:Mgcc49} || ${_WCCVER:Mgcc[5-]*})
+.  if ${WARNS} == 3 && ${_gccver} >= 49
 _cnowarnflags	+=	-Wno-unused-value
 .  endif
-.  if ${WARNS} == 3 && ${_WCCVER:Mgcc8*}
+.  if ${WARNS} == 3 && ${_gccver} >= 80
 _cnowarnflags	+=	-Wno-implicit-fallthrough
-.  endif
-.  if ${WARNS} >= 2 && ${_WCCVER:Mgcc4[789]}
-_cnowarnflags	+=	-Wno-error=maybe-uninitialized\
-			-Wno-error=uninitialized\
-			-Wno-error=shadow
-.  endif
-.  if ${WARNS} >= 3 && ${_WCCVER:Mgcc4[789]}
-_cnowarnflags	+=	-Wno-error=missing-field-initializers
 .  endif
 # Disable -Werror selectively for -Os and -Og compilations.  Both -Winline and
 # -Wmaybe-uninitialized are noisy and should be caught by standard -O and -O2.
@@ -121,7 +118,7 @@ WFORMAT		=	1
 . if defined(WFORMAT)
 .  if ${WFORMAT} > 0
 CWARNFLAGS	+=	-Wformat=2
-.   if !defined(NO_WERROR) && (${_WCCVER} == "gcc47" || ${_WCCVER} == "gcc80")
+.   if !defined(NO_WERROR) && ${_WCCVER} == "gcc80"
 CWARNFLAGS	+=	-Werror
 .   endif
 .  endif
@@ -129,22 +126,21 @@ CWARNFLAGS	+=	-Werror
 .endif
 
 # Build world with -fno-common. This will be default with GCC 10.
-#
-.if ${_WCCVER:Ngcc1[0-9][0-9]}
+.if ${_gccver} < 100
 CFLAGS		+=	-fno-common
 .endif
 
-.if defined(NO_WCAST_FUNCTION_TYPE) && ${WARNS} >= 3 && ${_WCCVER:Mgcc8*}
-_cnowarnflags	+=      -Wno-cast-function-type
+.if defined(NO_WCAST_FUNCTION_TYPE) && ${WARNS} >= 3 && ${_gccver} >= 80
+_cnowarnflags	+=	-Wno-cast-function-type
 .endif
 .if defined(NO_WARRAY_BOUNDS)
-_cnowarnflags	+=      -Wno-array-bounds
+_cnowarnflags	+=	-Wno-array-bounds
 .endif
 .if defined(NO_STRICT_OVERFLOW)
 CFLAGS		+=	-fno-strict-overflow
 .endif
 .if defined(NO_STRICT_ALIASING)
-CFLAGS		+=      -fno-strict-aliasing
+CFLAGS		+=	-fno-strict-aliasing
 .endif
 
 
@@ -155,6 +151,7 @@ CWARNFLAGS	+=	${_cnowarnflags}
 
 # Allow user-specified additional warning flags
 CFLAGS		+=	${CWARNFLAGS}
+
 
 # Tell bmake not to mistake standard targets for things to be searched for
 # or expect to ever be up-to-date

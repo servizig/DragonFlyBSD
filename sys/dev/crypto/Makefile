@@ -1,4 +1,4 @@
-SUBDIR=	aesni cryptodev rdrand rndtest tpm
+SUBDIR=	rdrand rndtest tpm
 
 # Empty for concurrent build
 #

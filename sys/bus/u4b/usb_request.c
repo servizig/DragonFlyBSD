@@ -1446,7 +1446,7 @@ usbd_req_set_alt_interface_no(struct usb_device *udev, struct lock *lock,
 	req.wIndex[0] = iface->idesc->bInterfaceNumber;
 	req.wIndex[1] = 0;
 	USETW(req.wLength, 0);
-	return (usbd_do_request(udev, lock, &req, 0));
+	return (usbd_do_request(udev, lock, &req, NULL));
 }
 
 /*------------------------------------------------------------------------*
@@ -1620,7 +1620,7 @@ usbd_req_clear_hub_feature(struct usb_device *udev, struct lock *lock,
 	USETW(req.wValue, sel);
 	USETW(req.wIndex, 0);
 	USETW(req.wLength, 0);
-	return (usbd_do_request(udev, lock, &req, 0));
+	return (usbd_do_request(udev, lock, &req, NULL));
 }
 
 /*------------------------------------------------------------------------*
@@ -1641,7 +1641,7 @@ usbd_req_set_hub_feature(struct usb_device *udev, struct lock *lock,
 	USETW(req.wValue, sel);
 	USETW(req.wIndex, 0);
 	USETW(req.wLength, 0);
-	return (usbd_do_request(udev, lock, &req, 0));
+	return (usbd_do_request(udev, lock, &req, NULL));
 }
 
 /*------------------------------------------------------------------------*
@@ -1663,7 +1663,7 @@ usbd_req_set_hub_u1_timeout(struct usb_device *udev, struct lock *lock,
 	req.wIndex[0] = port;
 	req.wIndex[1] = timeout;
 	USETW(req.wLength, 0);
-	return (usbd_do_request(udev, lock, &req, 0));
+	return (usbd_do_request(udev, lock, &req, NULL));
 }
 
 /*------------------------------------------------------------------------*
@@ -1685,7 +1685,7 @@ usbd_req_set_hub_u2_timeout(struct usb_device *udev, struct lock *lock,
 	req.wIndex[0] = port;
 	req.wIndex[1] = timeout;
 	USETW(req.wLength, 0);
-	return (usbd_do_request(udev, lock, &req, 0));
+	return (usbd_do_request(udev, lock, &req, NULL));
 }
 
 /*------------------------------------------------------------------------*
@@ -1706,7 +1706,7 @@ usbd_req_set_hub_depth(struct usb_device *udev, struct lock *lock,
 	USETW(req.wValue, depth);
 	USETW(req.wIndex, 0);
 	USETW(req.wLength, 0);
-	return (usbd_do_request(udev, lock, &req, 0));
+	return (usbd_do_request(udev, lock, &req, NULL));
 }
 
 /*------------------------------------------------------------------------*
@@ -1728,7 +1728,7 @@ usbd_req_clear_port_feature(struct usb_device *udev, struct lock *lock,
 	req.wIndex[0] = port;
 	req.wIndex[1] = 0;
 	USETW(req.wLength, 0);
-	return (usbd_do_request(udev, lock, &req, 0));
+	return (usbd_do_request(udev, lock, &req, NULL));
 }
 
 /*------------------------------------------------------------------------*
@@ -1750,7 +1750,7 @@ usbd_req_set_port_feature(struct usb_device *udev, struct lock *lock,
 	req.wIndex[0] = port;
 	req.wIndex[1] = 0;
 	USETW(req.wLength, 0);
-	return (usbd_do_request(udev, lock, &req, 0));
+	return (usbd_do_request(udev, lock, &req, NULL));
 }
 
 /*------------------------------------------------------------------------*
@@ -1779,7 +1779,7 @@ usbd_req_set_protocol(struct usb_device *udev, struct lock *lock,
 	req.wIndex[0] = iface->idesc->bInterfaceNumber;
 	req.wIndex[1] = 0;
 	USETW(req.wLength, 0);
-	return (usbd_do_request(udev, lock, &req, 0));
+	return (usbd_do_request(udev, lock, &req, NULL));
 }
 
 /*------------------------------------------------------------------------*
@@ -1863,7 +1863,7 @@ usbd_req_set_idle(struct usb_device *udev, struct lock *lock,
 	req.wIndex[0] = iface->idesc->bInterfaceNumber;
 	req.wIndex[1] = 0;
 	USETW(req.wLength, 0);
-	return (usbd_do_request(udev, lock, &req, 0));
+	return (usbd_do_request(udev, lock, &req, NULL));
 }
 
 /*------------------------------------------------------------------------*
@@ -1918,7 +1918,7 @@ usbd_req_set_config(struct usb_device *udev, struct lock *lock, uint8_t conf)
 	req.wValue[1] = 0;
 	USETW(req.wIndex, 0);
 	USETW(req.wLength, 0);
-	return (usbd_do_request(udev, lock, &req, 0));
+	return (usbd_do_request(udev, lock, &req, NULL));
 }
 
 /*------------------------------------------------------------------------*
@@ -2145,7 +2145,7 @@ usbd_req_clear_device_feature(struct usb_device *udev, struct lock *lock,
 	USETW(req.wValue, sel);
 	USETW(req.wIndex, 0);
 	USETW(req.wLength, 0);
-	return (usbd_do_request(udev, lock, &req, 0));
+	return (usbd_do_request(udev, lock, &req, NULL));
 }
 
 /*------------------------------------------------------------------------*
@@ -2166,7 +2166,7 @@ usbd_req_set_device_feature(struct usb_device *udev, struct lock *lock,
 	USETW(req.wValue, sel);
 	USETW(req.wIndex, 0);
 	USETW(req.wLength, 0);
-	return (usbd_do_request(udev, lock, &req, 0));
+	return (usbd_do_request(udev, lock, &req, NULL));
 }
 
 /*------------------------------------------------------------------------*
@@ -2194,7 +2194,7 @@ usbd_req_reset_tt(struct usb_device *udev, struct lock *lock,
 	req.wIndex[0] = port;
 	req.wIndex[1] = 0;
 	USETW(req.wLength, 0);
-	return (usbd_do_request(udev, lock, &req, 0));
+	return (usbd_do_request(udev, lock, &req, NULL));
 }
 
 /*------------------------------------------------------------------------*
@@ -2228,7 +2228,7 @@ usbd_req_clear_tt_buffer(struct usb_device *udev, struct lock *lock,
 	req.wIndex[0] = port;
 	req.wIndex[1] = 0;
 	USETW(req.wLength, 0);
-	return (usbd_do_request(udev, lock, &req, 0));
+	return (usbd_do_request(udev, lock, &req, NULL));
 }
 
 /*------------------------------------------------------------------------*
@@ -2252,7 +2252,7 @@ usbd_req_set_port_link_state(struct usb_device *udev, struct lock *lock,
 	req.wIndex[0] = port;
 	req.wIndex[1] = link_state;
 	USETW(req.wLength, 0);
-	return (usbd_do_request(udev, lock, &req, 0));
+	return (usbd_do_request(udev, lock, &req, NULL));
 }
 
 /*------------------------------------------------------------------------*

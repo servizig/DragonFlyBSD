@@ -268,7 +268,7 @@ void *
 yppushproc_xfrresp_1_svc(yppushresp_xfr *argp, struct svc_req *rqstp)
 {
 	static char * result;
-	yppush_show_status(argp->status, argp->transid);
+	yppush_show_status((ypxfrstat)argp->status, argp->transid);
 	return((void *) &result);
 }
 
@@ -327,7 +327,7 @@ create udp handle to NIS server"));
 				job->stat = YPPUSH_PMAP;
 				break;
 			default:
-				job->stat = YPPUSH_RPC;
+				job->stat = (ypxfrstat)YPPUSH_RPC;
 				break;
 			}
 		return(1);

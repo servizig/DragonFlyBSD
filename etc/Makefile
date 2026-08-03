@@ -102,7 +102,7 @@ check-deprecated-files:
 				-type f \( -name '*.so*' -o -perm +111 \) | \
 				chroot ${DESTDIR}/ xargs ldd 2>/dev/null > $${tmpldd}; \
 	count=0; for item in ${TO_REMOVE_LATE}; do \
-		if [ -e ${DESTDIR}$${item} -o -L ${DESTDIR}$${item} ]; then \
+		if [ -f ${DESTDIR}$${item} -o -L ${DESTDIR}$${item} ]; then \
 			echo "${DESTDIR}$${item} is deprecated"; \
 			deps=""; \
 			for object in `cat $${tmpldd} | awk -v library=$${item} \

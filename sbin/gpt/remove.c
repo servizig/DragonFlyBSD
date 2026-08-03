@@ -24,34 +24,32 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $FreeBSD: src/sbin/gpt/remove.c,v 1.10 2006/10/04 18:20:25 marcel Exp $
- * $DragonFly: src/sbin/gpt/remove.c,v 1.2 2007/06/17 08:34:59 dillon Exp $
  */
 
 #include <sys/types.h>
 
 #include <err.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#include "map.h"
 #include "gpt.h"
 
-static int all;
+static bool all = false;
 static uuid_t type;
 static off_t block, size;
-static unsigned int entry = NOENTRY;
+static unsigned int entry = MAP_NOENTRY;
 
 static void
 usage_remove(void)
 {
-
 	fprintf(stderr,
-	    "usage: %s -a device ...\n"
-	    "       %s [-b lba] [-i index] [-s lba] [-t uuid] device ...\n",
-	    getprogname(), getprogname());
+		"usage: %s -a device ...\n"
+		"       %s [-b lba] [-i index] [-s lba] [-t uuid] device ...\n",
+		getprogname(), getprogname());
 	exit(1);
 }
 
@@ -66,22 +64,22 @@ rem(int fd)
 	struct gpt_ent *ent;
 	unsigned int i;
 
-	gpt = map_find(MAP_TYPE_PRI_GPT_HDR);
+	gpt = map_find(MAP_TYPE_GPT_PRI_HDR);
 	if (gpt == NULL) {
 		warnx("%s: error: no primary GPT header; run create or recover",
 		    device_name);
 		return;
 	}
 
-	tpg = map_find(MAP_TYPE_SEC_GPT_HDR);
+	tpg = map_find(MAP_TYPE_GPT_SEC_HDR);
 	if (tpg == NULL) {
 		warnx("%s: error: no secondary GPT header; run recover",
 		    device_name);
 		return;
 	}
 
-	tbl = map_find(MAP_TYPE_PRI_GPT_TBL);
-	lbt = map_find(MAP_TYPE_SEC_GPT_TBL);
+	tbl = map_find(MAP_TYPE_GPT_PRI_TBL);
+	lbt = map_find(MAP_TYPE_GPT_SEC_TBL);
 	if (tbl == NULL || lbt == NULL) {
 		warnx("%s: error: run recover -- trust me", device_name);
 		return;
@@ -89,9 +87,10 @@ rem(int fd)
 
 	/* Remove all matching entries in the map. */
 	for (m = map_first(); m != NULL; m = m->map_next) {
-		if (m->map_type != MAP_TYPE_GPT_PART || m->map_index == NOENTRY)
+		if (m->map_type != MAP_TYPE_GPT_PART ||
+		    m->map_index == MAP_NOENTRY)
 			continue;
-		if (entry != NOENTRY && entry != m->map_index)
+		if (entry != MAP_NOENTRY && entry != m->map_index)
 			continue;
 		if (block > 0 && block != m->map_start)
 			continue;
@@ -101,7 +100,7 @@ rem(int fd)
 		i = m->map_index;
 
 		hdr = gpt->map_data;
-		ent = (void*)((char*)tbl->map_data + i *
+		ent = (void *)((char *)tbl->map_data + i *
 		    le32toh(hdr->hdr_entsz));
 		uuid_dec_le(&ent->ent_type, &uuid);
 		if (!uuid_is_nil(&type, NULL) &&
@@ -120,10 +119,10 @@ rem(int fd)
 		gpt_write(fd, tbl);
 
 		hdr = tpg->map_data;
-		ent = (void*)((char*)lbt->map_data + i *
+		ent = (void *)((char *)lbt->map_data + i *
 		    le32toh(hdr->hdr_entsz));
 
-		/* Remove the secundary entry. */
+		/* Remove the secondary entry. */
 		uuid_create_nil(&ent->ent_type, NULL);
 
 		hdr->hdr_crc_table = htole32(crc32(lbt->map_data,
@@ -145,12 +144,10 @@ cmd_remove(int argc, char *argv[])
 	int ch, fd;
 
 	/* Get the remove options */
-	while ((ch = getopt(argc, argv, "ab:i:s:t:")) != -1) {
+	while ((ch = getopt(argc, argv, "ab:hi:s:t:")) != -1) {
 		switch(ch) {
 		case 'a':
-			if (all > 0)
-				usage_remove();
-			all = 1;
+			all = true;
 			break;
 		case 'b':
 			if (block > 0)
@@ -160,10 +157,10 @@ cmd_remove(int argc, char *argv[])
 				usage_remove();
 			break;
 		case 'i':
-			if (entry != NOENTRY)
+			if (entry != MAP_NOENTRY)
 				usage_remove();
 			entry = strtoul(optarg, &p, 10);
-			if (*p != 0 || entry == NOENTRY)
+			if (*p != 0 || entry == MAP_NOENTRY)
 				usage_remove();
 			break;
 		case 's':
@@ -179,13 +176,14 @@ cmd_remove(int argc, char *argv[])
 			if (parse_uuid(optarg, &type) != 0)
 				usage_remove();
 			break;
+		case 'h':
 		default:
 			usage_remove();
 		}
 	}
 
 	if (!all ^
-	    (block > 0 || entry != NOENTRY || size > 0 ||
+	    (block > 0 || entry != MAP_NOENTRY || size > 0 ||
 	     !uuid_is_nil(&type, NULL)))
 		usage_remove();
 

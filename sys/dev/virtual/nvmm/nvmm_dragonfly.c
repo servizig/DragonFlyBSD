@@ -300,17 +300,22 @@ dfbsd_nvmm_open(struct dev_open_args *ap)
 	if (!(flags & O_CLOEXEC))
 		return EINVAL;
 
+	fp = ap->a_fpp ? *ap->a_fpp : NULL;
+	if (fp == NULL)
+		return ENOENT;
+
 	if (OFLAGS(flags) & O_WRONLY) {
+		/* Opened by the nvmmctl(8) utility. */
 		owner = &nvmm_root_owner;
 	} else {
 		owner = os_mem_alloc(sizeof(*owner));
 		owner->pid = curthread->td_proc->p_pid;
 	}
 
-	fp = ap->a_fpp ? *ap->a_fpp : NULL;
 	error = devfs_set_cdevpriv(fp, owner, dfbsd_nvmm_dtor);
 	if (error) {
-		dfbsd_nvmm_dtor(owner);
+		if (owner != &nvmm_root_owner)
+			os_mem_free(owner, sizeof(*owner));
 		return error;
 	}
 

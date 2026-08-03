@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -28,11 +30,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * @(#)forward.c	8.1 (Berkeley) 6/6/93
- * $FreeBSD: src/usr.bin/tail/forward.c,v 1.11.6.7 2003/01/07 05:26:22 tjr Exp $
  */
 
+#include <sys/param.h>
+#include <sys/mount.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -41,17 +42,18 @@
 #include <sys/event.h>
 #endif
 
-#include <limits.h>
-#include <fcntl.h>
+#include <err.h>
 #include <errno.h>
-#include <unistd.h>
+#include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <err.h>
+#include <unistd.h>
+
 #include "extern.h"
 
-static void rlines(FILE *, off_t, struct stat *);
+static void rlines(FILE *, const char *, off_t, struct stat *);
 
 /* defines for inner loop actions */
 #define USE_SLEEP	0
@@ -59,10 +61,11 @@ static void rlines(FILE *, off_t, struct stat *);
 #define USE_KQUEUE	1
 #define ADD_EVENTS	2
 
-struct kevent *ev;
+static struct kevent *ev;
+static int kq;
+static int action = USE_SLEEP;
+static const file_info_t *last;
 #endif
-int action = USE_SLEEP;
-int kq;
 
 /*
  * forward -- display the file, from an offset, forward.
@@ -87,29 +90,33 @@ int kq;
  *	NOREG	cyclically read lines into a wrap-around array of buffers
  */
 void
-forward(FILE *fp, enum STYLE style, off_t off, struct stat *sbp)
+forward(FILE *fp, const char *fn, enum STYLE style, off_t off,
+	struct stat *sbp)
 {
 	int ch;
 
-	switch(style) {
+	switch (style) {
 	case FBYTES:
 		if (off == 0)
 			break;
-		if (S_ISREG(sbp->st_mode)) {
+		if (S_ISREG(sbp->st_mode) && sbp->st_size > 0) {
 			if (sbp->st_size < off)
 				off = sbp->st_size;
 			if (fseeko(fp, off, SEEK_SET) == -1) {
-				ierr();
+				ierr(fn);
 				return;
 			}
-		} else while (off--)
-			if ((ch = getc(fp)) == EOF) {
-				if (ferror(fp)) {
-					ierr();
-					return;
+		} else {
+			while (off--) {
+				if ((ch = getc(fp)) == EOF) {
+					if (ferror(fp)) {
+						ierr(fn);
+						return;
+					}
+					break;
 				}
-				break;
 			}
+		}
 		break;
 	case FLINES:
 		if (off == 0)
@@ -117,7 +124,7 @@ forward(FILE *fp, enum STYLE style, off_t off, struct stat *sbp)
 		for (;;) {
 			if ((ch = getc(fp)) == EOF) {
 				if (ferror(fp)) {
-					ierr();
+					ierr(fn);
 					return;
 				}
 				break;
@@ -127,40 +134,45 @@ forward(FILE *fp, enum STYLE style, off_t off, struct stat *sbp)
 		}
 		break;
 	case RBYTES:
-		if (S_ISREG(sbp->st_mode)) {
+		if (S_ISREG(sbp->st_mode) && sbp->st_size > 0) {
 			if (sbp->st_size >= off &&
 			    fseeko(fp, -off, SEEK_END) == -1) {
-				ierr();
+				ierr(fn);
 				return;
 			}
 		} else if (off == 0) {
-			while (getc(fp) != EOF);
+			while (getc(fp) != EOF)
+				;
 			if (ferror(fp)) {
-				ierr();
+				ierr(fn);
 				return;
 			}
-		} else
-			if (display_bytes(fp, off))
+		} else {
+			if (display_bytes(fp, fn, off))
 				return;
+		}
 		break;
 	case RLINES:
-		if (S_ISREG(sbp->st_mode) && sbp->st_size != 0)
+		if (S_ISREG(sbp->st_mode) && sbp->st_size > 0) {
 			if (!off) {
-				if (fseeko(fp, (off_t)0, SEEK_END) == -1) {
-					ierr();
+				if (fseeko(fp, 0, SEEK_END) == -1) {
+					ierr(fn);
 					return;
 				}
-			} else
-				rlines(fp, off, sbp);
-		else if (off == 0) {
-			while (getc(fp) != EOF);
+			} else {
+				rlines(fp, fn, off, sbp);
+			}
+		} else if (off == 0) {
+			while (getc(fp) != EOF)
+				;
 			if (ferror(fp)) {
-				ierr();
+				ierr(fn);
 				return;
 			}
-		} else
-			if (display_lines(fp, off))
+		} else {
+			if (display_lines(fp, fn, off))
 				return;
+		}
 		break;
 	case REVERSE:
 		errx(1, "internal error: forward style cannot be REVERSE");
@@ -172,7 +184,7 @@ forward(FILE *fp, enum STYLE style, off_t off, struct stat *sbp)
 			oerr();
 	}
 	if (ferror(fp)) {
-		ierr();
+		ierr(fn);
 		return;
 	}
 	fflush(stdout);
@@ -182,14 +194,15 @@ forward(FILE *fp, enum STYLE style, off_t off, struct stat *sbp)
  * rlines -- display the last offset lines of the file.
  */
 static void
-rlines(FILE *fp, off_t off, struct stat *sbp)
+rlines(FILE *fp, const char *fn, off_t off, struct stat *sbp)
 {
 	struct mapinfo map;
 	off_t curoff, size;
 	int i;
 
-	if (!(size = sbp->st_size))
+	if ((size = sbp->st_size) == 0)
 		return;
+
 	map.start = NULL;
 	map.fd = fileno(fp);
 	map.mapoff = map.maxoff = size;
@@ -201,7 +214,7 @@ rlines(FILE *fp, off_t off, struct stat *sbp)
 	curoff = size - 2;
 	while (curoff >= 0) {
 		if (curoff < map.mapoff && maparound(&map, curoff) != 0) {
-			ierr();
+			ierr(fn);
 			return;
 		}
 		for (i = curoff - map.mapoff; i >= 0; i--)
@@ -214,73 +227,54 @@ rlines(FILE *fp, off_t off, struct stat *sbp)
 	}
 	curoff++;
 	if (mapprint(&map, curoff, size - curoff) != 0) {
-		ierr();
+		ierr(fn);
 		exit(1);
 	}
 
 	/* Set the file pointer to reflect the length displayed. */
 	if (fseeko(fp, sbp->st_size, SEEK_SET) == -1) {
-		ierr();
+		ierr(fn);
 		return;
 	}
 	if (map.start != NULL && munmap(map.start, map.maplen)) {
-		ierr();
+		ierr(fn);
 		return;
 	}
 }
 
-/*
- * follow -- display the file, from an offset, forward.
- */
 #ifndef BOOTSTRAPPING
-static void
-show(file_info_t *file, int at_index)
+static int
+show(file_info_t *file)
 {
-	int ch, first;
+	int ch;
 
-	first = 1;
 	while ((ch = getc(file->fp)) != EOF) {
-		if (first && no_files > 1) {
-			showfilename(at_index, file->file_name);
-			first = 0;
+		if (last != file) {
+			if (vflag || (!qflag && no_files > 1))
+				printfn(file->file_name, 1);
+			last = file;
 		}
 		if (putchar(ch) == EOF)
 			oerr();
 	}
 	fflush(stdout);
 	if (ferror(file->fp)) {
+		fclose(file->fp);
 		file->fp = NULL;
-		ierr();
-	} else {
-		clearerr(file->fp);
+		ierr(file->file_name);
+		return 0;
 	}
-}
-#endif
-
-void
-showfilename(int at_index, const char *filename)
-{
-	static int last_index = -1;
-	static int continuing = 0;
-
-	if (last_index == at_index)
-		return;
-	if (!qflag) {
-		if (continuing)
-			printf("\n");
-		printf("==> %s <==\n", filename);
-	}
-	continuing = 1;
-	last_index = at_index;
+	clearerr(file->fp);
+	return 1;
 }
 
-#ifndef BOOTSTRAPPING
 static void
 set_events(file_info_t *files)
 {
 	int i, n;
 	file_info_t *file;
 	struct timespec ts;
+	struct statfs sf;
 
 	ts.tv_sec = 0;
 	ts.tv_nsec = 0;
@@ -290,6 +284,13 @@ set_events(file_info_t *files)
 	for (i = 0, file = files; i < no_files; i++, file++) {
 		if (file->fp == NULL)
 			continue;
+
+		if (fstatfs(fileno(file->fp), &sf) == 0 &&
+		    (sf.f_flags & MNT_LOCAL) == 0) {
+			action = USE_SLEEP;
+			return;
+		}
+
 		if (Fflag && fileno(file->fp) != STDIN_FILENO) {
 			EV_SET(&ev[n], fileno(file->fp), EVFILT_VNODE,
 			       EV_ADD | EV_ENABLE | EV_CLEAR,
@@ -305,70 +306,103 @@ set_events(file_info_t *files)
 		action = USE_SLEEP;
 }
 
+/*
+ * follow -- display the file, from an offset, forward.
+ */
 void
 follow(file_info_t *files, enum STYLE style, off_t off)
 {
-	int active, i, n;
-	file_info_t *file;
+	int active, ev_change, i, n;
 	struct stat sb2;
+	file_info_t *file;
+	FILE *ftmp;
 	struct timespec ts;
 
 	/* Position each of the files */
-	file = files;
 	active = 0;
-	n = 0;
-	for (i = 0; i < no_files; i++, file++) {
-		if (file->fp) {
-			active = 1;
-			n++;
-			if (vflag || no_files > 1)
-				showfilename(i, file->file_name);
-			forward(file->fp, style, off, &file->st);
-			if (Fflag && fileno(file->fp) != STDIN_FILENO)
-				n++;
-		}
+	for (i = 0, file = files; i < no_files; i++, file++) {
+		if (file->fp == NULL)
+			continue;
+		active = 1;
+		if (vflag || (!qflag && no_files > 1))
+			printfn(file->file_name, 1);
+		forward(file->fp, file->file_name, style, off, &file->st);
+		last = file;
 	}
-
-	if (!active)
+	if (!Fflag && !active)
 		return;
 
 	kq = kqueue();
 	if (kq == -1)
 		err(1, "kqueue");
-	ev = malloc(n * sizeof(struct kevent));
+	/*
+	 * The number of kqueue events we track may vary over time and may
+	 * even grow past its initial value in the -F case, but it will
+	 * never exceed two per file, so just preallocate that.
+	 */
+	ev = malloc(no_files * 2 * sizeof(struct kevent));
 	if (ev == NULL)
-		err(1, "Couldn't allocate memory for kevents.");
+		err(1, "failed to allocate memory for kevents");
 	set_events(files);
 
 	for (;;) {
-		for (i = 0, file = files; i < no_files; i++, file++) {
-			if (file->fp == NULL)
-				continue;
-			if (Fflag && fileno(file->fp) != STDIN_FILENO) {
-				if (stat(file->file_name, &sb2) == -1) {
-					/*
-					 * file was rotated, skip it until it
-					 * reappears.
-					 */
+		ev_change = 0;
+		if (Fflag) {
+			for (i = 0, file = files; i < no_files; i++, file++) {
+				if (file->fp == NULL) {
+					file->fp = fopen(file->file_name, "r");
+					if (file->fp != NULL &&
+					    fstat(fileno(file->fp), &file->st)
+					    == -1) {
+						fclose(file->fp);
+						file->fp = NULL;
+					}
+					if (file->fp != NULL)
+						ev_change++;
 					continue;
 				}
+				if (fileno(file->fp) == STDIN_FILENO)
+					continue;
+				ftmp = fopen(file->file_name, "r");
+				if (ftmp == NULL ||
+				    fstat(fileno(ftmp), &sb2) == -1) {
+					if (errno != ENOENT)
+						ierr(file->file_name);
+					show(file);
+					if (file->fp != NULL) {
+						fclose(file->fp);
+						file->fp = NULL;
+					}
+					if (ftmp != NULL) {
+						fclose(ftmp);
+					}
+					ev_change++;
+					continue;
+				}
+
 				if (sb2.st_ino != file->st.st_ino ||
 				    sb2.st_dev != file->st.st_dev ||
 				    sb2.st_nlink == 0) {
-					file->fp = freopen(file->file_name, "r",
-							   file->fp);
-					if (file->fp == NULL) {
-						ierr();
-						continue;
-					} else {
-						memcpy(&file->st, &sb2,
-						       sizeof(struct stat));
-						set_events(files);
-					}
+					show(file);
+					if (file->fp != NULL)
+						fclose(file->fp);
+					file->fp = ftmp;
+					memcpy(&file->st, &sb2,
+					    sizeof(struct stat));
+					ev_change++;
+				} else {
+					fclose(ftmp);
 				}
 			}
-			show(file, i);
 		}
+
+		for (i = 0, file = files; i < no_files; i++, file++) {
+			if (file->fp != NULL && !show(file))
+				ev_change++;
+		}
+
+		if (ev_change)
+			set_events(files);
 
 		switch (action) {
 		case USE_KQUEUE:
@@ -377,17 +411,22 @@ follow(file_info_t *files, enum STYLE style, off_t off)
 			/*
 			 * In the -F case, we set a timeout to ensure that
 			 * we re-stat the file at least once every second.
+			 * If we've received EINTR, ignore it. Both reasons
+			 * for its generation are transient.
 			 */
-			n = kevent(kq, NULL, 0, ev, 1, Fflag ? &ts : NULL);
-			if (n == -1)
-				err(1, "kevent");
+			do {
+				n = kevent(kq, NULL, 0, ev, 1,
+					   Fflag ? &ts : NULL);
+				if (n < 0 && errno != EINTR)
+					err(1, "kevent");
+			} while (n < 0);
 			if (n == 0) {
 				/* timeout */
 				break;
 			} else if (ev->filter == EVFILT_READ && ev->data < 0) {
 				/* file shrank, reposition to end */
 				if (lseek(ev->ident, 0, SEEK_END) == -1) {
-					ierr();
+					ierr(file->file_name);
 					continue;
 				}
 			}

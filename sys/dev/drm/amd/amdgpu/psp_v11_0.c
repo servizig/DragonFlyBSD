@@ -33,9 +33,9 @@
 #include "sdma0/sdma0_4_0_offset.h"
 #include "nbio/nbio_7_4_offset.h"
 
-MODULE_FIRMWARE("amdgpu/vega20_sos.bin");
-MODULE_FIRMWARE("amdgpu/vega20_asd.bin");
-MODULE_FIRMWARE("amdgpu/vega20_ta.bin");
+MODULE_FIRMWARE("amdgpufw_vega20_sos");
+MODULE_FIRMWARE("amdgpufw_vega20_asd");
+MODULE_FIRMWARE("amdgpufw_vega20_ta");
 
 /* address block */
 #define smnMP1_FIRMWARE_FLAGS		0x3010024

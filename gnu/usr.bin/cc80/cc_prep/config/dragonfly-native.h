@@ -35,6 +35,22 @@
   } \
  }"
 
+/*
+ * Link GCC's libssp_nonshared.a to provide __stack_chk_fail_local() for stack
+ * protection.  This hidden symbol avoids PLT overhead on 32-bit x86 by
+ * deferring PIC register setup to the cold failure path.
+ *
+ * On x86-64, GCC calls __stack_chk_fail() directly because RIP-relative
+ * addressing makes PLT efficient, but we link libssp_nonshared.a for
+ * consistency with other systems.
+ *
+ * Adapted from gcc/config/freebsd.h
+ */
+#undef	LINK_SSP_SPEC
+#define LINK_SSP_SPEC "%{fstack-protector|fstack-protector-all" \
+		       "|fstack-protector-strong|fstack-protector-explicit" \
+		       ":-lssp_nonshared}"
+
 #define NATIVE_SYSTEM_HEADER_DIR	PREFIX2 "/include"
 #define STD_EXEC_PATH			PREFIX1 "/libexec/gcc" GCCSHORTVER
 #define STANDARD_EXEC_PREFIX		STD_EXEC_PATH "/"

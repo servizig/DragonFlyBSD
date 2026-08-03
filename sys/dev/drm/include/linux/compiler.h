@@ -55,12 +55,10 @@
 #define __exit
 #define	__stringify(x)			#x
 #define	__attribute_const__		__attribute__((__const__))
-#undef __always_inline
-#define	__always_inline			inline
-#define noinline			__attribute__((noinline))
 
-#define	likely(x)			__builtin_expect(!!(x), 1)
-#define	unlikely(x)			__builtin_expect(!!(x), 0)
+#define noinline			__noinline
+#define	likely(x)			__predict_true(x)
+#define	unlikely(x)			__predict_false(x)
 #define typeof(x)			__typeof(x)
 
 #define __maybe_unused			__unused

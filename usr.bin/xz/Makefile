@@ -36,7 +36,7 @@ LDADD=	-llzma
 .else
 # NOTE: different config than lib/liblzma/config.h
 CFLAGS+=	-DHAVE_CONFIG_H -I${.CURDIR}
-CFLAGS+=	-I${LZMADIR}/api -I${LZMADIR}/api/lzma
+CFLAGS+=	-I${LZMADIR}/api
 LZMADIR=	${XZDIR}/liblzma
 SRCS+=		${XZMT_SRCS}
 FLAGS_GROUPS=	threaded

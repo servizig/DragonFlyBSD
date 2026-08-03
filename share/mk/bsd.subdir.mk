@@ -1,5 +1,5 @@
 # The include file <bsd.subdir.mk> contains the default targets
-# for building subdirectories. 
+# for building subdirectories.
 #
 # For all of the directories listed in the variable SUBDIRS, the
 # specified directory will be visited and the target made. There is
@@ -27,45 +27,62 @@
 
 .include <bsd.init.mk>
 
-# If SUBDIR_ORDERED not specified we default strongly ordering all
-# subdirectories.
-#
-SUBDIR_ORDERED?= ${SUBDIR}
+.if !defined(SUBDIR_ORDERED)
+
+# SUBDIR_ORDERED unspecified: order all subdirectories
+SUBDIR_ORDERED=	${SUBDIR}
+
+.elif !empty(SUBDIR_ORDERED)
+
+# Rearrange the subdirectories in SUBDIR according to SUBDIR_ORDERED so
+# that the order is correct for the non-parallel mode, because '.ORDER'
+# only applies to the parallel mode.
+. for entry in ${SUBDIR}
+.  if !${SUBDIR_ORDERED:M${entry}}
+__subdir+=	${entry}
+.  endif
+. endfor
+SUBDIR:=	${__subdir} ${SUBDIR_ORDERED}
+
+.endif
 
 __targets= \
 	checkdpadd clean cleandepend cleandir cleanobj \
 	obj objlink tags depend all all-man \
-	maninstall realinstall	\
+	maninstall realinstall \
 	lint manlint regress \
 	buildfiles buildincludes installfiles installincludes
 #__targets+=	mandiff # XXX temporary target
 
 .for __target in ${__targets}
 
+${__target}: _SUBDIR_${__target}
+
 .if defined(SUBDIR) && !empty(SUBDIR) && !defined(NO_SUBDIR)
 
 _SUBDIR_${__target}: ${SUBDIR:S/^/_SUBDIR_${__target}_/}
 
+.if !empty(SUBDIR_ORDERED)
 # order subdirectories for each target, set up dependency
-#
 .ORDER: ${SUBDIR_ORDERED:S/^/_SUBDIR_${__target}_/}
+.endif
 
 # Now create the command set for each subdirectory and target
 #
 .for entry in ${SUBDIR}
 _SUBDIR_${__target}_${entry}:
-		@(if test -d ${.CURDIR}/${entry}.${MACHINE_ARCH}; then \
-			${ECHODIR} "===> ${DIRPRFX}${entry}.${MACHINE_ARCH}"; \
-			edir=${entry}.${MACHINE_ARCH}; \
-			cd ${.CURDIR}/$${edir}; \
-		else \
-			${ECHODIR} "===> ${DIRPRFX}${entry}"; \
-			edir=${entry}; \
-			cd ${.CURDIR}/$${edir}; \
-		fi; \
-		${MAKE} ${__target:realinstall=install} \
-			DIRPRFX=${DIRPRFX}$$edir/;)
-		@${ECHODIR} "<=== ${DIRPRFX}${entry}"
+	@(if test -d ${.CURDIR}/${entry}.${MACHINE_ARCH}; then \
+		${ECHODIR} "===> ${DIRPRFX}${entry}.${MACHINE_ARCH}"; \
+		edir=${entry}.${MACHINE_ARCH}; \
+		cd ${.CURDIR}/$${edir}; \
+	else \
+		${ECHODIR} "===> ${DIRPRFX}${entry}"; \
+		edir=${entry}; \
+		cd ${.CURDIR}/$${edir}; \
+	fi; \
+	${MAKE} ${__target:realinstall=install} \
+		DIRPRFX=${DIRPRFX}$$edir/;)
+	@${ECHODIR} "<=== ${DIRPRFX}${entry}"
 
 .endfor
 
@@ -85,10 +102,6 @@ ${SUBDIR}: .PHONY
 	fi; \
 	${MAKE} all
 
-
-.for __target in ${__targets}
-${__target}: _SUBDIR_${__target}
-.endfor
 
 .for __target in files includes
 .for __stage in build install

@@ -44,7 +44,6 @@
 #include <sys/caps.h>
 #include <sys/conf.h>
 #include <sys/proc.h>
-#include <sys/caps.h>
 #include <sys/signalvar.h>
 #include <sys/sysctl.h>
 #include <sys/taskqueue.h>
@@ -64,6 +63,8 @@
 #include <machine/pc/display.h>
 #include <machine/frame.h>
 #include <machine/framebuffer.h>
+
+#include <vm/pmap.h>
 
 #include <dev/misc/kbd/kbdreg.h>
 #include <dev/video/fb/fbreg.h>
@@ -144,9 +145,15 @@ static	bios_values_t	bios_value;
 static	int		enable_panic_key;
 SYSCTL_INT(_machdep, OID_AUTO, enable_panic_key, CTLFLAG_RW, &enable_panic_key,
 	   0, "Enable the panic key (CTRL-ALT-SHIFT-ESC)");
+
 static	int		syscons_async;
+static	int		enable_bell = TRUE;
+
+static SYSCTL_NODE(_kern, OID_AUTO, syscons, CTLFLAG_RD, 0, "syscons");
 SYSCTL_INT(_kern, OID_AUTO, syscons_async, CTLFLAG_RW, &syscons_async,
 	   0, "Asynchronous bulk syscons fb updates");
+SYSCTL_INT(_kern_syscons, OID_AUTO, enable_bell, CTLFLAG_RW, &enable_bell,
+	   0, "Enable bell");
 
 static int desired_cols = 0;
 TUNABLE_INT("kern.kms_columns", &desired_cols);
@@ -325,6 +332,8 @@ register_framebuffer(struct fb_info *info)
 {
 	sc_softc_t *sc;
 
+	KKASSERT(info->depth <= 32);
+
 	lwkt_gettoken(&vga_token);
 	sc = sc_get_softc(0, (sc_console_unit == 0) ? SC_KERNEL_CONSOLE : 0);
 	if (sc == NULL) {
@@ -367,8 +376,8 @@ register_framebuffer(struct fb_info *info)
 	sc->fbi_generation++;
 	syscons_unlock();
 
-	kprintf("kms console: xpixels %d ypixels %d\n",
-	    sc->fbi->width, sc->fbi->height);
+	kprintf("kms console: xpixels %d ypixels %d depth %d\n",
+	    sc->fbi->width, sc->fbi->height, sc->fbi->depth);
 	sc_update_render(sc->cur_scp);
 	if (info->fbops.fb_set_par != NULL)
 		info->fbops.fb_set_par(info);
@@ -4079,7 +4088,8 @@ scmmap(struct dev_mmap_args *ap)
 	    lwkt_reltoken(&vga_token);
 	    return EINVAL;
 	} else {
-	    ap->a_result = atop(scp->sc->fbi->paddr + ap->a_offset);
+	    /* This works for amdgpu(4) as well. */
+	    ap->a_result = atop(vtophys(scp->sc->fbi->vaddr + ap->a_offset));
 	}
     } else {
 	ap->a_result = (*vidsw[scp->sc->adapter]->mmap)(scp->sc->adp,
@@ -4312,7 +4322,7 @@ sc_paste(scr_stat *scp, u_char *p, int count)
 void
 sc_bell(scr_stat *scp, int pitch, int duration)
 {
-    if (cold || shutdown_in_progress)
+    if (cold || shutdown_in_progress || !enable_bell)
 	return;
 
     if (scp != scp->sc->cur_scp && (scp->sc->flags & SC_QUIET_BELL)) {

@@ -81,7 +81,7 @@ public:
   template<typename Arg, bool (*f)(const T &, Arg)>
   void traverse (Arg a) const
   {
-    m_map.traverse <f> (a);
+    m_map.template traverse <f> (a);
   }
 
   /* Basic implementation of insert operation.  */
@@ -310,7 +310,7 @@ public:
   template<typename Arg, bool (*f)(const T &, Arg)>
   void traverse (Arg a) const
   {
-    m_map.traverse <f> (a);
+    m_map.template traverse <f> (a);
   }
 
   /* Basic implementation of removal operation.  */

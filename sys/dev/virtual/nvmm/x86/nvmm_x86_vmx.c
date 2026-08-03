@@ -34,6 +34,7 @@
 #include "../nvmm.h"
 #include "../nvmm_internal.h"
 #include "nvmm_x86.h"
+#include "nvmm_x86_internal.h"
 
 int vmx_vmlaunch(uint64_t *gprs);
 int vmx_vmresume(uint64_t *gprs);
@@ -131,7 +132,7 @@ vmx_vmwrite(uint64_t field, uint64_t value)
 	);
 }
 
-static inline paddr_t __unused
+static inline paddr_t __diagused
 vmx_vmptrst(void)
 {
 	paddr_t pa;
@@ -184,10 +185,35 @@ vmx_sti(void)
 	__asm volatile ("sti" ::: "memory");
 }
 
+#define	MSR_IA32_PLATFORM_ID		0x0017
+
 #define MSR_IA32_FEATURE_CONTROL	0x003A
 #define		IA32_FEATURE_CONTROL_LOCK	__BIT(0)
 #define		IA32_FEATURE_CONTROL_IN_SMX	__BIT(1)
 #define		IA32_FEATURE_CONTROL_OUT_SMX	__BIT(2)
+
+#define	MSR_IA32_BIOS_SIGN_ID		0x008B
+
+#define MSR_IA32_ARCH_CAPABILITIES	0x010A
+#define		IA32_ARCH_RDCL_NO		__BIT(0)
+#define		IA32_ARCH_IBRS_ALL		__BIT(1)
+#define		IA32_ARCH_RSBA			__BIT(2)
+#define		IA32_ARCH_SKIP_L1DFL_VMENTRY	__BIT(3)
+#define		IA32_ARCH_SSB_NO		__BIT(4)
+#define		IA32_ARCH_MDS_NO		__BIT(5)
+#define		IA32_ARCH_IF_PSCHANGE_MC_NO	__BIT(6)
+#define		IA32_ARCH_TSX_CTRL		__BIT(7)
+#define		IA32_ARCH_TAA_NO		__BIT(8)
+
+#define MSR_IA32_FLUSH_CMD		0x010B
+#define		IA32_FLUSH_CMD_L1D_FLUSH	__BIT(0)
+
+#define MSR_IA32_MISC_ENABLE		0x01A0
+#define		IA32_MISC_PERFMON_EN		__BIT(7)
+#define		IA32_MISC_BTS_UNAVAIL		__BIT(11)
+#define		IA32_MISC_PEBS_UNAVAIL		__BIT(12)
+#define		IA32_MISC_EISST_EN		__BIT(16)
+#define		IA32_MISC_MWAIT_EN		__BIT(18)
 
 #define MSR_IA32_VMX_BASIC		0x0480
 #define		IA32_VMX_BASIC_IDENT		__BITS(30,0)
@@ -658,6 +684,7 @@ static uint64_t vmx_tlb_flush_op __read_mostly;
 static uint64_t vmx_ept_flush_op __read_mostly;
 static uint64_t vmx_eptp_type __read_mostly;
 static bool vmx_ept_has_ad __read_mostly;
+static bool vmx_cpu_has_arch_cap __read_mostly;
 
 static uint64_t vmx_pinbased_ctls __read_mostly;
 static uint64_t vmx_procbased_ctls __read_mostly;
@@ -734,8 +761,20 @@ static uint64_t vmx_xcr0_mask __read_mostly;
 #define MSRBM_NPAGES	1
 #define MSRBM_SIZE	(MSRBM_NPAGES * PAGE_SIZE)
 
+/* Guest/host CR0 mask: bits owned by the host */
 #define CR0_STATIC_MASK \
 	(CR0_ET | CR0_NW | CR0_CD)
+
+/*
+ * Guest real CR0 bits that must be handled specially:
+ * - CR0_ET: hardwired to 1 in modern CPUs; must always be 1
+ * - CR0_NE: proper FPU error handling; must always be 1
+ * - CR0_CD, CR0_NW: cache control; must be forced to 0 for performance
+ */
+#define CR0_FORCE_ZERO \
+	(CR0_NW | CR0_CD)
+#define CR0_FORCE_ONE \
+	(CR0_ET | CR0_NE)
 
 #define CR4_VALID \
 	(CR4_VME |			\
@@ -1350,6 +1389,9 @@ vmx_inkernel_handle_cpuid(struct nvmm_machine *mach, struct nvmm_cpu *vcpu,
 			if (vmx_procbased_ctls2 & PROC_CTLS2_INVPCID_ENABLE) {
 				cpudata->gprs[NVMM_X64_GPR_RBX] |= CPUID_0_07_EBX_INVPCID;
 			}
+			if (vmx_cpu_has_arch_cap) {
+				cpudata->gprs[NVMM_X64_GPR_RDX] |= CPUID_0_07_EDX_ARCH_CAP;
+			}
 			break;
 		default:
 			cpudata->gprs[NVMM_X64_GPR_RAX] = 0;
@@ -1622,19 +1664,9 @@ vmx_inkernel_handle_cr0(struct nvmm_machine *mach, struct nvmm_cpu *vcpu,
 	} else {
 		fakecr0 = cpudata->gprs[gpr];
 	}
+	fakecr0 |= CR0_ET; /* Force ET=1 for consistency. */
 
-	/*
-	 * fakecr0 is the value the guest believes is in %cr0. realcr0 is the
-	 * actual value in %cr0.
-	 *
-	 * In fakecr0 we must force CR0_ET to 1.
-	 *
-	 * In realcr0 we must force CR0_NW and CR0_CD to 0, and CR0_ET and
-	 * CR0_NE to 1.
-	 */
-	fakecr0 |= CR0_ET;
-	realcr0 = (fakecr0 & ~CR0_STATIC_MASK) | CR0_ET | CR0_NE;
-
+	realcr0 = (fakecr0 & ~CR0_FORCE_ZERO) | CR0_FORCE_ONE;
 	if (vmx_check_cr(realcr0, vmx_cr0_fixed0, vmx_cr0_fixed1) == -1) {
 		return -1;
 	}
@@ -1847,7 +1879,7 @@ vmx_exit_io(struct nvmm_machine *mach, struct nvmm_cpu *vcpu,
 }
 
 static const uint64_t msr_ignore_list[] = {
-	MSR_BIOS_SIGN,
+	MSR_IA32_BIOS_SIGN_ID,
 	MSR_IA32_PLATFORM_ID
 };
 
@@ -1866,20 +1898,14 @@ vmx_inkernel_handle_msr(struct nvmm_machine *mach, struct nvmm_cpu *vcpu,
 			cpudata->gprs[NVMM_X64_GPR_RDX] = (val >> 32);
 			goto handled;
 		}
-		if (exit->u.rdmsr.msr == MSR_MISC_ENABLE) {
+		if (exit->u.rdmsr.msr == MSR_IA32_MISC_ENABLE) {
 			val = cpudata->gmsr_misc_enable;
 			cpudata->gprs[NVMM_X64_GPR_RAX] = (val & 0xFFFFFFFF);
 			cpudata->gprs[NVMM_X64_GPR_RDX] = (val >> 32);
 			goto handled;
 		}
 		if (exit->u.rdmsr.msr == MSR_IA32_ARCH_CAPABILITIES) {
-			cpuid_desc_t descs;
-			x86_get_cpuid(0x00000000, &descs);
-			if (descs.eax < 7) {
-				goto error;
-			}
-			x86_get_cpuid(0x00000007, &descs);
-			if (!(descs.edx & CPUID_0_07_EDX_ARCH_CAP)) {
+			if (!vmx_cpu_has_arch_cap) {
 				goto error;
 			}
 			val = rdmsr(MSR_IA32_ARCH_CAPABILITIES);
@@ -1913,7 +1939,7 @@ vmx_inkernel_handle_msr(struct nvmm_machine *mach, struct nvmm_cpu *vcpu,
 			vmx_vmwrite(VMCS_GUEST_IA32_PAT, val);
 			goto handled;
 		}
-		if (exit->u.wrmsr.msr == MSR_MISC_ENABLE) {
+		if (exit->u.wrmsr.msr == MSR_IA32_MISC_ENABLE) {
 			/* Don't care. */
 			goto handled;
 		}
@@ -2625,17 +2651,12 @@ vmx_vcpu_setstate(struct nvmm_cpu *vcpu)
 	}
 
 	if (flags & NVMM_X64_STATE_CRS) {
-		/*
-		 * CR0_ET must be 1 both in the shadow and the real register.
-		 * CR0_NE must be 1 in the real register.
-		 * CR0_NW and CR0_CD must be 0 in the real register.
-		 */
 		vmx_vmwrite(VMCS_CR0_SHADOW,
 		    (state->crs[NVMM_X64_CR_CR0] & CR0_STATIC_MASK) |
 		    CR0_ET);
 		vmx_vmwrite(VMCS_GUEST_CR0,
-		    (state->crs[NVMM_X64_CR_CR0] & ~CR0_STATIC_MASK) |
-		    CR0_ET | CR0_NE);
+		    (state->crs[NVMM_X64_CR_CR0] & ~CR0_FORCE_ZERO) |
+		    CR0_FORCE_ONE);
 
 		cpudata->gcr2 = state->crs[NVMM_X64_CR_CR2];
 
@@ -2936,7 +2957,7 @@ vmx_vcpu_init(struct nvmm_machine *mach, struct nvmm_cpu *vcpu)
 	vmx_vmcs_enter(vcpu);
 
 	/* No link pointer. */
-	vmx_vmwrite(VMCS_LINK_POINTER, 0xFFFFFFFFFFFFFFFF);
+	vmx_vmwrite(VMCS_LINK_POINTER, 0xFFFFFFFFFFFFFFFFULL);
 
 	/* Install the CTLSs. */
 	vmx_vmwrite(VMCS_PINBASED_CTLS, vmx_pinbased_ctls);
@@ -3016,7 +3037,7 @@ vmx_vcpu_init(struct nvmm_machine *mach, struct nvmm_cpu *vcpu)
 	vmx_vmwrite(VMCS_EPTP, eptp);
 
 	/* Init IA32_MISC_ENABLE. */
-	cpudata->gmsr_misc_enable = rdmsr(MSR_MISC_ENABLE);
+	cpudata->gmsr_misc_enable = rdmsr(MSR_IA32_MISC_ENABLE);
 	cpudata->gmsr_misc_enable &=
 	    ~(IA32_MISC_PERFMON_EN|IA32_MISC_EISST_EN|IA32_MISC_MWAIT_EN);
 	cpudata->gmsr_misc_enable |=
@@ -3450,6 +3471,15 @@ vmx_ident(void)
 	if (!(msr & IA32_VMX_EPT_VPID_UC) && !(msr & IA32_VMX_EPT_VPID_WB)) {
 		os_printf("nvmm: EPT UC/WB memory types not supported\n");
 		return false;
+	}
+
+	vmx_cpu_has_arch_cap = false;
+	x86_get_cpuid(0x00000000, &descs);
+	if (descs.eax >= 7) {
+		x86_get_cpuid(0x00000007, &descs);
+		if (descs.edx & CPUID_0_07_EDX_ARCH_CAP) {
+			vmx_cpu_has_arch_cap = true;
+		}
 	}
 
 	return true;

@@ -475,14 +475,14 @@ libusb20_tr_bulk_intr_sync(struct libusb20_transfer *xfer,
 
 	do {
 		/* compute maximum transfer length */
-		transfer_max = 
+		transfer_max =
 		    libusb20_tr_get_max_total_length(xfer);
 
 		if (transfer_max > length)
 			transfer_max = length;
 
 		/* setup bulk or interrupt transfer */
-		libusb20_tr_setup_bulk(xfer, pbuf, 
+		libusb20_tr_setup_bulk(xfer, pbuf,
 		    transfer_max, timeout);
 
 		/* start the transfer */
@@ -595,11 +595,17 @@ libusb20_dev_close(struct libusb20_device *pdev)
 
 	pdev->is_opened = 0;
 
-	/* 
+	/*
 	 * The following variable is only used by the libusb v0.1
 	 * compat layer:
 	 */
 	pdev->claimed_interface = 0;
+
+	/*
+	 * The following variable is only used by the libusb v1.0
+	 * compat layer.
+	 */
+	pdev->auto_detach = 0;
 
 	return (error);
 }
@@ -1105,7 +1111,7 @@ libusb20_dev_get_bus_number(struct libusb20_device *pdev)
 }
 
 int
-libusb20_dev_get_iface_desc(struct libusb20_device *pdev, 
+libusb20_dev_get_iface_desc(struct libusb20_device *pdev,
     uint8_t iface_index, char *buf, uint8_t len)
 {
 	if ((buf == NULL) || (len == 0))

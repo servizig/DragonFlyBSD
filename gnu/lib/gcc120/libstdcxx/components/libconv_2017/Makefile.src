@@ -1,0 +1,23 @@
+# verbatim from libstdc++-v3/src/c++17/Makefile.am
+
+extra_string_inst_sources = cow-string-inst.cc
+extra_fs_sources = \
+	cow-fs_dir.cc \
+	cow-fs_ops.cc \
+	cow-fs_path.cc
+
+inst_sources = \
+	ostream-inst.cc \
+	string-inst.cc \
+	$(extra_string_inst_sources)
+
+sources = \
+	floating_from_chars.cc \
+	floating_to_chars.cc \
+	fs_dir.cc \
+	fs_ops.cc \
+	fs_path.cc \
+	memory_resource.cc \
+	$(extra_fs_sources)
+
+libc__17convenience_la_SOURCES = $(sources) $(inst_sources)

@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2021, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2025, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -165,7 +165,6 @@ AcpiTbGetRootTableEntry (
     UINT32                  TableEntrySize);
 
 
-#if (!ACPI_REDUCED_HARDWARE)
 /*******************************************************************************
  *
  * FUNCTION:    AcpiTbInitializeFacs
@@ -185,15 +184,7 @@ AcpiTbInitializeFacs (
 {
     ACPI_TABLE_FACS         *Facs;
 
-
-    /* If Hardware Reduced flag is set, there is no FACS */
-
-    if (AcpiGbl_ReducedHardware)
-    {
-        AcpiGbl_FACS = NULL;
-        return (AE_OK);
-    }
-    else if (AcpiGbl_FADT.XFacs &&
+    if (AcpiGbl_FADT.XFacs &&
          (!AcpiGbl_FADT.Facs || !AcpiGbl_Use32BitFacsAddresses))
     {
         (void) AcpiGetTableByIndex (AcpiGbl_XFacsIndex,
@@ -211,7 +202,6 @@ AcpiTbInitializeFacs (
 
     return (AE_OK);
 }
-#endif /* !ACPI_REDUCED_HARDWARE */
 
 
 /*******************************************************************************
@@ -323,6 +313,7 @@ AcpiTbGetRootTableEntry (
     UINT8                   *TableEntry,
     UINT32                  TableEntrySize)
 {
+    UINT32                  Address32;
     UINT64                  Address64;
 
 
@@ -336,8 +327,8 @@ AcpiTbGetRootTableEntry (
          * 32-bit platform, RSDT: Return 32-bit table entry
          * 64-bit platform, RSDT: Expand 32-bit to 64-bit and return
          */
-        return ((ACPI_PHYSICAL_ADDRESS) (*ACPI_CAST_PTR (
-            UINT32, TableEntry)));
+        ACPI_MOVE_32_TO_32(&Address32, TableEntry);
+        return Address32;
     }
     else
     {
@@ -471,7 +462,7 @@ AcpiTbParseRootTable (
 
     /* Validate the root table checksum */
 
-    Status = AcpiTbVerifyChecksum (Table, Length);
+    Status = AcpiUtVerifyChecksum (Table, Length);
     if (ACPI_FAILURE (Status))
     {
         AcpiOsUnmapMemory (Table, Length);

@@ -46,6 +46,8 @@ extern	int	busdma_swi_pending;
 extern	void	(*cpu_idle_hook)(void);
 void		cpu_idle(void);
 extern	u_int	cpu_exthigh;
+extern	u_int	cpu_feature;	/* CPUID_* features */
+extern	u_int	cpu_feature2;	/* CPUID2_* features */
 extern	u_int	via_feature_rng;
 extern	u_int	via_feature_xcrypt;
 extern	u_int	amd_feature;
@@ -83,6 +85,10 @@ struct	fpreg;
 struct  dbreg;
 struct __mcontext;
 struct dumperinfo;
+
+void	printcpuinfo(void);
+void	identify_cpu(void);
+void	panicifcpuunsupported(void);
 
 void	busdma_swi(void);
 void	cpu_gdinit (struct mdglobaldata *gd, int cpu);

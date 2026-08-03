@@ -82,7 +82,7 @@
 MALLOC_DEFINE(M_CRYPTOAPI, "cryptoapi", "Crypto API");
 
 static int aesni_disable = 0;
-// TUNABLE_INT("hw.aesni_disable", &aesni_disable);
+TUNABLE_INT("hw.aesni_disable", &aesni_disable);
 SYSCTL_INT(_hw, OID_AUTO, aesni_disable, CTLFLAG_RW, &aesni_disable, 0,
     "Disable AESNI");
 #define HAVE_AESNI
@@ -215,18 +215,18 @@ decrypt_data_cbc(block_fn_t block_fn, const void *ctx, uint8_t *data,
  */
 static void
 crypt_block_xts(const void *ctx, uint8_t *data, uint8_t *iv,
-    block_fn_t block_fn, uint8_t *block, int blocklen, int alpha)
+    block_fn_t block_fn, uint8_t *block, int blocksize, uint8_t alpha)
 {
 	int i;
 	u_int carry_in, carry_out;
 
-	xor_block3(block, data, iv, blocklen);
+	xor_block3(block, data, iv, blocksize);
 	block_fn(ctx, block, data);
-	xor_block(data, iv, blocklen);
+	xor_block(data, iv, blocksize);
 
 	/* Exponentiate tweak */
 	carry_in = 0;
-	for (i = 0; i < blocklen; i++) {
+	for (i = 0; i < blocksize; i++) {
 		carry_out = iv[i] & 0x80;
 		iv[i] = (iv[i] << 1) | (carry_in ? 1 : 0);
 		carry_in = carry_out;
@@ -240,13 +240,13 @@ crypt_block_xts(const void *ctx, uint8_t *data, uint8_t *iv,
  */
 static void
 crypt_data_xts(const void *ctx, uint8_t *data, int datalen, uint8_t *iv,
-    block_fn_t block_fn, uint8_t *block, int blocklen, int alpha)
+    block_fn_t block_fn, uint8_t *block, int blocksize, uint8_t alpha)
 {
-	for (int i = 0; i < datalen; i += blocklen) {
-		crypt_block_xts(ctx, data + i, iv, block_fn, block, blocklen,
+	for (int i = 0; i < datalen; i += blocksize) {
+		crypt_block_xts(ctx, data + i, iv, block_fn, block, blocksize,
 		    alpha);
 	}
-	explicit_bzero(block, blocklen);
+	explicit_bzero(block, blocksize);
 }
 
 /**
@@ -1120,7 +1120,7 @@ cryptoapi_cipher_encrypt(const cryptoapi_cipher_session_t session,
 	if ((datalen % session->cipher->blocksize) != 0)
 		return (EINVAL);
 
-	bzero(iv2, sizeof(iv2));
+	memset(iv2, 0, sizeof(iv2));
 	memcpy(iv2, iv, ivlen);
 
 	session->cipher->crypt(session->context, data, datalen, iv2, true);
@@ -1139,7 +1139,7 @@ cryptoapi_cipher_decrypt(const cryptoapi_cipher_session_t session,
 	if ((datalen % session->cipher->blocksize) != 0)
 		return (EINVAL);
 
-	bzero(iv2, sizeof(iv2));
+	memset(iv2, 0, sizeof(iv2));
 	memcpy(iv2, iv, ivlen);
 
 	session->cipher->crypt(session->context, data, datalen, iv2, false);

@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2021, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2025, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -167,15 +167,12 @@ ACPI_GLOBAL (ACPI_TABLE_LIST,           AcpiGbl_RootTableList);
 
 ACPI_GLOBAL (ACPI_TABLE_HEADER *,       AcpiGbl_DSDT);
 ACPI_GLOBAL (ACPI_TABLE_HEADER,         AcpiGbl_OriginalDsdtHeader);
+ACPI_INIT_GLOBAL (char *,               AcpiGbl_CDAT, NULL);
 ACPI_INIT_GLOBAL (UINT32,               AcpiGbl_DsdtIndex, ACPI_INVALID_TABLE_INDEX);
 ACPI_INIT_GLOBAL (UINT32,               AcpiGbl_FacsIndex, ACPI_INVALID_TABLE_INDEX);
 ACPI_INIT_GLOBAL (UINT32,               AcpiGbl_XFacsIndex, ACPI_INVALID_TABLE_INDEX);
 ACPI_INIT_GLOBAL (UINT32,               AcpiGbl_FadtIndex, ACPI_INVALID_TABLE_INDEX);
-
-#if (!ACPI_REDUCED_HARDWARE)
-ACPI_GLOBAL (ACPI_TABLE_FACS *,         AcpiGbl_FACS);
-
-#endif /* !ACPI_REDUCED_HARDWARE */
+ACPI_INIT_GLOBAL (ACPI_TABLE_FACS *,    AcpiGbl_FACS, NULL);
 
 /* These addresses are calculated from the FADT Event Block addresses */
 
@@ -267,6 +264,7 @@ ACPI_GLOBAL (ACPI_TABLE_HANDLER,        AcpiGbl_TableHandler);
 ACPI_GLOBAL (void *,                    AcpiGbl_TableHandlerContext);
 ACPI_GLOBAL (ACPI_INTERFACE_HANDLER,    AcpiGbl_InterfaceHandler);
 ACPI_GLOBAL (ACPI_SCI_HANDLER_INFO *,   AcpiGbl_SciHandlerList);
+ACPI_GLOBAL (ACPI_GED_HANDLER_INFO *,   AcpiGbl_GedHandlerList);
 
 /* Owner ID support */
 

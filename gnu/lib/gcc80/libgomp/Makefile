@@ -3,7 +3,6 @@ CFLAGS+=	-I${.OBJDIR}
 .include "../Makefile.inc"
 
 .PATH: ${GCCDIR}/libgomp
-#.PATH: ${GCCDIR}/libgomp/config/bsd
 .PATH: ${GCCDIR}/libgomp/config/posix
 
 CFLAGS+=	-DHAVE_CONFIG_H

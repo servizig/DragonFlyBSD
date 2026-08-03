@@ -4,17 +4,14 @@
 .include <bsd.own.mk>
 
 V=	${.CURDIR}/../../../contrib/nvi2
+.PATH: ${V}/catalog
 
 CAT=	dutch english french german polish ru_RU.KOI8-R spanish swedish \
 	tr_TR.ISO8859-9 uk_UA.KOI8-U zh_CN.GB2312
 
 SCAN=	${V}/cl/*.c ${V}/common/*.c ${V}/ex/*.c ${V}/vi/*.c
 
-.PATH: ${V}/catalog
-
-buildfiles:
-
-# Helper since iconv is non trivial to make a build tool
+# Helper since iconv(1) is non-trivial to make a build tool
 utf8convert: .PHONY
 .for c in dutch french german spanish swedish
 	iconv -f ISO8859-1 -t UTF-8 $V/catalog/$c.base > $c.UTF-8.base
@@ -32,9 +29,9 @@ all:	${CAT}
 
 .for c in ${CAT}
 ${c}:	${c}.base
-	@echo "... $c";							\
-	rm -f $c;							\
-	env LANG=C sort -u ${.ALLSRC} |					\
+	@echo "... ${.TARGET}";						\
+	rm -f ${.TARGET};						\
+	env LC_ALL=C sort -u ${.ALLSRC} |				\
 	awk '{								\
 		if ($$1 == 1) {						\
 			print "\nMESSAGE NUMBER 1 IS NOT LEGAL";	\
@@ -47,25 +44,23 @@ ${c}:	${c}.base
 		print $$0;						\
 	}' |								\
 	sed -e '1s/^/$$set 1~$$quote "~/; 1y/~/\n/' |			\
-	gencat $c /dev/stdin;						\
-	chmod 444 $c;							\
-	if grep DUPLICATE $c > /dev/null; then				\
-		grep DUPLICATE $@;					\
+	gencat ${.TARGET} /dev/stdin &&					\
+	if grep -q DUPLICATE ${.TARGET}; then				\
+		grep DUPLICATE ${.TARGET};				\
 	fi;								\
-	if grep 'NOT LEGAL' $c > /dev/null; then			\
-		grep 'NOT LEGAL' $@;					\
+	if grep -q 'NOT LEGAL' ${.TARGET}; then				\
+		grep 'NOT LEGAL' ${.TARGET};				\
 	fi
 .endfor
 
-CHK=	dutch.check english.check french.check german.check \
-	polish.check ru_RU.KOI8-R.check spanish.check swedish.check \
-	uk_UA.KOI8-U.check zh_CN.GB2312.check
-check: ${CHK}
+CHK=	${CAT:S/$/.check/}
+check: english.base ${CHK}
 .for c in ${CAT}
 ${c}.check: ${c}.base
-	@echo "... $c";							\
-	f=${.ALLSRC:S;.base$;;};					\
-	(echo "Unused message id's (this is okay):";			\
+	@echo "... ${.TARGET}";						\
+	f=${.ALLSRC:S/.base$//};					\
+	(export LC_ALL=C;						\
+	echo "Unused message id's (this is okay):";			\
 	awk '{								\
 		while (++nline < $$1)					\
 			printf "%03d\n", nline;				\
@@ -81,15 +76,15 @@ ${c}.check: ${c}.base
 	echo =========================;					\
 	echo "MESSAGES WITH THE SAME MESSAGE ID's (FIX!):";		\
 	for j in							\
-	    `sed '/^$$/d' < $$f.base | LANG=C sort -u |			\
+	    `sed '/^$$/d' < $$f.base | sort -u |			\
 	    awk '{print $$1}' | uniq -d`; do				\
-		egrep $$j $$f.base;					\
+		grep -w $$j $$f.base;					\
 	done;								\
 	echo =========================;					\
 	echo "Duplicate messages, both id and message (this is okay):";	\
-	sed '/^$$/d' < $$f.base | LANG=C sort | uniq -c |			\
+	sed '/^$$/d' < $$f.base | sort | uniq -c |			\
 	awk '$$1 != 1 { print $$0 }' | sort -n;				\
-	echo =========================) > $c
+	echo =========================) > ${.TARGET}
 .endfor
 
 english.base: ${SCAN}
@@ -107,9 +102,9 @@ ESLINKS= es_ES
 SVLINKS= sv_SE
 PLLINKS= pl_PL
 
-FILES=	${CATALOGS}
-FILESFROUPS=	FILES
-FILESDIR= ${SHAREDIR}/vi/catalog
+FILES=		${CATALOGS}
+FILESDIR=	${SHAREDIR}/vi/catalog
+
 SYMLINKS=
 .for l in ${NLLINKS}
 SYMLINKS+= dutch ${FILESDIR}/$l.ISO8859-1

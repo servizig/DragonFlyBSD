@@ -26,8 +26,7 @@
  * $FreeBSD: src/sbin/gpt/show.c,v 1.14 2006/06/22 22:22:32 marcel Exp $
  */
 
-#include <sys/types.h>
-#include <sys/diskmbr.h>
+#include <sys/param.h>
 
 #include <err.h>
 #include <libutil.h>
@@ -38,7 +37,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "map.h"
 #include "gpt.h"
 
 static bool show_guid = false;
@@ -48,16 +46,15 @@ static bool show_uuid = false;
 static void
 usage_show(void)
 {
-	fprintf(stderr,
-	    "usage: %s [-glu] device ...\n", getprogname());
+	fprintf(stderr, "usage: %s [-glu] device ...\n", getprogname());
 	exit(1);
 }
 
 static const char *
 friendly(uuid_t *t)
 {
-	static char *save_name1 /*= NULL*/;
-	static char *save_name2 /*= NULL*/;
+	static char *save_name1 = NULL;
+	static char *save_name2 = NULL;
 
 	if (show_uuid)
 		goto unfriendly;
@@ -83,30 +80,36 @@ show(int fd __unused)
 	map_t *m, *p;
 	struct mbr *mbr;
 	struct gpt_ent *ent;
-	unsigned int i;
-	char *s, humansz[sizeof("99.9GB")];
+	size_t i, j;
+	char *s, humansz[sizeof("99.9GB")], lwbuf[32];
+	char utfbuf[NELEM(ent->ent_name) * 3 + 1];
+	const char *name;
+	int lbawidth;
+
+	lbawidth = sprintf(lwbuf, "%ju", (uintmax_t)(mediasz / secsz));
+	if (lbawidth < 5)
+		lbawidth = 5;
 
 	humanize_number(humansz, sizeof(humansz), (int64_t)mediasz, "B",
 			HN_AUTOSCALE, HN_FRACTIONAL | HN_NOSPACE);
-	printf("Disk %s: %s (%llu %u-byte sectors)\n",
-	       device_name, humansz, (long long)(mediasz / secsz), secsz);
+	printf("Disk %s: %s (%ju %u-byte sectors)\n",
+	       device_name, humansz, (uintmax_t)(mediasz / secsz), secsz);
 
 	printf("  %*s", lbawidth, "Start");
 	printf("  %*s", lbawidth, "Sectors");
 	printf("  %*s", (int)(sizeof(humansz) - 1), "Size");
 	printf("  Index  Contents\n");
 
-	m = map_first();
-	while (m != NULL) {
-		printf("  %*llu", lbawidth, (long long)m->map_start);
-		printf("  %*llu", lbawidth, (long long)m->map_size);
+	for (m = map_first(); m != NULL; m = m->map_next) {
+		printf("  %*ju", lbawidth, (uintmax_t)m->map_start);
+		printf("  %*ju", lbawidth, (uintmax_t)m->map_size);
 		humanize_number(humansz, sizeof(humansz),
 				(int64_t)(m->map_size * secsz), "B",
 				HN_AUTOSCALE, HN_FRACTIONAL | HN_NOSPACE);
 		printf("  %*s", (int)(sizeof(humansz) - 1), humansz);
 		putchar(' ');
 		putchar(' ');
-		if (m->map_index != NOENTRY)
+		if (m->map_index != MAP_NOENTRY)
 			printf("%5d", m->map_index);
 		else
 			printf("    -");
@@ -121,17 +124,17 @@ show(int fd __unused)
 				printf("Extended ");
 			printf("MBR");
 			break;
-		case MAP_TYPE_PRI_GPT_HDR:
-			printf("Pri GPT header");
+		case MAP_TYPE_GPT_PRI_HDR:
+			printf("Primary GPT header");
 			break;
-		case MAP_TYPE_SEC_GPT_HDR:
-			printf("Sec GPT header");
+		case MAP_TYPE_GPT_SEC_HDR:
+			printf("Secondary GPT header");
 			break;
-		case MAP_TYPE_PRI_GPT_TBL:
-			printf("Pri GPT table");
+		case MAP_TYPE_GPT_PRI_TBL:
+			printf("Primary GPT table");
 			break;
-		case MAP_TYPE_SEC_GPT_TBL:
-			printf("Sec GPT table");
+		case MAP_TYPE_GPT_SEC_TBL:
+			printf("Secondary GPT table");
 			break;
 		case MAP_TYPE_MBR_PART:
 			p = m->map_data;
@@ -140,9 +143,7 @@ show(int fd __unused)
 			printf("MBR part ");
 			mbr = p->map_data;
 			for (i = 0; i < 4; i++) {
-				start = le16toh(mbr->mbr_part[i].part_start_hi);
-				start = (start << 16) +
-				    le16toh(mbr->mbr_part[i].part_start_lo);
+				start = le32toh(mbr->mbr_part[i].dp_start);
 				if (m->map_start == p->map_start + start)
 					break;
 			}
@@ -150,17 +151,30 @@ show(int fd __unused)
 				/* wasn't there */
 				printf("[partition not found?]");
 			} else {
-				printf("%d%s", mbr->mbr_part[i].part_typ,
-				    mbr->mbr_part[i].part_flag == 0x80 ?
-				    " (active)" : "");
+				name = NULL;
+				for (j = 0; j < NELEM(dos_ptypes); j++) {
+					if (dos_ptypes[j].type ==
+					    mbr->mbr_part[i].dp_typ) {
+						name = dos_ptypes[j].name;
+						break;
+					}
+				}
+				if (name != NULL)
+					printf("- %s", name);
+				else
+					printf("- %d", mbr->mbr_part[i].dp_typ);
+				if (mbr->mbr_part[i].dp_flag == 0x80)
+					printf(" (active)");
 			}
 			break;
 		case MAP_TYPE_GPT_PART:
 			printf("GPT part ");
 			ent = m->map_data;
 			if (show_label) {
-				printf("- \"%s\"",
-				    utf16_to_utf8(ent->ent_name));
+				utf16_to_utf8(ent->ent_name,
+				    NELEM(ent->ent_name),
+				    utfbuf, sizeof(utfbuf));
+				printf("- \"%s\"", utfbuf);
 			} else if (show_guid) {
 				s = NULL;
 				uuid_dec_le(&ent->ent_uuid, &guid);
@@ -176,8 +190,8 @@ show(int fd __unused)
 		case MAP_TYPE_PMBR:
 			printf("PMBR");
 			mbr = m->map_data;
-			if (mbr->mbr_part[0].part_typ == DOSPTYP_PMBR &&
-			    mbr->mbr_part[0].part_flag == 0x80)
+			if (mbr->mbr_part[0].dp_typ == DOSPTYP_PMBR &&
+			    mbr->mbr_part[0].dp_flag == 0x80)
 				printf(" (active)");
 			break;
 		default:
@@ -185,7 +199,6 @@ show(int fd __unused)
 			break;
 		}
 		putchar('\n');
-		m = m->map_next;
 	}
 }
 
@@ -194,7 +207,7 @@ cmd_show(int argc, char *argv[])
 {
 	int ch, fd;
 
-	while ((ch = getopt(argc, argv, "glu")) != -1) {
+	while ((ch = getopt(argc, argv, "ghlu")) != -1) {
 		switch(ch) {
 		case 'g':
 			show_guid = true;
@@ -205,6 +218,7 @@ cmd_show(int argc, char *argv[])
 		case 'u':
 			show_uuid = true;
 			break;
+		case 'h':
 		default:
 			usage_show();
 		}

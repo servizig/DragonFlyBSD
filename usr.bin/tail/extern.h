@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -25,16 +27,18 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)extern.h	8.1 (Berkeley) 6/6/93
- *
- * $FreeBSD: src/usr.bin/tail/extern.h,v 1.4.6.2 2001/12/19 20:29:29 iedowse Exp $
  */
 
 #define	WR(p, size) do { \
-	if (write(STDOUT_FILENO, p, size) != size) \
-		oerr(); \
-	} while(0)
+	ssize_t res; \
+	res = write(STDOUT_FILENO, p, size); \
+	if (res != (ssize_t)size) { \
+		if (res == -1) \
+			oerr(); \
+		else \
+			errx(1, "stdout"); \
+	} \
+} while (0)
 
 #define TAILMAPLEN (4<<20)
 
@@ -47,8 +51,8 @@ struct mapinfo {
 };
 
 struct file_info {
-	FILE	*fp;
-	char	*file_name;
+	FILE *fp;
+	const char *file_name;
 	struct stat st;
 };
 
@@ -57,17 +61,16 @@ typedef struct file_info file_info_t;
 enum STYLE { FBYTES, FLINES, RBYTES, RLINES, REVERSE };
 
 void follow(file_info_t *, enum STYLE, off_t);
-void forward(FILE *, enum STYLE, off_t, struct stat *);
-void reverse(FILE *, enum STYLE, off_t, struct stat *);
+void forward(FILE *, const char *, enum STYLE, off_t, struct stat *);
+void reverse(FILE *, const char *, enum STYLE, off_t, struct stat *);
 
-int display_bytes(FILE *, off_t);
-int display_lines(FILE *, off_t);
+int display_bytes(FILE *, const char *, off_t);
+int display_lines(FILE *, const char *, off_t);
 
-void ierr(void);
+void ierr(const char *);
 void oerr(void) __dead2;
 int mapprint(struct mapinfo *, off_t, off_t);
 int maparound(struct mapinfo *, off_t);
-void showfilename(int, const char *);
+void printfn(const char *, int);
 
 extern int Fflag, fflag, qflag, rflag, vflag, rval, no_files;
-extern const char *fname;

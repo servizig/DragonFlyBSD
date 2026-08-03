@@ -7,4 +7,4 @@ SUBDIR=  libiberty tools
 SUBDIR=  libcpp libiberty tools
 .endif
 
-.include <bsd.obj.mk>
+.include <bsd.subdir.mk>

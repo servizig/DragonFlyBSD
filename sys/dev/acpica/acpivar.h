@@ -38,10 +38,9 @@
 #include <sys/sysctl.h>
 #include <sys/lock.h>
 #include <sys/bus.h>
-#if 0
+#include <sys/power.h>
 #include <sys/spinlock.h>
 #include <sys/spinlock2.h>
-#endif
 #include <sys/serialize.h>
 #include <contrib/dev/acpica/source/include/acmacros.h>
 #include <contrib/dev/acpica/source/include/acconfig.h>
@@ -450,6 +449,14 @@ acpi_get_verbose(struct acpi_softc *sc)
     if (sc)
 	return (sc->acpi_verbose);
     return (0);
+}
+
+static __inline const char *
+acpi_d_state_to_str(int state)
+{
+    KASSERT(state >= ACPI_STATE_D0 && state <= ACPI_D_STATES_MAX,
+	("state out of bounds"));
+    return powerstate_to_str(state);
 }
 
 char		*acpi_name(ACPI_HANDLE handle);

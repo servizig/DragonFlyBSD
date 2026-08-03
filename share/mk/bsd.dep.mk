@@ -64,61 +64,58 @@ _MKDEPENV=	CCVER=${CCVER}
 # Keep `tags' here, before SRCS are mangled below for `depend'.
 .if !target(tags) && defined(SRCS) && !defined(NOTAGS)
 tags: ${SRCS}
-.if ${CTAGS:T} == "ctags"
+. if ${CTAGS:T} == "ctags"
 	@${CTAGS} ${CTAGSFLAGS} -f /dev/stdout \
 	    ${.ALLSRC:N*.h} | sed "s;${.CURDIR}/;;" > ${.TARGET}
-.elif ${CTAGS:T} == "gtags"
+. elif ${CTAGS:T} == "gtags"
 	@cd ${.CURDIR} && ${CTAGS} ${GTAGSFLAGS} ${.OBJDIR}
-.if defined(HTML)
+.  if defined(HTML)
 	@cd ${.CURDIR} && htags ${HTAGSFLAGS} -d ${.OBJDIR} ${.OBJDIR}
-.endif
-.endif
+.  endif
+. endif
 .endif
 
 .if defined(SRCS)
 CLEANFILES?=
 
-.for _LSRC in ${SRCS:M*.l:N*/*}
-.for _LC in ${_LSRC:R}.c
+. for _LSRC in ${SRCS:M*.l:N*/*}
+.  for _LC in ${_LSRC:R}.c
 ${_LC}: ${_LSRC}
 	${LEX} -t ${LFLAGS} ${.ALLSRC} > ${.TARGET}
 SRCS:=	${SRCS:S/${_LSRC}/${_LC}/}
 CLEANFILES+= ${_LC}
-.endfor
-.endfor
+.  endfor
+. endfor
 
-.for _YSRC in ${SRCS:M*.y:N*/*}
-.for _YC in ${_YSRC:R}.c
+. for _YSRC in ${SRCS:M*.y:N*/*}
+.  for _YC in ${_YSRC:R}.c
 SRCS:=	${SRCS:S/${_YSRC}/${_YC}/}
 CLEANFILES+= ${_YC}
-.if !empty(YFLAGS:M-d) && !empty(SRCS:My.tab.h)
+.   if !empty(YFLAGS:M-d) && !empty(SRCS:My.tab.h)
 .ORDER: ${_YC} y.tab.h
 ${_YC} y.tab.h: ${_YSRC}
 	${YACC} ${YFLAGS} ${.ALLSRC}
 	cp y.tab.c ${_YC}
 CLEANFILES+= y.tab.c y.tab.h
-.elif !empty(YFLAGS:M-d)
-.for _YH in ${_YC:S/.c/.h/}
+.   elif !empty(YFLAGS:M-d)
+.    for _YH in ${_YC:S/.c/.h/}
 ${_YH}: ${_YC}
 ${_YC}: ${_YSRC}
 	${YACC} ${YFLAGS} -o ${_YC} ${.ALLSRC}
 SRCS+= ${_YH}
 CLEANFILES+= ${_YH}
-.endfor
-.else
+.    endfor
+.   else
 ${_YC}: ${_YSRC}
 	${YACC} ${YFLAGS} -o ${_YC} ${.ALLSRC}
-.endif
-.endfor
-.endfor
-.endif
+.   endif
+.  endfor
+. endfor
+.endif  # defined(SRCS)
 
 .if !target(depend)
 .if defined(SRCS)
 depend: beforedepend _dependincs ${DEPENDFILE} afterdepend
-
-# Tell bmake not to look for generated files via .PATH
-.NOPATH: ${DEPENDFILE}
 
 # Different types of sources are compiled with slightly different flags.
 # Split up the sources, and filter out headers and non-applicable flags.
@@ -136,6 +133,9 @@ _DEPENDFILES=	${FLAGS_GROUPS:S/^/.depend_/g}
 
 ${DEPENDFILE}: ${_DEPENDFILES}
 
+# Tell bmake not to look for generated files via .PATH
+${DEPENDFILE} ${_DEPENDFILES}: .NOPATH
+
 #
 # __FLAG_FILES is built from SRCS.  That means it will contain
 # also .h files and other files that are not direct sources, but which
@@ -148,18 +148,18 @@ ${DEPENDFILE}: ${_DEPENDFILES}
 # by the mkdep calls, i.e. all sources that are not being used directly
 # for the .depend* file.
 #
-_ALL_DEPENDS=${__FLAGS_FILES:N*.[sS]:N*.c:N*.cc:N*.C:N*.cpp:N*.cpp:N*.cxx:N*.m}
+_ALL_DEPENDS=${__FLAGS_FILES:N*.[csS]:N*.cc:N*.C:N*.cpp:N*.cxx:N*.m}
 
 .for _FG in _ ${FLAGS_GROUPS}
 .depend${_FG:S/^/_/:N__}: ${${_FG}_FLAGS_FILES} ${_ALL_DEPENDS}
-	-rm -f ${.TARGET}
-	-> ${.TARGET}
+	rm -f ${.TARGET}
 .if ${${_FG}_FLAGS_FILES:M*.[csS]} != ""
 	${_MKDEPENV} CC=${MKDEPCC} ${MKDEPCMD} -f ${.TARGET} -a ${MKDEP} \
-	    ${${_FG}_FLAGS} \
+	    ${${_FG}_FLAGS:M-I*} \
 	    ${CFLAGS:M--sysroot=*} \
 	    ${CFLAGS:M-nostdinc*} ${CFLAGS:M-[BID]*} \
 	    ${CFLAGS:M-std=*} \
+	    ${${_FG}_FLAGS:N-I*} \
 	    ${.ALLSRC:M*.[csS]}
 .endif
 .if ${${_FG}_FLAGS_FILES:M*.cc} != "" || \
@@ -167,20 +167,25 @@ _ALL_DEPENDS=${__FLAGS_FILES:N*.[sS]:N*.c:N*.cc:N*.C:N*.cpp:N*.cpp:N*.cxx:N*.m}
     ${${_FG}_FLAGS_FILES:M*.cpp} != "" || \
     ${${_FG}_FLAGS_FILES:M*.cxx} != ""
 	${_MKDEPENV} CC=${CXX} ${MKDEPCMD} -f ${.TARGET} -a ${MKDEP} \
-	    ${${_FG}_FLAGS} \
+	    ${${_FG}_FLAGS:M-I*} \
 	    ${CXXFLAGS:M--sysroot=*} \
 	    ${CXXFLAGS:M-nostdinc*} ${CXXFLAGS:M-[BID]*} \
 	    ${CXXFLAGS:M-std=*} \
+	    ${${_FG}_FLAGS:N-I*} \
 	    ${.ALLSRC:M*.cc} ${.ALLSRC:M*.C} ${.ALLSRC:M*.cpp} ${.ALLSRC:M*.cxx}
 .endif
 .if ${${_FG}_FLAGS_FILES:M*.m} != ""
 	${MKDEPCMD} -f ${.TARGET} -a ${MKDEP} \
-	    ${${_FG}_FLAGS} \
+	    ${${_FG}_FLAGS:M-I*} \
 	    ${OBJCFLAGS:M-nostdinc*} ${OBJCFLAGS:M-[BID]*} \
 	    ${OBJCFLAGS:M-Wno-import*} \
+	    ${${_FG}_FLAGS:N-I*} \
 	    ${.ALLSRC:M*.m}
 .endif
-.if !empty(${_FG:M_}) && !empty(_DEPENDFILES)
+	# In case that the custom ${MKDEPCMD} does not create the depend file
+	# for empty dependency.
+	>> ${.TARGET}
+.if ${_FG} == "_" && !empty(_DEPENDFILES)
 	cat ${_DEPENDFILES} >> ${.TARGET}
 .endif
 .if defined(MKDEPINTDEPS) && !empty(MKDEPINTDEPS)
@@ -197,45 +202,49 @@ _EXTRADEPEND: .USE
 ${DEPENDFILE}: _EXTRADEPEND
 .endif
 
-.else
+.else  # !defined(SRCS)
+
 depend: beforedepend _dependincs afterdepend
-.endif
+
+.endif  # defined(SRCS)
+
 .if !target(beforedepend)
 beforedepend:
 .endif
 .if !target(afterdepend)
 afterdepend:
 .endif
-.endif
+
+.endif  # !target(depend)
 
 .if !target(cleandepend)
 cleandepend:
-.if defined(SRCS)
-.if ${CTAGS:T} == "ctags"
+. if defined(SRCS)
+.  if ${CTAGS:T} == "ctags"
 	rm -f ${DEPENDFILE} ${_DEPENDFILES} tags
-.elif ${CTAGS:T} == "gtags"
+.  elif ${CTAGS:T} == "gtags"
 	rm -f ${DEPENDFILE} ${_DEPENDFILES} GPATH GRTAGS GSYMS GTAGS
-.if defined(HTML)
+.   if defined(HTML)
 	rm -rf HTML
-.endif
-.endif
-.endif
+.   endif
+.  endif
+. endif
 .endif
 
 .if !target(checkdpadd) && (defined(DPADD) || defined(LDADD))
 checkdpadd:
 .if ${OBJFORMAT} != aout
-	@ldadd=`echo \`for lib in ${DPADD} ; do \
+	@ldadd=$$(echo $$(for lib in ${DPADD} ; do \
 		echo $$lib | sed 's;^/usr/lib/lib\(.*\)\.a;-l\1;' ; \
-	done \`` ; \
-	ldadd1=`echo ${LDADD}` ; \
+	done )) ; \
+	ldadd1=$$(echo ${LDADD}) ; \
 	if [ "$$ldadd" != "$$ldadd1" ] ; then \
 		echo ${.CURDIR} ; \
 		echo "DPADD -> $$ldadd" ; \
 		echo "LDADD -> $$ldadd1" ; \
 	fi
 .else
-	@dpadd=`echo \`ld -Bstatic -f ${LDADD}\`` ; \
+	@dpadd=$$(echo $$(ld -Bstatic -f ${LDADD})) ; \
 	if [ "$$dpadd" != "${DPADD}" ] ; then \
 		echo ${.CURDIR} ; \
 		echo "LDADD -> $$dpadd" ; \

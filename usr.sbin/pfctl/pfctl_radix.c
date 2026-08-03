@@ -51,7 +51,7 @@
 
 extern int dev_fd;
 
-static int	 pfr_next_token(char buf[], FILE *);
+static int	 pfr_next_token(char buf[BUF_SIZE], FILE *);
 
 
 int

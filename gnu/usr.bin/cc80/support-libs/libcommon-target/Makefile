@@ -21,12 +21,13 @@ OBJS=		${OBJS-libcommon-target}
 CFLAGS+=	-DPREFIX=\"${TOOLS_PREFIX}/usr\"
 
 # for opts-common.c
-.if ${CCVER:Mgcc80}
+.if ${CCVER:Mgcc*} && ${CCVER:S/gcc//} >= 80
 CXXFLAGS+=	-Wno-narrowing
 .elif ${CCVER:Mclang*}
 CXXFLAGS+=	-Wno-c++11-narrowing
 .endif
 
+# hack to force c++ compiler to compile *.c files to create library
 .for ofile in ${OBJS-libcommon-target}
 ${ofile}: ${ofile:.o=.c}
 	${CXX} ${STATIC_CXXFLAGS} ${CXXFLAGS} -c ${.IMPSRC} -o ${.TARGET}

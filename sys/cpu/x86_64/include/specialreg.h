@@ -540,6 +540,11 @@
 #define	MSR_EBL_CR_POWERON	0x02a
 #define	MSR_TEST_CTL		0x033
 
+#define	MSR_IA32_FEATURE_CONTROL 0x03a
+#define		IA32_FEATURE_CONTROL_LOCK	0x01	/* lock bit */
+#define		IA32_FEATURE_CONTROL_IN_SMX	0x02	/* enable VMX inside SMX */
+#define		IA32_FEATURE_CONTROL_OUT_SMX	0x04	/* enable VMX outside SMX */
+
 #define	MSR_SPEC_CTRL		0x048	/* IBRS Spectre mitigation */
 #define		SPEC_CTRL_IBRS		0x00000001
 #define		SPEC_CTRL_STIBP		0x00000002
@@ -622,6 +627,12 @@
 #define	MSR_MTRR4kBase		0x268
 #define	MSR_PAT			0x277
 #define	MSR_MTRRdefType		0x2ff
+#define	MSR_PKG_C3_RESIDENCY	0x3f8	/* Nehalem and later */
+#define	MSR_PKG_C6_RESIDENCY	0x3f9	/* Nehalem and later */
+#define	MSR_PKG_C7_RESIDENCY	0x3fa	/* Nehalem and later */
+#define	MSR_CORE_C3_RESIDENCY	0x3fc	/* Nehalem and later */
+#define	MSR_CORE_C6_RESIDENCY	0x3fd	/* Nehalem and later */
+#define	MSR_CORE_C7_RESIDENCY	0x3fe	/* Sandy Bridge and later */
 #define	MSR_MC0_CTL		0x400
 #define	MSR_MC0_STATUS		0x401
 #define	MSR_MC0_ADDR		0x402
@@ -642,6 +653,24 @@
 #define	MSR_MC4_STATUS		0x411
 #define	MSR_MC4_ADDR		0x412
 #define	MSR_MC4_MISC		0x413
+
+/* VMX MSRs */
+#define	MSR_VMX_BASIC			0x480
+#define	MSR_VMX_PINBASED_CTLS		0x481
+#define	MSR_VMX_PROCBASED_CTLS		0x482
+#define	MSR_VMX_EXIT_CTLS		0x483
+#define	MSR_VMX_ENTRY_CTLS		0x484
+#define	MSR_VMX_CR0_FIXED0		0x486
+#define	MSR_VMX_CR0_FIXED1		0x487
+#define	MSR_VMX_CR4_FIXED0		0x488
+#define	MSR_VMX_CR4_FIXED1		0x489
+#define	MSR_VMX_PROCBASED_CTLS2		0x48b
+#define	MSR_VMX_EPT_VPID_CAP		0x48c
+#define	MSR_VMX_TRUE_PINBASED_CTLS	0x48d
+#define	MSR_VMX_TRUE_PROCBASED_CTLS	0x48e
+#define	MSR_VMX_TRUE_EXIT_CTLS		0x48f
+#define	MSR_VMX_TRUE_ENTRY_CTLS		0x490
+
 #define	MSR_RAPL_POWER_UNIT	0x606
 #define	MSR_PKG_ENERGY_STATUS	0x611
 #define	MSR_DRAM_ENERGY_STATUS	0x619
@@ -651,6 +680,10 @@
 #define	MSR_PPERF		0x64e /* Productive Performance Count */
 #define	MSR_PERF_LIMIT_REASONS	0x64f /* Indicator of Frequency Clipping */
 #define	MSR_TSC_DEADLINE	0x6e0 /* LAPIC TSC Deadline Mode Target count */
+#define	MSR_PKG_C2_RESIDENCY	0x60d	/* Sandy Bridge and later */
+#define	MSR_PKG_C8_RESIDENCY	0x630	/* Haswell Family 06_45H and later */
+#define	MSR_PKG_C9_RESIDENCY	0x631	/* Haswell Family 06_45H and later */
+#define	MSR_PKG_C10_RESIDENCY	0x632	/* Haswell Family 06_45H and later */
 
 /* Hardware P-states interface */
 #define	MSR_PM_ENABLE		0x770 /* Enable/disable HWP */
@@ -659,18 +692,6 @@
 #define	MSR_HWP_INTERRUPT	0x773 /* Control HWP Native Interrupts */
 #define	MSR_HWP_REQUEST		0x774 /* Control hints to a logical proc */
 #define	MSR_HWP_STATUS		0x777
-
-/*
- * PAT modes.
- */
-#define	PAT_UNCACHEABLE		0x00
-#define	PAT_WRITE_COMBINING	0x01
-#define	PAT_WRITE_THROUGH	0x04
-#define	PAT_WRITE_PROTECTED	0x05
-#define	PAT_WRITE_BACK		0x06
-#define	PAT_UNCACHED		0x07
-#define	PAT_VALUE(i, m)		((long)(m) << (8 * (i)))
-#define	PAT_MASK(i)		PAT_VALUE(i, 0xff)
 
 /*
  * Constants related to MTRRs

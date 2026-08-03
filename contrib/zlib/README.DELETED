@@ -1,8 +1,12 @@
+.cmake-format.yaml
+BUILD.bazel
 CMakeLists.txt
 FAQ
 INDEX
+MODULE.bazel
 Makefile
 Makefile.in
+README-cmake.md
 amiga/
 configure
 contrib/
@@ -10,8 +14,6 @@ doc/
 examples/
 make_vms.com
 msdos/
-nintendods/
-old/
 os400/
 qnx/
 test/
@@ -19,8 +21,8 @@ treebuild.xml
 watcom/
 win32/
 zconf.h
-zconf.h.cmakein
 zconf.h.in
 zlib.3.pdf
 zlib.map
 zlib.pc.cmakein
+zlibConfig.cmake.in

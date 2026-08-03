@@ -26,7 +26,7 @@
         ..
     ..
     c++
-        4.7
+        12.0
             backward
             ..
             bits
@@ -35,18 +35,22 @@
             ..
             decimal
             ..
+            experimental
+                bits
+                ..
+            ..
             ext
                 pb_ds
                     detail
-                        branch_policy
+                        bin_search_tree_
                         ..
                         binary_heap_
                         ..
-                        binomial_heap_base_
-                        ..
                         binomial_heap_
                         ..
-                        bin_search_tree_
+                        binomial_heap_base_
+                        ..
+                        branch_policy
                         ..
                         cc_hash_table_map_
                         ..
@@ -87,9 +91,9 @@
                     ..
                 ..
             ..
-            profile
-                impl
-                ..
+            parallel
+            ..
+            pstl
             ..
             tr1
             ..
@@ -186,8 +190,6 @@
         ..
     ..
     cpu
-    ..
-    crypto
     ..
     dev
         acpica
@@ -449,8 +451,6 @@
         isofs
             cd9660
             ..
-        ..
-        mfs
         ..
         msdosfs
         ..

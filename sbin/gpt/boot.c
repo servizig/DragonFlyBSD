@@ -1,13 +1,13 @@
 /*
  * Copyright (c) 2008 The DragonFly Project.  All rights reserved.
- * 
+ *
  * This code is derived from software contributed to The DragonFly Project
  * by Matthew Dillon <dillon@backplane.com>
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
@@ -17,7 +17,7 @@
  * 3. Neither the name of The DragonFly Project nor the names of its
  *    contributors may be used to endorse or promote products derived
  *    from this software without specific, prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -42,7 +42,6 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "map.h"
 #include "gpt.h"
 
 static void
@@ -55,60 +54,51 @@ usage_boot(void)
 static void
 bootset(int fd)
 {
-	uuid_t uuid;
 	off_t  block;
 	off_t  size;
-	unsigned int entry;
+	off_t  alignment;
 	map_t *gpt, *tpg;
 	map_t *tbl, *lbt;
 	map_t *map;
-	u_int32_t status;
 	struct gpt_hdr *hdr;
 	struct gpt_ent *ent;
 	struct mbr *mbr;
 	int bfd;
 
 	/*
-	 * Paramters for boot partition
+	 * Paramters for boot partition (entry #0)
 	 */
-	uuid_name_lookup(&uuid, "DragonFly Label32", &status);
-	if (status != uuid_s_ok)
-		err(1, "unable to find uuid for 'DragonFly Label32'");
-	entry = 0;
+	uuid_t uuid = GPT_ENT_TYPE_DRAGONFLY_LABEL32;
 	block = 0;
-	size = (off_t)1024 * 1024 * 1024 / 512;		/* 1GB */
+	size = (off_t)1024 * 1024 * 1024 / secsz;		/* 1GB */
+	alignment = (off_t)1024 * 1024 / secsz;			/* 1MB */
 
-	gpt = map_find(MAP_TYPE_PRI_GPT_HDR);
+	gpt = map_find(MAP_TYPE_GPT_PRI_HDR);
 	if (gpt == NULL)
 		errx(1, "%s: error: no primary GPT header", device_name);
-	tpg = map_find(MAP_TYPE_SEC_GPT_HDR);
+	tpg = map_find(MAP_TYPE_GPT_SEC_HDR);
 	if (tpg == NULL)
 		errx(1, "%s: error: no secondary GPT header", device_name);
-	tbl = map_find(MAP_TYPE_PRI_GPT_TBL);
-	lbt = map_find(MAP_TYPE_SEC_GPT_TBL);
+	tbl = map_find(MAP_TYPE_GPT_PRI_TBL);
+	lbt = map_find(MAP_TYPE_GPT_SEC_TBL);
 	if (tbl == NULL || lbt == NULL) {
-		errx(1, "%s: error: no primary or secondary gpt table",
+		errx(1, "%s: error: no primary or secondary GPT table",
 		     device_name);
 	}
 
 	hdr = gpt->map_data;
-	if (entry > le32toh(hdr->hdr_entries)) {
-		errx(1, "%s: error: index %u out of range (%u max)",
-		     device_name, entry, le32toh(hdr->hdr_entries));
-	}
-
-	ent = (void *)((char *)tbl->map_data + entry *
-		       le32toh(hdr->hdr_entsz));
-	if (!uuid_is_nil(&ent->ent_type, NULL)) {
-		errx(1, "%s: error: entry at index %d is not free",
-		     device_name, entry);
-	}
-	map = map_alloc(block, size);
+	ent = tbl->map_data; /* entry #0 */
+	if (!uuid_is_nil(&ent->ent_type, NULL))
+		errx(1, "%s: error: entry #0 is not free", device_name);
+	map = map_alloc(block, size, alignment);
 	if (map == NULL)
 		errx(1, "%s: error: no space available on device", device_name);
 	block = map->map_start;
 	size  = map->map_size;
 
+	/*
+	 * Write primary GPT table
+	 */
 	uuid_enc_le(&ent->ent_type, &uuid);
 	ent->ent_lba_start = htole64(map->map_start);
 	ent->ent_lba_end = htole64(map->map_start + map->map_size - 1LL);
@@ -122,8 +112,11 @@ bootset(int fd)
 	gpt_write(fd, gpt);
 	gpt_write(fd, tbl);
 
+	/*
+	 * Write secondary GPT table
+	 */
 	hdr = tpg->map_data;
-	ent = (void*)((char*)lbt->map_data + entry * le32toh(hdr->hdr_entsz));
+	ent = lbt->map_data; /* entry #0 */
 	uuid_enc_le(&ent->ent_type, &uuid);
 	ent->ent_lba_start = htole64(map->map_start);
 	ent->ent_lba_end = htole64(map->map_start + map->map_size - 1LL);
@@ -161,19 +154,16 @@ bootset(int fd)
 	/*
 	 * Generate partition #1
 	 */
-	mbr->mbr_part[1].part_shd = 0xff;
-	mbr->mbr_part[1].part_ssect = 0xff;
-	mbr->mbr_part[1].part_scyl = 0xff;
-	mbr->mbr_part[1].part_ehd = 0xff;
-	mbr->mbr_part[1].part_esect = 0xff;
-	mbr->mbr_part[1].part_ecyl = 0xff;
-	mbr->mbr_part[1].part_start_lo = htole16(block);
-	mbr->mbr_part[1].part_start_hi = htole16((block) >> 16);
-	mbr->mbr_part[1].part_size_lo = htole16(size);
-	mbr->mbr_part[1].part_size_hi = htole16(size >> 16);
-
-	mbr->mbr_part[1].part_typ = 108;
-	mbr->mbr_part[1].part_flag = 0x80;
+	mbr->mbr_part[1].dp_shd = 0xff;
+	mbr->mbr_part[1].dp_ssect = 0xff;
+	mbr->mbr_part[1].dp_scyl = 0xff;
+	mbr->mbr_part[1].dp_ehd = 0xff;
+	mbr->mbr_part[1].dp_esect = 0xff;
+	mbr->mbr_part[1].dp_ecyl = 0xff;
+	mbr->mbr_part[1].dp_start = htole32((uint32_t)block);
+	mbr->mbr_part[1].dp_size = htole32((uint32_t)size);
+	mbr->mbr_part[1].dp_typ = DOSPTYP_DFLYBSD;
+	mbr->mbr_part[1].dp_flag = 0x80;
 
 	gpt_write(fd, map);
 }
@@ -183,8 +173,9 @@ cmd_boot(int argc, char *argv[])
 {
 	int ch, fd;
 
-	while ((ch = getopt(argc, argv, "")) != -1) {
+	while ((ch = getopt(argc, argv, "h")) != -1) {
 		switch(ch) {
+		case 'h':
 		default:
 			usage_boot();
 		}

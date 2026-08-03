@@ -135,7 +135,9 @@ boot2$s: boot2$s.ldr boot2$s.bin ${BTX}/btx/btx
 	dd if=boot2$s.ld of=${.TARGET} obs=$$(( (${NSECT$s} - 1) * 512)) conv=osync 2>/dev/null
 
 boot2$s.ldr:
-	dd if=/dev/zero of=${.TARGET} bs=512 count=1 2>/dev/null
+	# Use 'awk' instead of 'dd' to avoid depending on '/dev/zero'.
+	${AWK} 'BEGIN { for (i = 0; i < 512; i++) printf("%c", 0) }' \
+		> ${.TARGET}
 
 boot2$s.bin: boot2$s.out
 	objcopy -S -O binary boot2$s.out ${.TARGET}

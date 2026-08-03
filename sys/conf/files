@@ -398,6 +398,7 @@ dev/powermng/perfbias/perfbias.c	optional perfbias
 dev/powermng/amdsmn/amdsmn.c	optional amdsmn
 dev/powermng/amdsmn/amdsmn.c	optional amdtemp
 dev/powermng/amdtemp/amdtemp.c	optional amdtemp
+dev/powermng/corecstat/corecstat.c	optional corecstat
 dev/powermng/corepower/corepower.c	optional corepower
 dev/powermng/coretemp/coretemp.c	optional coretemp
 dev/powermng/kate/kate.c	optional kate pci
@@ -2249,6 +2250,7 @@ crypto/blowfish/bf_skey.c		optional crypto
 crypto/camellia/camellia.c		optional crypto
 crypto/camellia/camellia-api.c		optional crypto
 crypto/chacha20/chacha.c		optional crypto
+crypto/crypto.c				optional crypto
 crypto/chachapoly.c			optional crypto
 crypto/cryptoapi/cryptoapi.c		optional crypto
 crypto/curve25519/curve25519.c		optional crypto
@@ -2265,17 +2267,6 @@ crypto/sha1.c				optional crypto
 crypto/sha2/sha2.c			standard
 crypto/siphash/siphash.c		optional crypto
 crypto/twofish/twofish.c		optional crypto
-net/zlib.c				optional crypto
-opencrypto/cast.c			optional crypto
-opencrypto/criov.c			optional crypto
-opencrypto/crypto.c			optional crypto
-opencrypto/cryptodev.c			optional cryptodev
-opencrypto/cryptodev_if.m		optional crypto
-opencrypto/cryptosoft.c			optional crypto
-opencrypto/deflate.c			optional crypto
-opencrypto/gmac.c			optional crypto
-opencrypto/skipjack.c			optional crypto
-opencrypto/xform.c			optional crypto
 # drm_agpsupport.c must be included if CONFIG_AGP is set
 #dev/drm/drm_agpsupport.c		optional drm compile-with "${NORMAL_C} -include $S/dev/drm/kconfig.h ${WERROR}"
 dev/drm/drm_atomic.c			optional drm compile-with "${NORMAL_C} -include $S/dev/drm/kconfig.h ${WERROR}"
@@ -2360,6 +2351,7 @@ dev/drm/linux_kobject.c			optional drm compile-with "${NORMAL_C} -include $S/dev
 dev/drm/linux_kthread.c			optional drm compile-with "${NORMAL_C} -include $S/dev/drm/kconfig.h ${WERROR}"
 dev/drm/linux_list_sort.c		optional drm compile-with "${NORMAL_C} -include $S/dev/drm/kconfig.h ${WERROR}"
 dev/drm/linux_pci.c			optional drm compile-with "${NORMAL_C} -include $S/dev/drm/kconfig.h ${WERROR}"
+dev/drm/linux_pm_qos.c			optional drm compile-with "${NORMAL_C} -include $S/dev/drm/kconfig.h ${WERROR}"
 dev/drm/linux_printf.c			optional drm compile-with "${NORMAL_C} -include $S/dev/drm/kconfig.h ${WERROR}"
 dev/drm/linux_radix.c			optional drm compile-with "${NORMAL_C} -include $S/dev/drm/kconfig.h ${WERROR}"
 dev/drm/linux_rcu.c			optional drm compile-with "${NORMAL_C} -include $S/dev/drm/kconfig.h ${WERROR}"
@@ -2617,7 +2609,7 @@ ${OSACPI_MI_DIR}/acpi_cpu_cstate.c	optional acpi
 ${OSACPI_MI_DIR}/acpi_cpu_pstate.c	optional acpi
 ${OSACPI_MI_DIR}/acpi_ec.c		optional acpi
 ${OSACPI_MI_DIR}/acpi_hpet.c		optional acpi
-${OSACPI_MI_DIR}/acpi_if.m		optional acpi
+${OSACPI_MI_DIR}/acpi_if.m		standard
 ${OSACPI_MI_DIR}/acpi_isab.c		optional acpi isa
 ${OSACPI_MI_DIR}/acpi_lid.c		optional acpi
 ${OSACPI_MI_DIR}/acpi_package.c		optional acpi
@@ -2809,6 +2801,7 @@ ${ACPICA_COMP_DIR}/utilities/utaddress.c	optional acpi
 ${ACPICA_COMP_DIR}/utilities/utalloc.c		optional acpi
 ${ACPICA_COMP_DIR}/utilities/utascii.c		optional acpi
 ${ACPICA_COMP_DIR}/utilities/utbuffer.c		optional acpi
+${ACPICA_COMP_DIR}/utilities/utcksum.c		optional acpi
 ${ACPICA_COMP_DIR}/utilities/utcopy.c		optional acpi
 ${ACPICA_COMP_DIR}/utilities/utdebug.c		optional acpi
 ${ACPICA_COMP_DIR}/utilities/utdecode.c		optional acpi
@@ -2914,6 +2907,21 @@ bus/u4b/net/if_urndis.c			optional urndis uether
 #
 # USB WLAN drivers
 #
+bus/u4b/wlan/if_mtw.c			optional mtw
+mtw7601ufw.c				optional mtwfw			\
+	compile-with	"${AWK} -f $S/tools/fw_stub.awk run.fw:mtw7601ufw -m mtw7601ufw -c ${.TARGET}" \
+	no-implicit-rule before-depend local				\
+	clean		"mtw7601ufw.c"
+mtw7601ufw.fwo				optional mtwfw			\
+	dependency	"mtw.fw"					\
+	compile-with	"${NORMAL_FWO}"					\
+	no-implicit-rule						\
+	clean		"mtw7601ufw.fwo"
+mtw.fw					optional mtwfw			\
+	dependency	"$S/contrib/dev/mtw/mtw-mt7601u.fw.uu"		\
+	compile-with	"${NORMAL_FW}"					\
+	no-obj no-implicit-rule						\
+	clean		"mtw.fw"
 bus/u4b/wlan/if_rum.c			optional rum
 bus/u4b/wlan/if_run.c			optional run
 runfw.c					optional runfw			\
@@ -3076,7 +3084,36 @@ dev/virtual/vmware/vmxnet3/if_vmx.c	optional vmx
 #
 # Gpio support for ACPI based SoC platforms
 #
-bus/gpio/gpio_if.m			optional gpio_acpi
-bus/gpio/gpio_acpi/gpio_acpi.c		optional gpio_acpi
-bus/gpio/gpio_intel/gpio_cherryview.c	optional gpio_intel gpio_acpi
-bus/gpio/gpio_intel/gpio_intel.c	optional gpio_intel gpio_acpi
+bus/gpio/gpio_if.m			optional gpio_acpi acpi
+bus/gpio/gpio_acpi/gpio_acpi.c		optional gpio_acpi acpi
+bus/gpio/gpio_intel/gpio_cherryview.c	optional gpio_intel gpio_acpi acpi
+bus/gpio/gpio_intel/gpio_intel.c	optional gpio_intel gpio_acpi acpi
+
+#
+# Obsolete devices (these entries will be removed in the future)
+#
+
+OBSOLETE				optional ubsec		\
+	no-obj							\
+	warning "device ubsec was removed"
+
+OBSOLETE				optional hifn		\
+	no-obj							\
+	warning "device hifn was removed"
+
+OBSOLETE				optional safe		\
+	no-obj							\
+	warning "device safe was removed"
+
+OBSOLETE				optional padlock	\
+	no-obj							\
+	warning "device padlock was removed"
+
+OBSOLETE				optional cryptodev	\
+	no-obj							\
+	warning "device cryptodev was removed"
+
+OBSOLETE				optional aesni		\
+	no-obj							\
+	warning "device aesni was removed"
+

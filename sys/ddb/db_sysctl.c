@@ -99,6 +99,10 @@ SYSCTL_PROC(_debug, OID_AUTO, panic, CTLTYPE_INT | CTLFLAG_RW, 0, 0,
  * a nice clean page-fault guard panic message then the guard isn't
  * working.
  */
+#pragma GCC diagnostic push
+#if defined(__GNUC__) && __GNUC__ >= 12
+#pragma GCC diagnostic ignored "-Winfinite-recursion"
+#endif
 static void
 stack_guard_panic2(void)
 {
@@ -108,6 +112,7 @@ stack_guard_panic2(void)
 	/* NOT REACHED */
 	kprintf("%p", dummy);	/* dummy to force dummy[] to be allocated */
 }
+#pragma GCC diagnostic pop
 
 static int
 sysctl_debug_panic2(SYSCTL_HANDLER_ARGS)

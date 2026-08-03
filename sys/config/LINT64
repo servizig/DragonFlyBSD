@@ -408,7 +408,7 @@ options                ACCEPT_FILTER_HTTP
 # carried in TCP option 19.
 # This is enabled on a per-socket basis using the TCP_SIGNATURE_ENABLE
 # socket option.
-# This requires the use of 'device crypto' or 'device cryptodev'.
+# This requires the use of 'device crypto'
 #
 # XXX disabled for now until building with it is fixed, which broke
 # after removing IPsec.
@@ -1640,6 +1640,9 @@ device		perfbias
 # Intel software controlled clock modulation
 device		clockmod
 
+# Intel Nehalem and newer CPUs Cstate and Package-Cstate residency counters.
+device		corecstat
+
 # Intel Sandy Bridge and newer CPUs power usage estimation
 device		corepower
 
@@ -1967,6 +1970,10 @@ device		udav
 
 # USB wireless NICs, requires wlan_amrr
 #
+# MediaTek MT7601U USB wireless driver
+device		mtw
+device		mtwfw
+#
 # Ralink Technology RT2501USB/RT2601USB
 device		rum
 #
@@ -2014,19 +2021,11 @@ options		DCONS_FORCE_GDB=1	# force to be the gdb device
 #####################################################################
 # crypto subsystem
 #
-# This is a port of the openbsd crypto framework.  Include this when
-# you have a h/w crypto device to accelerate user applications that
-# link to openssl.
-#
-# Drivers are ports from openbsd with some simple enhancements that have
-# been fed back to openbsd (and hopefully will be included).
 
 device		crypto		# core crypto support
-device		cryptodev	# /dev/crypto for access to h/w
 
 device		rndtest		# FIPS 140-2 entropy tester
 
-device		aesni		# hardware crypto/RNG for AES-NI
 device		rdrand		# hardware RNG for RdRand
 
 #
@@ -2225,7 +2224,6 @@ options	KTR_ENTRIES=1024
 options	KTR_VERBOSE=1
 #options KTR_ACPI_EC
 #options KTR_CTXSW
-#options KTR_DMCRYPT
 #options KTR_ETHERNET
 #options KTR_HAMMER
 #options KTR_IFQ

@@ -252,7 +252,7 @@ kern_sigaction(int sig, struct sigaction *act, struct sigaction *oact)
 	struct lwp *lp;
 	struct sigacts *ps = p->p_sigacts;
 
-	if (sig <= 0 || sig >= _SIG_MAXSIG)
+	if (!_SIG_VALID(sig))
 		return (EINVAL);
 
 	lwkt_gettoken(&p->p_token);
@@ -271,10 +271,12 @@ kern_sigaction(int sig, struct sigaction *act, struct sigaction *oact)
 			oact->sa_flags |= SA_NODEFER;
 		if (SIGISMEMBER(ps->ps_siginfo, sig))
 			oact->sa_flags |= SA_SIGINFO;
-		if (sig == SIGCHLD && p->p_sigacts->ps_flag & PS_NOCLDSTOP)
-			oact->sa_flags |= SA_NOCLDSTOP;
-		if (sig == SIGCHLD && p->p_sigacts->ps_flag & PS_NOCLDWAIT)
-			oact->sa_flags |= SA_NOCLDWAIT;
+		if (sig == SIGCHLD) {
+			if (p->p_sigacts->ps_flag & PS_NOCLDSTOP)
+				oact->sa_flags |= SA_NOCLDSTOP;
+			if (p->p_sigacts->ps_flag & PS_NOCLDWAIT)
+				oact->sa_flags |= SA_NOCLDWAIT;
+		}
 	}
 	if (act) {
 		/*
@@ -407,7 +409,7 @@ siginit(struct proc *p)
 	int i;
 
 	for (i = 1; i <= NSIG; i++) {
-		if (sigprop(i) & SA_IGNORE && i != SIGCONT)
+		if ((sigprop(i) & SA_IGNORE) && i != SIGCONT)
 			SIGADDSET(p->p_sigignore, i);
 	}
 
@@ -781,7 +783,7 @@ kern_kill(int sig, pid_t pid, lwpid_t tid)
 		 * Sending a signal to pid 1 as root requires that we
 		 * are not reboot-restricted.
 		 */
-		if (pid == 1 && caps_priv_check_self(SYSCAP_NOREBOOT))
+		if (pid == 1 && caps_priv_check_self(SYSCAP_NOREBOOT | __SYSCAP_WHEELOK))
 			return EPERM;
 
 		/*
@@ -1134,11 +1136,7 @@ lwpsignal(struct proc *p, struct lwp *lp, int sig)
 	sig_t action;
 	int prop;
 
-	if (sig >= _SIG_MAXSIG || sig <= 0) {
-		kprintf("lwpsignal: signal %d\n", sig);
-		panic("lwpsignal signal number");
-	}
-
+	KASSERT(_SIG_VALID(sig), ("%s: invalid signal %d", __func__, sig));
 	KKASSERT(lp == NULL || lp->lwp_proc == p);
 
 	/*
@@ -1174,12 +1172,8 @@ lwpsignal(struct proc *p, struct lwp *lp, int sig)
 		 * than SIGKILL.  Note that we must still deliver the signal
 		 * if P_WEXIT is set in the process flags.
 		 */
-		if (lp && (lp->lwp_mpflags & LWP_MP_WEXIT) && sig != SIGKILL) {
-			lwkt_reltoken(&lp->lwp_token);
-			LWPRELE(lp);
-			PRELE(p);
-			return;
-		}
+		if (lp && (lp->lwp_mpflags & LWP_MP_WEXIT) && sig != SIGKILL)
+			goto out;
 
 		/*
 		 * If the signal is being ignored, then we forget about
@@ -1192,15 +1186,9 @@ lwpsignal(struct proc *p, struct lwp *lp, int sig)
 			 * lurking in a kqueue.
 			 */
 			KNOTE(&p->p_klist, NOTE_SIGNAL | sig);
-			if (lp) {
-				lwkt_reltoken(&lp->lwp_token);
-				LWPRELE(lp);
-			} else {
-				lwkt_reltoken(&p->p_token);
-			}
-			PRELE(p);
-			return;
+			goto out;
 		}
+
 		if (SIGISMEMBER(p->p_sigcatch, sig))
 			action = SIG_CATCH;
 		else
@@ -1225,16 +1213,9 @@ lwpsignal(struct proc *p, struct lwp *lp, int sig)
 		 * and don't clear any pending SIGCONT.
 		 */
 		if ((prop & SA_TTYSTOP) && p->p_pgrp->pg_jobc == 0 &&
-		    action == SIG_DFL) {
-			if (lp) {
-				lwkt_reltoken(&lp->lwp_token);
-				LWPRELE(lp);
-			} else {
-				lwkt_reltoken(&p->p_token);
-			}
-			PRELE(p);
-			return;
-		}
+		    action == SIG_DFL)
+			goto out;
+
 		lwkt_gettoken(&p->p_token);
 		SIG_CONTSIGMASK_ATOMIC(p->p_siglist);
 		p->p_flags &= ~P_CONTINUED;
@@ -1251,6 +1232,7 @@ lwpsignal(struct proc *p, struct lwp *lp, int sig)
 			lwkt_reltoken(&p->p_token);
 			goto not_stopped;
 		}
+
 		sigsetfrompid(curthread, p, sig);
 		if (lp) {
 			spin_lock(&lp->lwp_spin);
@@ -1339,11 +1321,10 @@ lwpsignal(struct proc *p, struct lwp *lp, int sig)
 		 */
 		lwkt_reltoken(&p->p_token);
 		goto out;
-		/* NOTREACHED */
 	}
+	/* else not stopped */
 not_stopped:
 	;
-	/* else not stopped */
 active_process:
 
 	/*
@@ -1754,23 +1735,23 @@ static int
 kern_sigtimedwait(sigset_t waitset, siginfo_t *info, struct timespec *timeout)
 {
 	sigset_t savedmask, set;
+	struct timespec rts, ets, ts;
 	struct proc *p = curproc;
 	struct lwp *lp = curthread->td_lwp;
-	int error, sig, hz, timevalid = 0;
-	struct timespec rts, ets, ts;
-	struct timeval tv;
+	bool timevalid;
+	int error, sig, hz;
 
 	error = 0;
 	sig = 0;
-	ets.tv_sec = 0;		/* silence compiler warning */
-	ets.tv_nsec = 0;	/* silence compiler warning */
 	SIG_CANTMASK(waitset);
 	savedmask = lp->lwp_sigmask;
 
-	if (timeout) {
+	timespecclear(&ets);
+	timevalid = false;
+	if (timeout != NULL) {
 		if (timeout->tv_sec >= 0 && timeout->tv_nsec >= 0 &&
 		    timeout->tv_nsec < 1000000000) {
-			timevalid = 1;
+			timevalid = true;
 			getnanouptime(&rts);
 			timespecadd(&rts, timeout, &ets);
 		}
@@ -1807,8 +1788,8 @@ kern_sigtimedwait(sigset_t waitset, siginfo_t *info, struct timespec *timeout)
 		 * POSIX says this must be checked after looking for pending
 		 * signals.
 		 */
-		if (timeout) {
-			if (timevalid == 0) {
+		if (timeout != NULL) {
+			if (!timevalid) {
 				error = EINVAL;
 				break;
 			}
@@ -1818,8 +1799,7 @@ kern_sigtimedwait(sigset_t waitset, siginfo_t *info, struct timespec *timeout)
 				break;
 			}
 			timespecsub(&ets, &rts, &ts);
-			TIMESPEC_TO_TIMEVAL(&tv, &ts);
-			hz = tvtohz_high(&tv);
+			hz = tstohz_high(&ts);
 		} else {
 			hz = 0;
 		}
@@ -1833,7 +1813,7 @@ kern_sigtimedwait(sigset_t waitset, siginfo_t *info, struct timespec *timeout)
 		 * be broken in lwpsignal().
 		 */
 		error = tsleep(&p->p_sigacts, PCATCH, "sigwt", hz);
-		if (timeout) {
+		if (timeout != NULL) {
 			if (error == ERESTART) {
 				/* can not restart a timeout wait. */
 				error = EINTR;
@@ -1855,6 +1835,17 @@ kern_sigtimedwait(sigset_t waitset, siginfo_t *info, struct timespec *timeout)
 		spin_lock(&lp->lwp_spin);
 		lwp_delsig(lp, sig, 1);	/* take the signal! */
 		spin_unlock(&lp->lwp_spin);
+
+#ifdef KTRACE
+		if (KTRPOINT(lp->lwp_thread, KTR_PSIG)) {
+			struct sigacts *ps = p->p_sigacts;
+			sig_t action = ps->ps_sigact[_SIG_IDX(sig)];
+			ktrpsig(lp, sig, action,
+				((lp->lwp_flags & LWP_OLDMASK) ?
+				 &lp->lwp_oldsigmask : &lp->lwp_sigmask),
+				0);
+		}
+#endif
 
 		if (sig == SIGKILL) {
 			sigexit(lp, sig);
@@ -2068,7 +2059,7 @@ issignal(struct lwp *lp, int maytrace, int *ptokp)
 			 *	 we do not re-notify the parent if we have
 			 *	 to loop several times waiting for the parent
 			 *	 to let us continue.  XXX not sure if this is
-			 * 	 still true
+			 *	 still true.
 			 *
 			 * NOTE: Do not tstop here.  Issue the proc_stop()
 			 *	 so other parties see that we know we need
@@ -2083,8 +2074,9 @@ issignal(struct lwp *lp, int maytrace, int *ptokp)
 			proc_stop(p, SSTOP);
 
 			/*
-			 * Normally we don't stop until we return to userland, but
-			 * make an exception when tracing and 'maytrace' is asserted.
+			 * Normally we don't stop until we return to userland,
+			 * but make an exception when tracing and 'maytrace'
+			 * is asserted.
 			 */
 			if (p->p_flags & P_TRACED)
 				tstop();
@@ -2181,7 +2173,7 @@ issignal(struct lwp *lp, int maytrace, int *ptokp)
 					haveptok = 1;
 				}
 				if (p->p_flags & P_TRACED ||
-		    		    (p->p_pgrp->pg_jobc == 0 &&
+				    (p->p_pgrp->pg_jobc == 0 &&
 				    prop & SA_TTYSTOP))
 					break;	/* == ignore */
 				if ((p->p_flags & P_WEXIT) == 0) {
@@ -2223,7 +2215,8 @@ issignal(struct lwp *lp, int maytrace, int *ptokp)
 			 */
 			if ((prop & SA_CONT) == 0 &&
 			    (p->p_flags & P_TRACED) == 0)
-				kprintf("issignal\n");
+				kprintf("%s: should not hit signal %d!\n",
+					__func__, sig);
 			break;		/* == ignore */
 
 		default:
@@ -2267,7 +2260,7 @@ postsig(int sig, int haveptok)
 	sigset_t returnmask;
 	int code;
 
-	KASSERT(sig != 0, ("postsig"));
+	KASSERT(_SIG_VALID(sig), ("%s: invalid signal %d", __func__, sig));
 
 	/*
 	 * If we are a virtual kernel running an emulated user process
@@ -2287,9 +2280,12 @@ postsig(int sig, int haveptok)
 	spin_unlock(&lp->lwp_spin);
 	action = ps->ps_sigact[_SIG_IDX(sig)];
 #ifdef KTRACE
-	if (KTRPOINT(lp->lwp_thread, KTR_PSIG))
-		ktrpsig(lp, sig, action, lp->lwp_flags & LWP_OLDMASK ?
-			&lp->lwp_oldsigmask : &lp->lwp_sigmask, 0);
+	if (KTRPOINT(lp->lwp_thread, KTR_PSIG)) {
+		ktrpsig(lp, sig, action,
+			((lp->lwp_flags & LWP_OLDMASK) ?
+			 &lp->lwp_oldsigmask : &lp->lwp_sigmask),
+			0);
+	}
 #endif
 	/*
 	 * We don't need p_token after this point.
@@ -2429,7 +2425,7 @@ sigexit(struct lwp *lp, int sig)
 	/* NOTREACHED */
 }
 
-static char corefilename[MAXPATHLEN+1] = {"%N.core"};
+static char corefilename[MAXPATHLEN+1] = "%N.core";
 SYSCTL_STRING(_kern, OID_AUTO, corefile, CTLFLAG_RW, corefilename,
 	      sizeof(corefilename), "process corefile name format string");
 
@@ -2450,16 +2446,16 @@ expand_name(const char *name, uid_t uid, pid_t pid)
 {
 	char *temp;
 	char buf[11];		/* Buffer for pid/uid -- max 4B */
-	int i, n;
+	int i, l, n;
 	char *format = corefilename;
 	size_t namelen;
 
 	temp = kmalloc(MAXPATHLEN + 1, M_TEMP, M_NOWAIT);
 	if (temp == NULL)
 		return NULL;
+
 	namelen = strlen(name);
 	for (i = 0, n = 0; n < MAXPATHLEN && format[i]; i++) {
-		int l;
 		switch (format[i]) {
 		case '%':	/* Format character */
 			i++;
@@ -2469,7 +2465,9 @@ expand_name(const char *name, uid_t uid, pid_t pid)
 				break;
 			case 'N':	/* process name */
 				if ((n + namelen) > MAXPATHLEN) {
-					log(LOG_ERR, "pid %d (%s), uid (%u):  Path `%s%s' is too long\n",
+					log(LOG_ERR,
+					    "pid %d (%s), uid (%u): "
+					    "Path `%s%s' is too long\n",
 					    pid, name, uid, temp, name);
 					kfree(temp, M_TEMP);
 					return NULL;
@@ -2480,7 +2478,9 @@ expand_name(const char *name, uid_t uid, pid_t pid)
 			case 'P':	/* process id */
 				l = ksprintf(buf, "%u", pid);
 				if ((n + l) > MAXPATHLEN) {
-					log(LOG_ERR, "pid %d (%s), uid (%u):  Path `%s%s' is too long\n",
+					log(LOG_ERR,
+					    "pid %d (%s), uid (%u): "
+					    "Path `%s%s' is too long\n",
 					    pid, name, uid, temp, name);
 					kfree(temp, M_TEMP);
 					return NULL;
@@ -2491,7 +2491,9 @@ expand_name(const char *name, uid_t uid, pid_t pid)
 			case 'U':	/* user id */
 				l = ksprintf(buf, "%u", uid);
 				if ((n + l) > MAXPATHLEN) {
-					log(LOG_ERR, "pid %d (%s), uid (%u):  Path `%s%s' is too long\n",
+					log(LOG_ERR,
+					    "pid %d (%s), uid (%u): "
+					    "Path `%s%s' is too long\n",
 					    pid, name, uid, temp, name);
 					kfree(temp, M_TEMP);
 					return NULL;
@@ -2500,7 +2502,9 @@ expand_name(const char *name, uid_t uid, pid_t pid)
 				n += l;
 				break;
 			default:
-			  	log(LOG_ERR, "Unknown format character %c in `%s'\n", format[i], format);
+				log(LOG_ERR,
+				    "Unknown format character %c in `%s'\n",
+				    format[i], format);
 			}
 			break;
 		default:
@@ -2601,7 +2605,7 @@ coredump(struct lwp *lp, int sig)
 	vn_unlock(vp);
 
 	error = p->p_sysent->sv_coredump ?
-		  p->p_sysent->sv_coredump(lp, sig, vp, limit) : ENOSYS;
+		p->p_sysent->sv_coredump(lp, sig, vp, limit) : ENOSYS;
 
 out1:
 	lf.l_type = F_UNLCK;

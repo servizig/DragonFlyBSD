@@ -80,7 +80,7 @@ KMODMODE?=	${BINMODE}
 
 .SUFFIXES: .out .o .c .cc .cxx .C .y .l .s .S
 
-.if !defined(NO_WERROR) && (${CCVER} == "gcc47" || ${CCVER} == "gcc80")
+.if !defined(NO_WERROR) && ${CCVER} == "gcc80"
 WERROR=-Werror
 .endif
 
@@ -118,10 +118,6 @@ CFLAGS+=	-nostdinc ${_ICFLAGS}
 # operate relative to /usr/src/sys using e.g. <platform/pc64/isa/blah.h>
 #
 CFLAGS+=	-I.
-.if defined(FREEBSD_COMPAT)
-CFLAGS+=	-Idragonfly/freebsd_compat
-CFLAGS+=	-DFREEBSD_COMPAT=1
-.endif
 CFLAGS+=	-Idragonfly
 
 # Add -I paths for headers in the kernel build directory
@@ -350,7 +346,7 @@ MFILES?= kern/bus_if.m kern/device_if.m bus/iicbus/iicbb_if.m \
     dev/sound/pcm/feeder_if.m dev/sound/pcm/mixer_if.m \
     dev/sound/midi/mpu_if.m dev/sound/midi/mpufoi_if.m \
     dev/sound/midi/synth_if.m  \
-    libiconv/iconv_converter_if.m dev/agp/agp_if.m opencrypto/cryptodev_if.m \
+    libiconv/iconv_converter_if.m dev/agp/agp_if.m \
     bus/mmc/mmcbus_if.m bus/mmc/mmcbr_if.m \
     dev/virtual/virtio/virtio/virtio_bus_if.m \
     dev/misc/backlight/backlight_if.m dev/misc/coremctl/coremctl_if.m kern/cpu_if.m \

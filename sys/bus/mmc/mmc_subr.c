@@ -191,6 +191,7 @@ mmc_switch_status(device_t brdev, device_t reqdev, uint16_t rca, u_int timeout)
 	 * type MMC_CAP_WAIT_WHILE_BUSY will issue mmc_send_status() only
 	 * once and then exit the loop.
 	 */
+	end.tv_sec = end.tv_usec = 0;
 	for (;;) {
 		err = mmc_send_status(brdev, reqdev, rca, &status);
 		if (err != MMC_ERR_NONE)

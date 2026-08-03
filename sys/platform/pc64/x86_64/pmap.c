@@ -188,6 +188,8 @@ static uint64_t protection_codes[PROTECTION_CODES_SIZE];
 		next_ba = TAILQ_FIRST(&iobj->backing_list);		\
 		while ((iba = next_ba) != NULL) {			\
 			next_ba = TAILQ_NEXT(iba, entry);		\
+			if (iba->flags & VM_MAP_BACK_VPAGETABLE)	\
+				continue;				\
 			ipmap = iba->pmap;				\
 			if (match_pmap && ipmap != match_pmap)		\
 				continue;				\
@@ -247,10 +249,6 @@ vm_offset_t kernel_vm_end = VM_MIN_KERNEL_ADDRESS;
 static pt_entry_t pat_pte_index[PAT_INDEX_SIZE];	/* PAT -> PG_ bits */
 static pt_entry_t pat_pde_index[PAT_INDEX_SIZE];	/* PAT -> PG_ bits */
 
-static uint64_t KPTbase;
-static uint64_t KPTphys;
-static uint64_t KPDphys;	/* phys addr of kernel level 2 */
-static uint64_t KPDbase;	/* phys addr of kernel level 2 @ KERNBASE */
 uint64_t KPDPphys;		/* phys addr of kernel level 3 */
 uint64_t KPML4phys;		/* phys addr of kernel level 4 */
 
@@ -431,7 +429,7 @@ RB_GENERATE2(pv_entry_rb_tree, pv_entry, pv_entry,
  */
 static __inline
 void
-pmap_removed_pte(vm_page_t m, pt_entry_t pte)
+pmap_removed_pte(pmap_t pmap, vm_page_t m, pt_entry_t pte)
 {
 	int flags;
 	int nflags;
@@ -443,6 +441,8 @@ pmap_removed_pte(vm_page_t m, pt_entry_t pte)
 		if (atomic_fcmpset_int(&m->flags, &flags, nflags))
 			break;
 	}
+	if (pte & pmap->pmap_bits[PG_W_IDX])
+		vm_page_unwire(m, -1);
 }
 
 /*
@@ -859,6 +859,10 @@ static
 void
 create_pagetables(vm_paddr_t *firstaddr)
 {
+	uint64_t kpt_base;
+	uint64_t kpt_phys;
+	uint64_t kpd_base;	/* phys addr of kernel level 2 @ KERNBASE */
+	uint64_t kpd_phys;	/* phys addr of kernel level 2 */
 	long i;		/* must be 64 bits */
 	long nkpt_base;
 	long nkpt_phys;
@@ -939,16 +943,16 @@ create_pagetables(vm_paddr_t *firstaddr)
 	 * NOTE: We allocate all kernel PD pages up-front, typically
 	 *	 ~511G of KVM, requiring 511 PD pages.
 	 */
-	KPTbase = allocpages(firstaddr, nkpt_base);	/* KERNBASE to end */
-	KPTphys = allocpages(firstaddr, nkpt_phys);	/* KVA start */
+	kpt_base = allocpages(firstaddr, nkpt_base);	/* KERNBASE to end */
+	kpt_phys = allocpages(firstaddr, nkpt_phys);	/* KVA start */
 	KPML4phys = allocpages(firstaddr, 1);		/* recursive PML4 map */
 	KPDPphys = allocpages(firstaddr, NKPML4E);	/* kernel PDP pages */
-	KPDphys = allocpages(firstaddr, nkpd_phys);	/* kernel PD pages */
+	kpd_phys = allocpages(firstaddr, nkpd_phys);	/* kernel PD pages */
 
 	/*
 	 * Alloc PD pages for the area starting at KERNBASE.
 	 */
-	KPDbase = allocpages(firstaddr, NPDPEPG - KPDPI);
+	kpd_base = allocpages(firstaddr, NPDPEPG - KPDPI);
 
 	/*
 	 * Stuff for our DMAP.  Use 2MB pages even when 1GB pages
@@ -968,8 +972,8 @@ create_pagetables(vm_paddr_t *firstaddr)
 	 * XXX not fully used, underneath 2M pages
 	 */
 	for (i = 0; (i << PAGE_SHIFT) < *firstaddr; i++) {
-		((pt_entry_t *)KPTbase)[i] = i << PAGE_SHIFT;
-		((pt_entry_t *)KPTbase)[i] |=
+		((pt_entry_t *)kpt_base)[i] = i << PAGE_SHIFT;
+		((pt_entry_t *)kpt_base)[i] |=
 		    pmap_bits_default[PG_RW_IDX] |
 		    pmap_bits_default[PG_V_IDX] |
 		    pmap_bits_default[PG_G_IDX];
@@ -982,14 +986,14 @@ create_pagetables(vm_paddr_t *firstaddr)
 	 * data, bss, and initial pre-allocations.
 	 */
 	for (i = 0; i < nkpt_base; i++) {
-		((pd_entry_t *)KPDbase)[i] = KPTbase + (i << PAGE_SHIFT);
-		((pd_entry_t *)KPDbase)[i] |=
+		((pd_entry_t *)kpd_base)[i] = kpt_base + (i << PAGE_SHIFT);
+		((pd_entry_t *)kpd_base)[i] |=
 		    pmap_bits_default[PG_RW_IDX] |
 		    pmap_bits_default[PG_V_IDX];
 	}
 	for (i = 0; i < nkpt_phys; i++) {
-		((pd_entry_t *)KPDphys)[i] = KPTphys + (i << PAGE_SHIFT);
-		((pd_entry_t *)KPDphys)[i] |=
+		((pd_entry_t *)kpd_phys)[i] = kpt_phys + (i << PAGE_SHIFT);
+		((pd_entry_t *)kpd_phys)[i] |=
 		    pmap_bits_default[PG_RW_IDX] |
 		    pmap_bits_default[PG_V_IDX];
 	}
@@ -1000,8 +1004,8 @@ create_pagetables(vm_paddr_t *firstaddr)
 	 * above in the KERNBASE area.
 	 */
 	for (i = 0; (i << PDRSHIFT) < *firstaddr; i++) {
-		((pd_entry_t *)KPDbase)[i] = i << PDRSHIFT;
-		((pd_entry_t *)KPDbase)[i] |=
+		((pd_entry_t *)kpd_base)[i] = i << PDRSHIFT;
+		((pd_entry_t *)kpd_base)[i] |=
 		    pmap_bits_default[PG_RW_IDX] |
 		    pmap_bits_default[PG_V_IDX] |
 		    pmap_bits_default[PG_PS_IDX] |
@@ -1017,7 +1021,7 @@ create_pagetables(vm_paddr_t *firstaddr)
 	 */
 	for (i = 0; i < nkpd_phys; i++) {
 		((pdp_entry_t *)KPDPphys)[NKPML4E * NPDPEPG - NKPDPE + i] =
-				KPDphys + (i << PAGE_SHIFT);
+				kpd_phys + (i << PAGE_SHIFT);
 		((pdp_entry_t *)KPDPphys)[NKPML4E * NPDPEPG - NKPDPE + i] |=
 		    pmap_bits_default[PG_RW_IDX] |
 		    pmap_bits_default[PG_V_IDX] |
@@ -1030,7 +1034,7 @@ create_pagetables(vm_paddr_t *firstaddr)
 	i = (NKPML4E - 1) * NPDPEPG + KPDPI;
 	for (j = 0; j < NPDPEPG - KPDPI; ++j) {
 		((pdp_entry_t *)KPDPphys)[i + j] =
-				KPDbase + (j << PAGE_SHIFT);
+				kpd_base + (j << PAGE_SHIFT);
 		((pdp_entry_t *)KPDPphys)[i + j] |=
 		    pmap_bits_default[PG_RW_IDX] |
 		    pmap_bits_default[PG_V_IDX] |
@@ -1716,7 +1720,7 @@ pmap_page_to_dmap(vm_page_t m)
  * Extract the physical page address associated with the map/VA pair.
  * The page must be wired for this to work reliably.
  */
-vm_paddr_t 
+vm_paddr_t
 pmap_extract(pmap_t pmap, vm_offset_t va, void **handlep)
 {
 	vm_paddr_t rtval;
@@ -3499,7 +3503,7 @@ pmap_growkernel(vm_offset_t kstart, vm_offset_t kend)
 					~(vm_offset_t)(PAGE_SIZE * NPTEPG - 1);
 			if (kernel_vm_end - 1 >= vm_map_max(kernel_map)) {
 				kernel_vm_end = vm_map_max(kernel_map);
-				break;                       
+				break;
 			}
 		}
 	}
@@ -3562,7 +3566,7 @@ pmap_growkernel(vm_offset_t kstart, vm_offset_t kend)
 				 ~(vm_offset_t)(PAGE_SIZE * NPTEPG - 1);
 			if (kstart - 1 >= vm_map_max(kernel_map)) {
 				kstart = vm_map_max(kernel_map);
-				break;                       
+				break;
 			}
 			continue;
 		}
@@ -3593,7 +3597,7 @@ pmap_growkernel(vm_offset_t kstart, vm_offset_t kend)
 
 		if (kstart - 1 >= vm_map_max(kernel_map)) {
 			kstart = vm_map_max(kernel_map);
-			break;                       
+			break;
 		}
 	}
 
@@ -4888,7 +4892,7 @@ pmap_remove_callback(pmap_t pmap, struct pmap_scan_info *info,
 		 * We can safely clear PG_MAPPED and PG_WRITEABLE only
 		 * if PG_MAPPEDMULTI is not set, atomically.
 		 */
-		pmap_removed_pte(p, pte);
+		pmap_removed_pte(pmap, p, pte);
 	}
 	if (pte & pmap->pmap_bits[PG_V_IDX]) {
 		atomic_add_long(&pmap->pm_stats.resident_count, -1);
@@ -4941,6 +4945,23 @@ pmap_remove_all(vm_page_t m)
 	if ((m->flags & PG_MAPPED) == 0)
 		return;
 
+	/*
+	 * Pages mapped via VPAGETABLE cannot be found via the backing_list
+	 * scan because the VA formula doesn't apply.  The vkernel is
+	 * responsible for calling MADV_INVAL to remove real PTEs when it
+	 * modifies its page tables.
+	 *
+	 * The dirty and accessed bits will be synchronized when the
+	 * wired page(s) are removed rather than here.
+	 *
+	 * Clear PG_MAPPED at the end.
+	 */
+#if 0
+	if (m->flags & PG_VPTMAPPED) {
+		vm_page_dirty(m);
+		vm_page_flag_set(m, PG_REFERENCED);
+	}
+#endif
 	retry = ticks + hz * 60;
 again:
 	PMAP_PAGE_BACKING_SCAN(m, NULL, ipmap, iptep, ipte, iva) {
@@ -4958,7 +4979,7 @@ again:
 			 *	 transition against them being set in
 			 *	 pmap_enter().
 			 */
-			pmap_removed_pte(m, ipte);
+			pmap_removed_pte(ipmap, m, ipte);
 		}
 
 		/*
@@ -5010,7 +5031,11 @@ again:
 			      m, m->md.interlock_count);
 		}
 	}
-	vm_page_flag_clear(m, PG_MAPPED | PG_MAPPEDMULTI | PG_WRITEABLE);
+	vm_page_flag_clear(m, PG_MAPPED | PG_MAPPEDMULTI | PG_WRITEABLE
+#if 0
+			      | PG_VPTMAPPED
+#endif
+			  );
 }
 
 /*
@@ -5045,7 +5070,7 @@ pmap_remove_specific(pmap_t pmap_match, vm_page_t m)
 			 *	 transition against them being set in
 			 *	 pmap_enter().
 			 */
-			pmap_removed_pte(m, ipte);
+			pmap_removed_pte(ipmap, m, ipte);
 		}
 
 		/*
@@ -5159,6 +5184,10 @@ again:
 /*
  * Insert the vm_page (m) at the virtual address (va), replacing any prior
  * mapping at that address.  Set protection and wiring as requested.
+ *
+ * This function bumps m->wire_count if the pmap entry is to be wired,
+ * and will decrement oldm->wire_count if the entry being overwritten
+ * was previously marked wired.
  *
  * If entry is non-NULL we check to see if the SEG_SIZE optimization is
  * possible.  If it is we enter the page into the appropriate shared pmap
@@ -5381,15 +5410,19 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	/*
 	 * Account for the changes in the pt_pv and pmap.
 	 *
-	 * Retain the same wiring count due to replacing an existing page,
-	 * or bump the wiring count for a new page.
+	 * Bump wiring count for the pmap if new page is wired (whether
+	 * managed or not), and for the page now that it has been
+	 * entered into the pmap.
 	 */
 	if (pt_pv && opa == 0) {
 		vm_page_wire_quick(pt_pv->pv_m);
 		atomic_add_long(&pt_pv->pv_pmap->pm_stats.resident_count, 1);
 	}
-	if (wired && (origpte & pmap->pmap_bits[PG_W_IDX]) == 0)
+	if (wired) {
 		atomic_add_long(&pmap->pm_stats.wired_count, 1);
+		if ((m->flags & PG_FICTITIOUS) == 0)
+			vm_page_wire(m);
+	}
 
 	/*
 	 * Account for the removal of the old page.  pmap and pt_pv stats
@@ -5421,8 +5454,19 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 		 *	 transition against them being set in
 		 *	 pmap_enter().
 		 */
-		pmap_removed_pte(oldm, origpte);
+		pmap_removed_pte(pmap, oldm, origpte);
 	}
+
+	/*
+	 * Drop the wiring count in the pmap if the old page was wired
+	 * (whether managed or not).
+	 */
+	if ((origpte & pmap->pmap_bits[PG_V_IDX]) &&
+	    (origpte & pmap->pmap_bits[PG_W_IDX]))
+	{
+		atomic_add_long(&pmap->pm_stats.wired_count, -1);
+	}
+
 	if (oldm) {
 		if ((atomic_fetchadd_long(&oldm->md.interlock_count, -1) &
 		     0x7FFFFFFFFFFFFFFFLU) == 0x4000000000000001LU) {
@@ -5510,7 +5554,7 @@ pmap_object_init_pt(pmap_t pmap, vm_map_entry_t entry,
 
 	if (pindex + psize > object->size) {
 		if (object->size < pindex)
-			return;		  
+			return;
 		psize = object->size - pindex;
 	}
 
@@ -5651,23 +5695,39 @@ pmap_prefault_ok(pmap_t pmap, vm_offset_t addr)
 }
 
 /*
- * Change the wiring attribute for a pmap/va pair.  The mapping must already
- * exist in the pmap.  The mapping may or may not be managed.  The wiring in
- * the page is not changed, the page is returned so the caller can adjust
- * its wiring (the page is not locked in any way).
+ * Remove the wiring attribute in the PTE for a pmap/va pair, returning the
+ * related unmodified vm_page_t if it was wired and adjust *pva to the next
+ * offset that might contain pages.  This function also updates the pmap
+ * wired_count statistic.
+ *
+ * Because this function may scan the entire address space, it is critical
+ * that *pva be adjusted optimally.
+ *
+ * NULL is returned if no page was present, it was unmanaged, or it was
+ * present but not wired.
  *
  * Wiring is not a hardware characteristic so there is no need to invalidate
  * TLB.  However, in an SMP environment we must use a locked bus cycle to
  * update the pte (if we are not using the pmap_inval_*() API that is)...
  * it's ok to do this for simple wiring changes.
+ *
+ * The caller is responsible for dealing with m->wire_count
  */
 vm_page_t
-pmap_unwire(pmap_t pmap, vm_offset_t va)
+pmap_unwire(pmap_t pmap, vm_offset_t *pva)
 {
 	pt_entry_t *ptep;
 	pv_entry_t pt_pv;
 	vm_paddr_t pa;
 	vm_page_t m;
+	vm_offset_t va = *pva;
+
+	/*
+	 * Default next va to scan, will be optimized down below where
+	 * possible.  This routine may be called upon to unwire the
+	 * entire pmap, so we optimize PT and PD level tests.
+	 */
+	*pva = va + PAGE_SIZE;
 
 	if (pmap == NULL)
 		return NULL;
@@ -5675,27 +5735,40 @@ pmap_unwire(pmap_t pmap, vm_offset_t va)
 	/*
 	 * Assume elements in the kernel pmap are stable
 	 */
+	m = NULL;
 	if (pmap == kernel_pmap) {
-		if (pmap_pt(pmap, va) == 0)
+		if (pmap_pt(pmap, va) == NULL) {
+			if (pmap_pdp(pmap, va) == NULL)
+				*pva = (va & ~(long)(NBPML4 - 1)) + NBPML4;
+			else if (pmap_pd(pmap, va) == NULL)
+				*pva = (va & ~(long)(NBPDP - 1)) + NBPDP;
+			else
+				*pva = (va & ~(long)(NBPDR - 1)) + NBPDR;
 			return NULL;
+		}
 		ptep = pmap_pte_quick(pmap, va);
-		if (pmap_pte_v(pmap, ptep)) {
-			if (pmap_pte_w(pmap, ptep))
-				atomic_add_long(&pmap->pm_stats.wired_count,-1);
+		if (pmap_pte_v(pmap, ptep) && pmap_pte_w(pmap, ptep)) {
+			atomic_add_long(&pmap->pm_stats.wired_count, -1);
 			atomic_clear_long(ptep, pmap->pmap_bits[PG_W_IDX]);
 			pa = *ptep & PG_FRAME;
 			m = PHYS_TO_VM_PAGE(pa);
-		} else {
-			m = NULL;
+			/* caller handles m->wire_count */
 		}
 	} else {
 		/*
 		 * We can only [un]wire pmap-local pages (we cannot wire
-		 * shared pages)
+		 * shared pages).
 		 */
 		pt_pv = pv_get(pmap, pmap_pt_pindex(va), NULL);
-		if (pt_pv == NULL)
+		if (pt_pv == NULL) {
+			if (pmap_pdp(pmap, va) == NULL)
+				*pva = (va & ~(long)(NBPML4 - 1)) + NBPML4;
+			else if (pmap_pd(pmap, va) == NULL)
+				*pva = (va & ~(long)(NBPDP - 1)) + NBPDP;
+			else
+				*pva = (va & ~(long)(NBPDR - 1)) + NBPDR;
 			return NULL;
+		}
 
 		ptep = pv_pte_lookup(pt_pv, pmap_pte_index(va));
 		if ((*ptep & pmap->pmap_bits[PG_V_IDX]) == 0) {
@@ -5706,13 +5779,12 @@ pmap_unwire(pmap_t pmap, vm_offset_t va)
 		if (pmap_pte_w(pmap, ptep)) {
 			atomic_add_long(&pt_pv->pv_pmap->pm_stats.wired_count,
 					-1);
+			atomic_clear_long(ptep, pmap->pmap_bits[PG_W_IDX]);
+
+			pa = *ptep & PG_FRAME;
+			m = PHYS_TO_VM_PAGE(pa);
+			/* caller handles m->wire_count */
 		}
-		/* XXX else return NULL so caller doesn't unwire m ? */
-
-		atomic_clear_long(ptep, pmap->pmap_bits[PG_W_IDX]);
-
-		pa = *ptep & PG_FRAME;
-		m = PHYS_TO_VM_PAGE(pa);	/* held by wired count */
 		pv_put(pt_pv);
 	}
 	return m;
@@ -5725,10 +5797,10 @@ pmap_unwire(pmap_t pmap, vm_offset_t va)
  * This routine is only advisory and need not do anything.
  */
 void
-pmap_copy(pmap_t dst_pmap, pmap_t src_pmap, vm_offset_t dst_addr, 
+pmap_copy(pmap_t dst_pmap, pmap_t src_pmap, vm_offset_t dst_addr,
 	  vm_size_t len, vm_offset_t src_addr)
 {
-}	
+}
 
 /*
  * pmap_zero_page:
@@ -5836,6 +5908,24 @@ pmap_testbit(vm_page_t m, int bit)
 		return FALSE;
 
 	/*
+	 * Pages mapped via VPAGETABLE cannot be found via the backing_list
+	 * scan because the VA formula doesn't apply (vkernel can map any
+	 * physical page to any VA).
+	 *
+	 * However, such pages will be wired so regardless of what we want
+	 * to test, we don't have to include those pages.  The wired pages
+	 * access and modified bits will be synchronized when they are
+	 * removed from the VPAGETABLE.
+	 *
+	 * The vkernel is responsible for calling MADV_INVAL when it modifies
+	 * its page tables.
+	 */
+#if 0
+	if (m->flags & PG_VPTMAPPED)
+		return TRUE;
+#endif
+
+	/*
 	 * Iterate the mapping
 	 */
 	PMAP_PAGE_BACKING_SCAN(m, NULL, ipmap, iptep, ipte, iva) {
@@ -5844,6 +5934,7 @@ pmap_testbit(vm_page_t m, int bit)
 			break;
 		}
 	} PMAP_PAGE_BACKING_DONE;
+
 	return res;
 }
 
@@ -5889,6 +5980,27 @@ pmap_clearbit(vm_page_t m, int bit_index)
 	}
 	if ((m->flags & (PG_MAPPED | PG_WRITEABLE)) == 0)
 		return;
+
+	/*
+	 * Pages mapped via VPAGETABLE cannot be found via the backing_list
+	 * scan, but will be wired.  Thus we can't modify page permissions
+	 * or mark the page dirty.  It will be marked when the pages are
+	 * removed from the page table(s).
+	 *
+	 * However, we still must clear PG_WRITEABLE.
+	 *
+	 * The vkernel is responsible for calling MADV_INVAL when it
+	 * modifies its page tables.
+	 */
+#if 0
+	if (m->flags & PG_VPTMAPPED) {
+		if (bit_index == PG_RW_IDX) {
+			vm_page_dirty(m);
+			vm_page_flag_clear(m, PG_WRITEABLE);
+		}
+		return;
+	}
+#endif
 
 	/*
 	 * Being asked to clear other random bits, we don't track them
@@ -6048,6 +6160,21 @@ pmap_ts_referenced(vm_page_t m)
 
 	if (__predict_false(!pmap_initialized || (m->flags & PG_FICTITIOUS)))
 		return rval;
+
+	/*
+	 * Pages mapped via VPAGETABLE cannot be found via the backing_list
+	 * scan, but will be wired.  Because they are wired the referenced
+	 * bit is not really useful so just return the ganged bit we get
+	 * from other mappings.
+	 *
+	 * The vkernel is responsible for calling MADV_INVAL
+	 * when it modifies its page tables.
+	 */
+#if 0
+	if (m->flags & PG_VPTMAPPED)
+		return 1;
+#endif
+
 	PMAP_PAGE_BACKING_SCAN(m, NULL, ipmap, iptep, ipte, iva) {
 		if (ipte & ipmap->pmap_bits[PG_A_IDX]) {
 			npte = ipte & ~ipmap->pmap_bits[PG_A_IDX];
@@ -6058,6 +6185,7 @@ pmap_ts_referenced(vm_page_t m)
 				break;
 		}
 	} PMAP_PAGE_BACKING_DONE;
+
 	return rval;
 }
 
@@ -6396,7 +6524,7 @@ pmap_mincore(pmap_t pmap, vm_offset_t addr)
 	pt_entry_t *ptep, pte;
 	vm_page_t m;
 	int val = 0;
-	
+
 	ptep = pmap_pte(pmap, addr);
 
 	if (ptep && (pte = *ptep) != 0) {
@@ -6431,7 +6559,7 @@ pmap_mincore(pmap_t pmap, vm_offset_t addr)
 			val |= MINCORE_REFERENCED_OTHER;
 			vm_page_flag_set(m, PG_REFERENCED);
 		}
-	} 
+	}
 	return val;
 }
 

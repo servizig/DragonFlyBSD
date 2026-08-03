@@ -1,0 +1,46 @@
+.PATH: ${GCCDIR}/libiberty
+
+# from libiberty/Makefile
+#
+objext = o
+LIBOBJS =  strverscmp.o
+# A configuration can specify extra .o files that should be included,
+# even if they are in libc. (Perhaps the libc version is buggy.)
+EXTRA_OFILES =
+# These are always included in the library.
+REQUIRED_OFILES =							\
+	./regex.$(objext) ./cplus-dem.$(objext) ./cp-demangle.$(objext) \
+	./md5.$(objext) ./sha1.$(objext) ./alloca.$(objext)		\
+	./argv.$(objext)						\
+	./bsearch_r.$(objext)						\
+	./choose-temp.$(objext) ./concat.$(objext)			\
+	./cp-demint.$(objext) ./crc32.$(objext) ./d-demangle.$(objext)	\
+	./dwarfnames.$(objext) ./dyn-string.$(objext)			\
+	./fdmatch.$(objext) ./fibheap.$(objext)				\
+	./filedescriptor.$(objext)	\
+	./filename_cmp.$(objext) ./floatformat.$(objext)		\
+	./fnmatch.$(objext) ./fopen_unlocked.$(objext)			\
+	./getopt.$(objext) ./getopt1.$(objext) ./getpwd.$(objext)	\
+	./getruntime.$(objext) ./hashtab.$(objext) ./hex.$(objext)	\
+	./lbasename.$(objext) ./lrealpath.$(objext)			\
+	./make-relative-prefix.$(objext) ./make-temp-file.$(objext)	\
+	./objalloc.$(objext)						\
+	./obstack.$(objext)						\
+	./partition.$(objext) ./pexecute.$(objext) ./physmem.$(objext)	\
+	./pex-common.$(objext) ./pex-one.$(objext)			\
+	./pex-unix.$(objext) ./vprintf-support.$(objext)		\
+	./rust-demangle.$(objext)					\
+	./safe-ctype.$(objext)						\
+	./simple-object.$(objext) ./simple-object-coff.$(objext)	\
+	./simple-object-elf.$(objext) ./simple-object-mach-o.$(objext)	\
+	./simple-object-xcoff.$(objext)					\
+	./sort.$(objext) ./spaces.$(objext)				\
+	./splay-tree.$(objext) ./stack-limit.$(objext)			\
+	./strerror.$(objext) ./strsignal.$(objext)			\
+	./timeval-utils.$(objext) ./unlink-if-ordinary.$(objext)	\
+	./xasprintf.$(objext) ./xatexit.$(objext) ./xexit.$(objext)	\
+	./xmalloc.$(objext) ./xmemdup.$(objext) ./xstrdup.$(objext)	\
+	./xstrerror.$(objext) ./xstrndup.$(objext)			\
+	./xvasprintf.$(objext)
+
+SRCS=	${REQUIRED_OFILES:T:.o=.c} ${EXTRA_OFILES:T:.o=.c} ${LIBOBJS:T:.o=.c}

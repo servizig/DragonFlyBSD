@@ -8,7 +8,6 @@ LOCAL_CONFIG=	yes
 
 LIB=		cpp
 
-CFLAGS+=	-I${.CURDIR}
 CFLAGS+=	-Duchar="unsigned char"
 CXXFLAGS+=	${NOEXCEPTION_FLAGS}
 GOOD_CONFIG=	${.CURDIR}/../../support-libs/libcpp/config.h

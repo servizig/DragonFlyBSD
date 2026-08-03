@@ -2,10 +2,6 @@
 
 COMPVERSION=	gcc80
 
-lang_tree_files+=	ada/gcc-interface/ada-tree.def
-lang_tree_files+=	cp/cp-tree.def
-lang_tree_files+=	objc/objc-tree.def
-
 optionsfiles=		${GCCDIR}/gcc/ada/gcc-interface/lang.opt
 optionsfiles+=		${GCCDIR}/gcc/brig/lang.opt
 optionsfiles+=		${GCCDIR}/gcc/fortran/lang.opt
@@ -101,7 +97,7 @@ GTFILES = $(CPP_ID_DATA_H) $(srcdir)/input.h $(srcdir)/coretypes.h \
   $(srcdir)/calls.c
 
 # C
-GTFILES_C+= \
+GTFILES_C= \
   [c] \
   $(srcdir)/c/c-lang.c \
   $(srcdir)/c/c-tree.h \

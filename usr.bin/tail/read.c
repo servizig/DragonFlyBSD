@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -28,21 +30,19 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * @(#)read.c	8.1 (Berkeley) 6/6/93
- * $FreeBSD: src/usr.bin/tail/read.c,v 1.6.8.1 2001/01/24 08:41:14 ru Exp $
- * $DragonFly: src/usr.bin/tail/read.c,v 1.6 2008/02/05 14:35:43 matthias Exp $
  */
 
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <fcntl.h>
+
+#include <err.h>
 #include <errno.h>
-#include <unistd.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <err.h>
+#include <unistd.h>
+
 #include "extern.h"
 
 /*
@@ -56,7 +56,7 @@
  * the end.
  */
 int
-display_bytes(FILE *fp, off_t off)
+display_bytes(FILE *fp, const char *fn, off_t off)
 {
 	int ch, len, tlen;
 	char *ep, *p, *t;
@@ -64,7 +64,7 @@ display_bytes(FILE *fp, off_t off)
 	char *sp;
 
 	if ((sp = p = malloc(off)) == NULL)
-		err(1, "malloc");
+		err(1, "failed to allocate memory");
 
 	for (wrap = 0, ep = p + off; (ch = getc(fp)) != EOF;) {
 		*p = ch;
@@ -74,7 +74,7 @@ display_bytes(FILE *fp, off_t off)
 		}
 	}
 	if (ferror(fp)) {
-		ierr();
+		ierr(fn);
 		free(sp);
 		return 1;
 	}
@@ -106,9 +106,11 @@ display_bytes(FILE *fp, off_t off)
 	} else {
 		if (wrap && (len = ep - p))
 			WR(p, len);
-		if ((len = p - sp) != 0)
+		len = p - sp;
+		if (len)
 			WR(sp, len);
 	}
+
 	free(sp);
 	return 0;
 }
@@ -124,39 +126,41 @@ display_bytes(FILE *fp, off_t off)
  * the end.
  */
 int
-display_lines(FILE *fp, off_t off)
+display_lines(FILE *fp, const char *fn, off_t off)
 {
 	struct {
-		ssize_t blen;
-		ssize_t len;
+		int blen;
+		int len;
 		char *l;
 	} *lines;
-	int ch, rc = 0;
-	char *p = NULL;
+	int ch, rc;
+	char *p, *sp;
 	int blen, cnt, recno, wrap;
-	char *sp;
 
-	if ((lines = malloc(off * sizeof(*lines))) == NULL)
-		err(1, "malloc");
-	bzero(lines, off * sizeof(*lines));
-	sp = NULL;
+	if ((lines = calloc(off, sizeof(*lines))) == NULL)
+		err(1, "failed to allocate memory");
+	p = sp = NULL;
 	blen = cnt = recno = wrap = 0;
+	rc = 0;
 
 	while ((ch = getc(fp)) != EOF) {
 		if (++cnt > blen) {
-			if ((sp = realloc(sp, blen += 1024)) == NULL)
-				err(1, "realloc");
+			blen += 1024;
+			if ((sp = realloc(sp, blen)) == NULL)
+				err(1, "failed to allocate memory");
 			p = sp + cnt - 1;
 		}
 		*p++ = ch;
 		if (ch == '\n') {
 			if (lines[recno].blen < cnt) {
 				lines[recno].blen = cnt + 256;
-				if ((lines[recno].l = realloc(lines[recno].l,
-				    lines[recno].blen)) == NULL)
-					err(1, "realloc");
+				lines[recno].l = realloc(lines[recno].l,
+							 lines[recno].blen);
+				if (lines[recno].l == NULL)
+					err(1, "failed to allocate memory");
 			}
-			bcopy(sp, lines[recno].l, lines[recno].len = cnt);
+			bcopy(sp, lines[recno].l, cnt);
+			lines[recno].len = cnt;
 			cnt = 0;
 			p = sp;
 			if (++recno == off) {
@@ -166,9 +170,9 @@ display_lines(FILE *fp, off_t off)
 		}
 	}
 	if (ferror(fp)) {
-		ierr();
+		ierr(fn);
 		rc = 1;
-		goto out;
+		goto done;
 	}
 	if (cnt) {
 		lines[recno].l = sp;
@@ -193,7 +197,7 @@ display_lines(FILE *fp, off_t off)
 		for (cnt = 0; cnt < recno; ++cnt)
 			WR(lines[cnt].l, lines[cnt].len);
 	}
-out:
+done:
 	for (cnt = 0; cnt < off; cnt++)
 		free(lines[cnt].l);
 	free(sp);

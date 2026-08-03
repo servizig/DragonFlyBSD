@@ -41,6 +41,7 @@
  */
 
 #include "use_isa.h"
+#include "use_pci.h"
 #include "opt_cpu.h"
 #include "opt_ddb.h"
 #include "opt_inet.h"
@@ -132,10 +133,6 @@
 
 extern u_int64_t hammer_time(u_int64_t, u_int64_t);
 
-extern void printcpuinfo(void);	/* XXX header file */
-extern void identify_cpu(void);
-extern void panicifcpuunsupported(void);
-
 static void cpu_startup(void *);
 static void pic_finish(void *);
 static void cpu_finish(void *);
@@ -168,6 +165,8 @@ cpumask_t smp_idleinvl_reqs;
 __read_mostly static int cpu_mwait_halt_global;
 __read_mostly static int clock_debug1;
 __read_mostly static int flame_poll_debug;
+/* Forces most shallow C-state if positive. */
+__read_mostly static uint32_t cpu_mwait_inhibit_deep_sleep = 0;
 
 SYSCTL_INT(_debug, OID_AUTO, flame_poll_debug,
 	CTLFLAG_RW, &flame_poll_debug, 0, "");
@@ -1131,7 +1130,11 @@ cpu_mwait_cx_hint(struct cpu_idle_stat *stat)
 	int hint, cx_idx;
 	u_int idx;
 
-	hint = stat->hint;
+	if (atomic_load_32(&cpu_mwait_inhibit_deep_sleep) > 0)
+		hint = cpu_mwait_hints[0];
+	else
+		hint = stat->hint;
+
 	if (hint >= 0)
 		goto done;
 
@@ -2753,7 +2756,9 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 
 	lidt(&r_idt_arr[0]);
 
+#if NPCI > 0
 	pci_early_quirks();
+#endif
 
 	/*
 	 * Initialize the console before we print anything out.
@@ -2765,7 +2770,7 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 		kprintf("WARNING: loader(8) metadata is missing!\n");
 #endif
 
-#if	NISA >0
+#if NISA > 0
 	elcr_probe();
 	isa_defaultirq();
 #endif
@@ -3714,4 +3719,28 @@ cpu_interrupt_running(struct thread *td)
 	} else {
 		return 0;
 	}
+}
+
+static void
+dummy_nop(void *arg)
+{
+	/* Nothing */
+}
+
+void
+cpu_inhibit_deep_sleep(int set)
+{
+	uint32_t val;
+
+	val = atomic_fetchadd_32(&cpu_mwait_inhibit_deep_sleep, set ? 1 : -1);
+	/*
+	 * Need to wakeup all cores, to force the change. Either forces wakeup
+	 * from deep sleep, or allows going from shallow sleep to deep sleep.
+	 *
+	 * TODO: Technically, we only need one of each hyper-threading pair to
+	 *       get woken up here.
+	 */
+	if ((set && val == 0) || (!set && val == 1))
+		lwkt_send_ipiq_mask(smp_active_mask, (void *)dummy_nop, NULL);
+
 }

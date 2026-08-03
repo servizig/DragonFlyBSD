@@ -1,13 +1,13 @@
 /*
  * Copyright (c) 2007 The DragonFly Project.  All rights reserved.
- * 
+ *
  * This code is derived from software contributed to The DragonFly Project
  * by Matthew Dillon <dillon@backplane.com>
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
@@ -17,7 +17,7 @@
  * 3. Neither the name of The DragonFly Project nor the names of its
  *    contributors may be used to endorse or promote products derived
  *    from this software without specific, prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -57,7 +57,6 @@
  * SUCH DAMAGE.
  *
  * $FreeBSD: src/sys/sys/diskslice.h,v 1.36.2.1 2001/01/29 01:50:50 ken Exp $
- * $DragonFly: src/sys/sys/diskslice.h,v 1.22 2007/06/19 06:07:51 dillon Exp $
  */
 
 #ifndef	_SYS_DISKSLICE_H_
@@ -84,8 +83,10 @@
 #endif
 #endif
 
+#define	COMPATIBILITY_SLICE	0	/* e.g. ad0s0 */
+					/* 1 is WHOLE_DISK_SLICE; see below */
 #define	BASE_SLICE		2	/* e.g. ad0s1 */
-#define	COMPATIBILITY_SLICE	0	/* e.g. ad0a-j */
+
 				/* 101 - compat disklabel DIOCGDINFO	*/
 				/* 102 - compat disklabel DIOCSDINFO	*/
 				/* 103 - compat disklabel DIOCWDINFO	*/
@@ -98,7 +99,6 @@
 #define DIOCRECLUSTER		_IOWR('d', 134, struct disk_ioc_recluster)
 #define	DIOCGMEDIASIZE		_IOR('d', 135, off_t)
 #define	DIOCGSECTORSIZE		_IOR('d', 136, u_int)
-#define	MAX_SLICES		16
 
 /*
  * Support limits
@@ -114,6 +114,12 @@
  */
 #define	WHOLE_DISK_SLICE	1
 #define WHOLE_SLICE_PART	(DKMAXPARTITIONS - 1)
+
+/*
+ * The max number of slices to probe for MBR disks.
+ * GPT disks use more slices; see dsmakeslicestruct().
+ */
+#define	MAX_SLICES		16
 
 #ifdef MAXPARTITIONS			/* XXX don't depend on disklabel.h */
 #if MAXPARTITIONS !=	16		/* but check consistency if possible */
@@ -167,7 +173,7 @@ struct diskslices {
 	int	dss_secshift;		/* block to sector shift (or -1) */
 	int	dss_secsize;		/* sector size */
 	struct diskslice
-		dss_slices[MAX_SLICES];	/* actually usually less */
+		dss_slices[MAX_SLICES];	/* usually less; can allocate more */
 };
 
 struct disk_ioc_recluster {
@@ -212,7 +218,7 @@ struct partinfo {
 	 * partitions.  If not known, they will be set to a nil uuid.
 	 *
 	 * fstype_uuid represents the slice or partition type, e.g.
-	 * like GPT_ENT_TYPE_DRAGONFLY_DISKLABEL32.  If not nil,
+	 * like GPT_ENT_TYPE_DRAGONFLY_LABEL64.  If not nil,
 	 * storage_uuid uniquely identifies the physical storage.
 	 */
 	struct uuid	fstype_uuid;

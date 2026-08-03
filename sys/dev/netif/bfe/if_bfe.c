@@ -334,8 +334,9 @@ bfe_attach(device_t dev)
 		irq = pci_read_config(dev, BFE_PCI_INTLINE, 4);
 
 		/* Reset the power state. */
-		device_printf(dev, "chip is in D%d power mode"
-			      " -- setting to D0\n", pci_get_powerstate(dev));
+		device_printf(dev, "chip is in %s power mode"
+			      " -- setting to D0\n",
+			      pci_powerstate_to_str(pci_get_powerstate(dev)));
 
 		pci_set_powerstate(dev, PCI_POWERSTATE_D0);
 
@@ -343,7 +344,7 @@ bfe_attach(device_t dev)
 		pci_write_config(dev, BFE_PCI_MEMLO, membase, 4);
 		pci_write_config(dev, BFE_PCI_INTLINE, irq, 4);
 	}
-#endif	/* !BURN_BRIDGE */
+#endif	/* !BURN_BRIDGES */
 
 	/*
 	 * Map control/status registers.

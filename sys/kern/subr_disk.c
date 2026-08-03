@@ -117,7 +117,7 @@ static int disk_probe_slice(struct disk *dp, cdev_t dev, int slice, int reprobe)
 static void disk_probe(struct disk *dp, int reprobe);
 static void _setdiskinfo(struct disk *disk, struct disk_info *info);
 static void bioqwritereorder(struct bio_queue_head *bioq);
-static void disk_cleanserial(char *serno);
+static void disk_cleanname(char *name);
 static int disk_debug(int, char *, ...) __printflike(2, 3);
 static cdev_t _disk_create_named(const char *name, int unit, struct disk *dp,
     struct dev_ops *raw_ops, int clone);
@@ -218,6 +218,7 @@ disk_probe_slice(struct disk *dp, cdev_t dev, int slice, int reprobe)
 			sp->ds_reserved = 0;
 
 		ops->op_getpackname(sp->ds_label, packname, sizeof(packname));
+		disk_cleanname(packname);
 
 		destroy_dev_alias(dev, "by-label/*");
 		if (packname[0])
@@ -238,9 +239,7 @@ disk_probe_slice(struct disk *dp, cdev_t dev, int slice, int reprobe)
 					 */
 					ndev->si_flags |= SI_REPROBE_TEST;
 
-					/*
-					 * Destroy old UUID alias
-					 */
+					/* Destroy old UUID alias */
 					destroy_dev_alias(ndev,
 							  "part-by-uuid/*");
 					destroy_dev_alias(ndev,
@@ -254,7 +253,8 @@ disk_probe_slice(struct disk *dp, cdev_t dev, int slice, int reprobe)
 						make_dev_alias(ndev,
 						    "part-by-uuid/%s",
 						    uuid_buf);
-						udev_dict_set_cstr(ndev, "uuid", uuid_buf);
+						udev_dict_set_cstr(ndev,
+						    "uuid", uuid_buf);
 					}
 					if (packname[0]) {
 						make_dev_alias(ndev,
@@ -355,6 +355,7 @@ disk_probe(struct disk *dp, int reprobe)
 	struct diskslice *sp;
 	struct dev_ops *dops;
 	char uuid_buf[128];
+	char name_buf[64];
 
 	/*
 	 * d_media_blksize can be 0 for non-disk storage devices such
@@ -418,17 +419,19 @@ disk_probe(struct disk *dp, int reprobe)
 		if (sp->ds_size == 0)
 			continue;
 
+		ksnprintf(name_buf, sizeof(name_buf),
+			  ((info->d_dsflags & DSO_DEVICEMAPPER)
+			   ? "%s.s%d" : "%ss%d"),
+			  dev->si_name, sno);
+
 		if (reprobe &&
-		    (ndev = devfs_find_device_by_name("%ss%d",
-						      dev->si_name, sno))) {
+		    (ndev = devfs_find_device_by_name("%s", name_buf))) {
 			/*
 			 * Device already exists and is still valid
 			 */
 			ndev->si_flags |= SI_REPROBE_TEST;
 
-			/*
-			 * Destroy old UUID alias
-			 */
+			/* Destroy old UUID alias */
 			destroy_dev_alias(ndev, "slice-by-uuid/*");
 
 			/* Create UUID alias */
@@ -445,8 +448,7 @@ disk_probe(struct disk *dp, int reprobe)
 			ndev = make_dev_covering(dops, dp->d_rawdev->si_ops,
 					dkmakewholeslice(dkunit(dev), i),
 					UID_ROOT, GID_OPERATOR, 0640,
-					(info->d_dsflags & DSO_DEVICEMAPPER)?
-					"%s.s%d" : "%ss%d", dev->si_name, sno);
+					"%s", name_buf);
 			ndev->si_parent = dev;
 			ndev->si_iosize_max = dev->si_iosize_max;
 			udev_dict_set_cstr(ndev, "subsystem", "disk");
@@ -477,16 +479,13 @@ disk_probe(struct disk *dp, int reprobe)
 
 		/*
 		 * Probe appropriate slices for a disklabel
-		 *
-		 * XXX slice type 1 used by our gpt probe code.
-		 * XXX slice type 0 used by mbr compat slice.
 		 */
-		if (sp->ds_type == DOSPTYP_386BSD ||
+		if (i == COMPATIBILITY_SLICE ||
+		    sp->ds_type == DOSPTYP_386BSD ||
 		    sp->ds_type == DOSPTYP_NETBSD ||
 		    sp->ds_type == DOSPTYP_OPENBSD ||
-		    sp->ds_type == DOSPTYP_DFLYBSD ||
-		    sp->ds_type == 0 ||
-		    sp->ds_type == 1) {
+		    sp->ds_type == DOSPTYP_DFLYBSD)
+		{
 			if (dp->d_slice->dss_first_bsd_slice == 0)
 				dp->d_slice->dss_first_bsd_slice = i;
 			disk_probe_slice(dp, ndev, i, reprobe);
@@ -801,7 +800,7 @@ _setdiskinfo(struct disk *disk, struct disk_info *info)
 	if (info->d_serialno && info->d_serialno[0] &&
 	    (info->d_serialno[0] != ' ' || strlen(info->d_serialno) > 1)) {
 		info->d_serialno = kstrdup(info->d_serialno, M_TEMP);
-		disk_cleanserial(info->d_serialno);
+		disk_cleanname(info->d_serialno);
 		if (disk->d_cdev) {
 			make_dev_alias(disk->d_cdev, "serno/%s",
 				       info->d_serialno);
@@ -1570,14 +1569,15 @@ disk_uninit(void)
 }
 
 /*
- * Clean out illegal characters in serial numbers.
+ * Clean out illegal characters in a name, such as a serial number,
+ * a disklabel packname.
  */
 static void
-disk_cleanserial(char *serno)
+disk_cleanname(char *name)
 {
 	char c;
 
-	while ((c = *serno) != 0) {
+	while ((c = *name) != 0) {
 		if (c >= 'a' && c <= 'z')
 			;
 		else if (c >= 'A' && c <= 'Z')
@@ -1588,7 +1588,7 @@ disk_cleanserial(char *serno)
 			;
 		else
 			c = '_';
-		*serno++= c;
+		*name++ = c;
 	}
 }
 

@@ -34,6 +34,8 @@
 #include "opt_inet.h"
 #include "opt_ifpoll.h"
 
+#include "use_loop.h"
+
 #include <sys/param.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
@@ -1370,6 +1372,10 @@ failed:
 static int
 ifa_maintain_loopback_route(int cmd, struct ifaddr *ifa, struct sockaddr *ia)
 {
+#if NLOOP == 0
+	/* The loopback interface was not compiled in kernel. */
+	return (0);
+#else
 	struct sockaddr_dl null_sdl;
 	struct rt_addrinfo info;
 	struct ifaddr *rti_ifa;
@@ -1428,6 +1434,7 @@ ifa_maintain_loopback_route(int cmd, struct ifaddr *ifa, struct sockaddr *ia)
 	    __func__, (cmd == RTM_ADD ? "insertion" : "deletion"),
 	    ifp->if_xname, error);
 	return (error);
+#endif
 }
 
 int

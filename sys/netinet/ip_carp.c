@@ -365,10 +365,10 @@ SYSCTL_STRUCT(_net_inet_carp, CARPCTL_STATS, stats, CTLFLAG_RW,
 static struct lwkt_token carp_listtok = LWKT_TOKEN_INITIALIZER(carp_list_token);
 
 static void	carp_hmac_prepare(struct carp_softc *);
-static void	carp_hmac_generate(struct carp_softc *, uint32_t *,
-		    unsigned char *);
-static int	carp_hmac_verify(struct carp_softc *, uint32_t *,
-		    unsigned char *);
+static void	carp_hmac_generate(struct carp_softc *, uint32_t [2],
+		    unsigned char [20]);
+static int	carp_hmac_verify(struct carp_softc *, uint32_t [2],
+		    unsigned char [20]);
 static void	carp_setroute(struct carp_softc *, int);
 static void	carp_proto_input_c(struct carp_softc *, struct mbuf *,
 		    struct carp_header *, sa_family_t);

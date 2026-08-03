@@ -30,8 +30,11 @@
 struct pm_qos_request {
 };
 
+#define PM_QOS_DEFAULT_VALUE 1
+
 #define pm_qos_add_request(a,b,c)
-#define pm_qos_update_request(a,b)
 #define pm_qos_remove_request(a)
+
+void pm_qos_update_request(struct pm_qos_request *handle, int target_value);
 
 #endif	/* _LINUX_PM_QOS_H_ */
