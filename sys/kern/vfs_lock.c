@@ -59,8 +59,10 @@
 #include <sys/mount.h>
 #include <sys/proc.h>
 #include <sys/vnode.h>
-#include <sys/spinlock2.h>
 #include <sys/sysctl.h>
+#include <sys/lockf.h>
+
+#include <sys/spinlock2.h>
 
 #include <machine/limits.h>
 
@@ -108,10 +110,10 @@ SYSCTL_INT(_debug, OID_AUTO, batchfreevnodes, CTLFLAG_RW,
 
 static long auxrecovervnodes1;
 SYSCTL_INT(_debug, OID_AUTO, auxrecovervnodes1, CTLFLAG_RW,
-        &auxrecovervnodes1, 0, "vnlru auxillary vnodes recovered");
+        &auxrecovervnodes1, 0, "vnlru auxiliary vnodes recovered");
 static long auxrecovervnodes2;
 SYSCTL_INT(_debug, OID_AUTO, auxrecovervnodes2, CTLFLAG_RW,
-        &auxrecovervnodes2, 0, "vnlru auxillary vnodes recovered");
+        &auxrecovervnodes2, 0, "vnlru auxiliary vnodes recovered");
 
 #ifdef TRACKVNODE
 static u_long trackvnode;
@@ -511,6 +513,7 @@ vnode_terminate(struct vnode *vp)
 	_vinactive(vp);
 	spin_unlock(&vp->v_spin);
 
+	lf_lockf_cleanup(&vp->v_lockf);
 	vx_unlock(vp);
 }
 
@@ -1038,6 +1041,7 @@ failed:
 		 * Nothing should have been able to access this vp.  Only
 		 * our ref should remain now.
 		 */
+		lf_lockf_cleanup(&vp->v_lockf);
 		atomic_clear_int(&vp->v_refcnt, VREF_TERMINATE|VREF_FINALIZE);
 		KASSERT(vp->v_refcnt == 1,
 			("vp %p badrefs %08x", vp, vp->v_refcnt));
@@ -1193,6 +1197,7 @@ allocvnode(int lktimeout, int lkflags)
 		 * At this point we can kfree() the vnode if we want to.
 		 * Instead, we reuse it for the allocation.
 		 */
+		lf_lockf_cleanup(&vp->v_lockf);
 		atomic_clear_int(&vp->v_refcnt, VREF_TERMINATE|VREF_FINALIZE);
 		KASSERT(vp->v_refcnt == 1,
 			("vp %p badrefs %08x", vp, vp->v_refcnt));
@@ -1272,6 +1277,7 @@ freesomevnodes(int n)
 		vx_unlock(vp);
 		--n;
 		++count;
+		lf_lockf_cleanup(&vp->v_lockf);
 		kfree_obj(vp, M_VNODE);
 		atomic_add_int(&numvnodes, -1);
 	}

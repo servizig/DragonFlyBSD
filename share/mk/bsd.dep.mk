@@ -23,7 +23,10 @@
 #
 # MKDEPINTDEPS	Extra internal dependencies for intermediates [not set]
 #
-# SRCS          List of source files (c, c++, assembler)
+# MKDEPSRCDIR	The root directory of the source files [not set]
+#		Used to prepend the relative subdirs to dependency targets.
+#
+# SRCS		List of source files (c, c++, assembler)
 #
 #
 # +++ targets +++
@@ -59,6 +62,11 @@ DEPENDFILE?=	.depend
 _MKDEPENV=	${NXENV:NPATH=*}
 .else
 _MKDEPENV=	CCVER=${CCVER}
+.endif
+
+_MKDEPSRCDIR=
+.if defined(MKDEPSRCDIR) && !empty(MKDEPSRCDIR)
+_MKDEPSRCDIR=	-S ${MKDEPSRCDIR}
 .endif
 
 # Keep `tags' here, before SRCS are mangled below for `depend'.
@@ -113,6 +121,16 @@ ${_YC}: ${_YSRC}
 . endfor
 .endif  # defined(SRCS)
 
+# Propagate the group flags to build commands via per-file variables,
+# where they'll be fetched via ${_${.TARGET:R}_FLAGS}.
+# Strip the filename suffix so it applies to all kinds of objects (e.g.,
+# .o, .po, .So).
+.for _FG in ${FLAGS_GROUPS}
+.for _FFILE in ${${_FG}_FLAGS_FILES}
+_${_FFILE:R}_FLAGS+=	${${_FG}_FLAGS}
+.endfor
+.endfor
+
 .if !target(depend)
 .if defined(SRCS)
 depend: beforedepend _dependincs ${DEPENDFILE} afterdepend
@@ -154,7 +172,8 @@ _ALL_DEPENDS=${__FLAGS_FILES:N*.[csS]:N*.cc:N*.C:N*.cpp:N*.cxx:N*.m}
 .depend${_FG:S/^/_/:N__}: ${${_FG}_FLAGS_FILES} ${_ALL_DEPENDS}
 	rm -f ${.TARGET}
 .if ${${_FG}_FLAGS_FILES:M*.[csS]} != ""
-	${_MKDEPENV} CC=${MKDEPCC} ${MKDEPCMD} -f ${.TARGET} -a ${MKDEP} \
+	${_MKDEPENV} CC=${MKDEPCC} ${MKDEPCMD} -f ${.TARGET} -a \
+	    ${_MKDEPSRCDIR} ${MKDEP} \
 	    ${${_FG}_FLAGS:M-I*} \
 	    ${CFLAGS:M--sysroot=*} \
 	    ${CFLAGS:M-nostdinc*} ${CFLAGS:M-[BID]*} \
@@ -166,7 +185,8 @@ _ALL_DEPENDS=${__FLAGS_FILES:N*.[csS]:N*.cc:N*.C:N*.cpp:N*.cxx:N*.m}
     ${${_FG}_FLAGS_FILES:M*.C} != "" || \
     ${${_FG}_FLAGS_FILES:M*.cpp} != "" || \
     ${${_FG}_FLAGS_FILES:M*.cxx} != ""
-	${_MKDEPENV} CC=${CXX} ${MKDEPCMD} -f ${.TARGET} -a ${MKDEP} \
+	${_MKDEPENV} CC=${CXX} ${MKDEPCMD} -f ${.TARGET} -a \
+	    ${_MKDEPSRCDIR} ${MKDEP} \
 	    ${${_FG}_FLAGS:M-I*} \
 	    ${CXXFLAGS:M--sysroot=*} \
 	    ${CXXFLAGS:M-nostdinc*} ${CXXFLAGS:M-[BID]*} \
@@ -175,7 +195,8 @@ _ALL_DEPENDS=${__FLAGS_FILES:N*.[csS]:N*.cc:N*.C:N*.cpp:N*.cxx:N*.m}
 	    ${.ALLSRC:M*.cc} ${.ALLSRC:M*.C} ${.ALLSRC:M*.cpp} ${.ALLSRC:M*.cxx}
 .endif
 .if ${${_FG}_FLAGS_FILES:M*.m} != ""
-	${MKDEPCMD} -f ${.TARGET} -a ${MKDEP} \
+	${MKDEPCMD} -f ${.TARGET} -a \
+	    ${_MKDEPSRCDIR} ${MKDEP} \
 	    ${${_FG}_FLAGS:M-I*} \
 	    ${OBJCFLAGS:M-nostdinc*} ${OBJCFLAGS:M-[BID]*} \
 	    ${OBJCFLAGS:M-Wno-import*} \

@@ -1,28 +1,16 @@
-# hostprog helpers for screen maps generation
-.PATH: ${.CURDIR}/../scrnmaps
+.include "../scrnmaps/Makefile.scrnmaps"
+srcdir=	${.CURDIR}/../scrnmaps
 
-# SCRMAPS
-.include "./Makefile.scrnmaps"
+.for map in ${SCRMAPS:R}
+PROGS+=	${map}
 
-SCRMAPS_MK=	${SCRMAPS:R:S/$/.nx/g}
+# Copy the source to apply different CFLAGS.
+SRCS_${map}=	${map}.c
+CLEANFILES+=	${map}.c
+${map}.c: ${srcdir}/mkscrfil.c
+	cp ${.ALLSRC} ${.TARGET}
 
-${SCRMAPS_MK}: ${.TARGET:R} mkscrfil.c
-	${NXCC} ${NXCFLAGS} -I${.CURDIR}/../scrnmaps -DFIL=\"${.TARGET:R}\" ${NXLDFLAGS} \
-		-o ${.TARGET} ${.CURDIR}/../scrnmaps/mkscrfil.c
+CFLAGS_${map}=	-I${srcdir} -DFIL=\"${map}\"
+.endfor
 
-CLEANFILES+=	${SCRMAPS_MK}
-
-genfiles: ${SCRMAPS_MK}
-depend all: genfiles
-
-build-tools: ${SCRMAPS_MK}
-
-# this tools are used in place, they are not installed anywhere
-install:
-
-# Hint HOST_CCVER handling.
-__USE_HOST_CCVER=
-
-.include <bsd.obj.mk>
-.include <bsd.dep.mk>
-.include <bsd.sys.mk>
+.include <bsd.hostprog.mk>

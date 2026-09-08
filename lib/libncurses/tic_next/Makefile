@@ -15,6 +15,7 @@ CFLAGS+=	-I${.CURDIR}
 CFLAGS+=	-I${.OBJDIR}
 
 LDADD+=		../libtic/libtic.na
+DPADD+=		../libtic/libtic.na
 
 ncurses_def.h:	MKncurses_def.sh ncurses_defs
 	AWK=awk sh ${NCURSESDIR}/include/MKncurses_def.sh \
@@ -32,10 +33,5 @@ tic_next.nx: ../libtic/libtic.na
 CLEANFILES=	ncurses_def.h parametrized.h termsort.c
 
 SRCS=	ncurses_def.h parametrized.h tic.c dump_entry.c tparm_type.c transform.c
-
-build-tools: tic_next.nx
-
-# this tic_next is used in place, it is not installed anywhere
-install:
 
 .include <bsd.hostprog.mk>

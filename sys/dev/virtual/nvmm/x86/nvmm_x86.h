@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2021 Maxime Villard, m00nbsd.net
+ * Copyright (c) 2018-2026 Maxime Villard, m00nbsd.net
  * All rights reserved.
  *
  * This code is part of the NVMM hypervisor.
@@ -485,28 +485,40 @@ struct nvmm_vcpu_conf_tpr {
 #define CPUID_0_07_ECX_VPCLMULQDQ	__BIT(10)
 #define CPUID_0_07_ECX_AVX512_VNNI	__BIT(11)
 #define CPUID_0_07_ECX_AVX512_BITALG	__BIT(12)
+#define CPUID_0_07_ECX_TME_EN		__BIT(13)
 #define CPUID_0_07_ECX_AVX512_VPOPCNTDQ __BIT(14)
 #define CPUID_0_07_ECX_LA57		__BIT(16)
 #define CPUID_0_07_ECX_MAWAU		__BITS(21, 17)
 #define CPUID_0_07_ECX_RDPID		__BIT(22)
-#define CPUID_0_07_ECX_KL		__BIT(23)
+#define CPUID_0_07_ECX_KEY_LOCKER	__BIT(23)
+#define CPUID_0_07_ECX_BUS_LOCK_DETECT	__BIT(24)
 #define CPUID_0_07_ECX_CLDEMOTE		__BIT(25)
 #define CPUID_0_07_ECX_MOVDIRI		__BIT(27)
 #define CPUID_0_07_ECX_MOVDIR64B	__BIT(28)
+#define CPUID_0_07_ECX_ENQCMD		__BIT(29)
 #define CPUID_0_07_ECX_SGXLC		__BIT(30)
 #define CPUID_0_07_ECX_PKS		__BIT(31)
 /* [ECX=0] Fn0000_0007:EDX (Structured Extended Features) */
+#define CPUID_0_07_EDX_SGX_KEYS		__BIT(1)
 #define CPUID_0_07_EDX_AVX512_4VNNIW	__BIT(2)
 #define CPUID_0_07_EDX_AVX512_4FMAPS	__BIT(3)
 #define CPUID_0_07_EDX_FSREP_MOV	__BIT(4)
+#define CPUID_0_07_EDX_UINTR		__BIT(5)
 #define CPUID_0_07_EDX_AVX512_VP2INTERSECT __BIT(8)
 #define CPUID_0_07_EDX_SRBDS_CTRL	__BIT(9)
 #define CPUID_0_07_EDX_MD_CLEAR		__BIT(10)
-#define CPUID_0_07_EDX_TSX_FORCE_ABORT	__BIT(13)
+#define CPUID_0_07_EDX_RTM_ALWAYS_ABORT	__BIT(11)
+#define CPUID_0_07_EDX_RTM_FORCE_ABORT	__BIT(13)
 #define CPUID_0_07_EDX_SERIALIZE	__BIT(14)
 #define CPUID_0_07_EDX_HYBRID		__BIT(15)
 #define CPUID_0_07_EDX_TSXLDTRK		__BIT(16)
+#define CPUID_0_07_EDX_PCONFIG		__BIT(18)
+#define CPUID_0_07_EDX_ARCH_LBRS	__BIT(19)
 #define CPUID_0_07_EDX_CET_IBT		__BIT(20)
+#define CPUID_0_07_EDX_AMX_BF16		__BIT(22)
+#define CPUID_0_07_EDX_AVX512_FP16	__BIT(23)
+#define CPUID_0_07_EDX_AMX_TILE		__BIT(24)
+#define CPUID_0_07_EDX_AMX_INT8		__BIT(25)
 #define CPUID_0_07_EDX_IBRS		__BIT(26)
 #define CPUID_0_07_EDX_STIBP		__BIT(27)
 #define CPUID_0_07_EDX_L1D_FLUSH	__BIT(28)
@@ -526,8 +538,9 @@ struct nvmm_vcpu_conf_tpr {
 /* [ECX=1] Fn0000_000D:EAX (Processor Extended State Enumeration) */
 #define CPUID_0_0D_ECX1_EAX_XSAVEOPT	__BIT(0)
 #define CPUID_0_0D_ECX1_EAX_XSAVEC	__BIT(1)
-#define CPUID_0_0D_ECX1_EAX_XGETBV	__BIT(2)
+#define CPUID_0_0D_ECX1_EAX_XGETBV1	__BIT(2)
 #define CPUID_0_0D_ECX1_EAX_XSAVES	__BIT(3)
+#define CPUID_0_0D_ECX1_EAX_XFD		__BIT(4)
 
 /* Fn8000_0001:ECX */
 #define CPUID_8_01_ECX_LAHF		__BIT(0)
@@ -556,6 +569,7 @@ struct nvmm_vcpu_conf_tpr {
 #define CPUID_8_01_ECX_PERFTSC		__BIT(27)
 #define CPUID_8_01_ECX_PERFEXTLLC	__BIT(28)
 #define CPUID_8_01_ECX_MWAITX		__BIT(29)
+#define CPUID_8_01_ECX_AddrMaskExt	__BIT(30)
 /* Fn8000_0001:EDX */
 #define CPUID_8_01_EDX_FPU		__BIT(0)
 #define CPUID_8_01_EDX_VME		__BIT(1)
@@ -617,8 +631,12 @@ struct nvmm_vcpu_conf_tpr {
 #define CPUID_8_08_EBX_EferLmsleUnsupp	__BIT(20)
 #define CPUID_8_08_EBX_INVLPGBnestedPg	__BIT(21)
 #define CPUID_8_08_EBX_SSBD		__BIT(24)
-#define CPUID_8_08_EBX_VIRT_SSBD	__BIT(25)
-#define CPUID_8_08_EBX_SSB_NO		__BIT(26)
+#define CPUID_8_08_EBX_SsbdVirtSpecCtrl	__BIT(25)
+#define CPUID_8_08_EBX_SsbdNotRequired	__BIT(26)
+#define CPUID_8_08_EBX_CPPC		__BIT(27)
+#define CPUID_8_08_EBX_PSFD		__BIT(28)
+#define CPUID_8_08_EBX_BTC_NO		__BIT(29)
+#define CPUID_8_08_EBX_IBPB_RET		__BIT(30)
 /* Fn8000_0008:ECX */
 #define CPUID_8_08_ECX_NC		__BITS(7,0)
 #define CPUID_8_08_ECX_ApicIdSize	__BITS(15,12)
@@ -644,76 +662,6 @@ struct nvmm_vcpu_conf_tpr {
 #define CPUID_8_0A_EDX_SSSCheck		__BIT(19)
 #define CPUID_8_0A_EDX_SpecCtrl		__BIT(20)
 #define CPUID_8_0A_EDX_TlbiCtl		__BIT(24)
-
-/* -------------------------------------------------------------------------- */
-
-/*
- * Register defines.
- */
-
-/* Bits in CR0 control register */
-#define CR0_PE	__BIT(0)	/* Protected mode Enable */
-#define CR0_MP	__BIT(1)	/* "Math" Present (NPX or NPX emulator) */
-#define CR0_EM	__BIT(2)	/* EMulate non-NPX coproc. (trap ESC only) */
-#define CR0_TS	__BIT(3)	/* Task Switched (if MP, trap ESC and WAIT) */
-#define CR0_ET	__BIT(4)	/* Extension Type (387 (if set) vs 287) */
-#define CR0_NE	__BIT(5)	/* Numeric Error enable (EX16 vs IRQ13) */
-#define CR0_WP	__BIT(16)	/* Write Protect (honor page protect in all modes) */
-#define CR0_AM	__BIT(18)	/* Alignment Mask (set to enable AC flag) */
-#define CR0_NW	__BIT(29)	/* Not Write-through */
-#define CR0_CD	__BIT(30)	/* Cache Disable */
-#define CR0_PG	__BIT(31)	/* PaGing enable */
-
-/* Bits in CR4 control register */
-#define CR4_VME		__BIT(0)	/* Virtual 8086 mode extensions */
-#define CR4_PVI		__BIT(1)	/* Protected-mode virtual interrupts */
-#define CR4_TSD		__BIT(2)	/* Time stamp disable */
-#define CR4_DE		__BIT(3)	/* Debugging extensions */
-#define CR4_PSE		__BIT(4)	/* Page size extensions */
-#define CR4_PAE		__BIT(5)	/* Physical address extension */
-#define CR4_MCE		__BIT(6)	/* Machine check enable */
-#define CR4_PGE		__BIT(7)	/* Page global enable */
-#define CR4_PCE		__BIT(8)	/* Performance monitoring counter enable */
-#define CR4_OSFXSR	__BIT(9)	/* Fast FPU save/restore used by OS */
-#define CR4_OSXMMEXCPT	__BIT(10)	/* Enable SIMD/MMX2 to use except 16 */
-#define CR4_UMIP	__BIT(11)	/* User Mode Instruction Prevention */
-#define CR4_LA57	__BIT(12)	/* Enable 57-bit linear address */
-#define CR4_VMXE	__BIT(13)	/* Enable VMX - Intel specific */
-#define CR4_SMXE	__BIT(14)	/* Enable SMX - Intel specific */
-#define CR4_FSGSBASE	__BIT(16)	/* Enable *FSBASE and *GSBASE instructions */
-#define CR4_PCIDE	__BIT(17)	/* Enable Process Context IDentifiers */
-#define CR4_OSXSAVE	__BIT(18)	/* Enable XSave (for AVX Instructions) */
-#define CR4_SMEP	__BIT(20)	/* Supervisor-Mode Execution Prevent */
-#define CR4_SMAP	__BIT(21)	/* Supervisor-Mode Access Prevent */
-#define CR4_PKE		__BIT(22)	/* Protection Keys Enable for user pages */
-#define CR4_CET		__BIT(23)	/* Enable CET */
-#define CR4_PKS		__BIT(24)	/* Protection Keys Enable for kern pages */
-
-/* Extended Control Register XCR0 */
-#define XCR0_X87	__BIT(0)	/* x87 FPU/MMX state */
-#define XCR0_SSE	__BIT(1)	/* SSE state */
-#define XCR0_AVX	__BIT(2)	/* AVX state */
-
-#define MSR_TSC			0x0010
-#define MSR_SYSENTER_CS		0x0174
-#define MSR_SYSENTER_ESP	0x0175
-#define MSR_SYSENTER_EIP	0x0176
-#define MSR_CR_PAT		0x0277		/* Page Attribute Table (PAT) */
-#define MSR_STAR		0xC0000081	/* legacy mode SYSCALL target/cs/ss */
-#define MSR_LSTAR		0xC0000082	/* long mode SYSCALL target rip */
-#define MSR_CSTAR		0xC0000083	/* compat mode SYSCALL target rip */
-#define MSR_SFMASK		0xC0000084	/* SYSCALL Flag Mask */
-#define MSR_KERNELGSBASE	0xC0000102	/* Kernel GS Base Register */
-
-#define MSR_EFER	0xC0000080	/* Extended Feature Enable Register */
-#define		EFER_SCE	__BIT(0)	/* SYSCALL Enable (R/W) */
-#define		EFER_LME	__BIT(8)	/* Long Mode Enable (R/W) */
-#define		EFER_LMA	__BIT(10)	/* Long Mode Active (R) */
-#define		EFER_NXE	__BIT(11)	/* PTE No-Execute Enable (R/W) */
-#define		EFER_SVME	__BIT(12)	/* SVM Enable (R/W) */
-#define		EFER_LMSLE	__BIT(13)	/* Long Mode Segment Limit Enable */
-#define		EFER_FFXSR	__BIT(14)	/* Fast FXSAVE/FXRSTOR Enable */
-#define		EFER_TCE	__BIT(15)	/* Translation Cache Extension */
 
 #endif /* ASM_NVMM */
 

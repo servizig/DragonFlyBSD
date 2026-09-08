@@ -31,38 +31,45 @@
 # $FreeBSD: src/usr.bin/mkdep/mkdep.gcc.sh,v 1.18 1999/08/28 01:04:04 peter Exp $
 
 D=.depend			# default dependency file is .depend
-append=0
-pflag=
+append=
+pflag_sed=
+srcdir=
 
-while :
-	do case "$1" in
-		# -a appends to the depend file
-		-a)
-			append=1
-			shift ;;
+while : ; do
+	case "$1" in
+	# -a appends to the depend file
+	-a)
+		append=yes
+		shift ;;
 
-		# -f allows you to select a makefile name
-		-f)
-			D=$2
-			shift; shift ;;
+	# -f allows you to select a makefile name
+	-f)
+		D=$2
+		shift; shift ;;
 
-		# the -p flag produces "program: program.c" style dependencies
-		# so .o's don't get produced
-		-p)
-			pflag=p
-			shift ;;
-		*)
-			break ;;
+	# the -p flag produces "program: program.c" style dependencies
+	# so .o's don't get produced
+	-p)
+		pflag_sed='s;\.o:;:;'
+		shift ;;
+
+	# -S specifies the directory of source files
+	-S)
+		srcdir=$2
+		shift; shift ;;
+
+	*)
+		break ;;
 	esac
 done
 
-case $# in 0)
-	echo 'usage: mkdep [-ap] [-f file] [flags] file ...' >&2
-	exit 1;;
-esac
+if [ $# -eq 0 ]; then
+	echo 'usage: mkdep [-ap] [-f file] [-s srcdir] [flags] file ...' >&2
+	exit 1
+fi
 
 TMP=_mkdep$$
-trap 'rm -f $TMP ; trap 2 ; kill -2 $$' 1 2 3 13 15
+trap 'rm -f $TMP $TMP.new ; trap 2 ; kill -2 $$' 1 2 3 13 15
 trap 'rm -f $TMP' 0
 
 # For C sources, mkdep must use exactly the same cpp and predefined flags
@@ -74,23 +81,88 @@ MKDEP_CPP_OPTS=${MKDEP_CPP_OPTS-"-M"};
 
 echo "# $@" > $TMP	# store arguments for debugging
 
-if $MKDEP_CPP $MKDEP_CPP_OPTS "$@" >> $TMP; then :
-else
+if ! $MKDEP_CPP $MKDEP_CPP_OPTS "$@" >> $TMP; then
 	echo 'mkdep: compile failed' >&2
 	exit 1
 fi
 
-case x$pflag in
-	x) case $append in
-		0) sed -e 's; \./; ;g' < $TMP >  $D;;
-		*) sed -e 's; \./; ;g' < $TMP >> $D;;
-	   esac
-	;;
-	*) case $append in
-		0) sed -e 's;\.o:;:;' -e 's; \./; ;g' < $TMP >  $D;;
-		*) sed -e 's;\.o:;:;' -e 's; \./; ;g' < $TMP >> $D;;
-	   esac
-	;;
-esac
+if [ "$srcdir" != "" ]; then
+	# Add relative subdirectories to targets, so that they won't conflict
+	# when there are sources of the same name in different subdirectories.
+	awk -v prefix="${srcdir%/}/" '
+		# A dependency line starts with one or more targets, with no
+		# colon among them, followed by a colon and either a space
+		# or end of line.
+		/^[^#[:space:]][^:]*:([[:space:]]|$)/ {
+			line = $0
+			colon = index(line, ":")
+			targets = substr(line, 1, colon - 1)
+			rest = substr(line, colon)
+
+			# Get the first dependency.
+			deps = substr(line, colon + 1)
+			sub(/^[[:space:]]+/, "", deps)
+			nline = ""
+			if (deps == "" || deps == "\\") {
+				if ((getline nline) < 0)
+					exit
+				split(nline, files)
+				src = files[1]
+			} else {
+				split(deps, files)
+				src = files[1]
+			}
+
+			if (index(src, prefix) == 1) {
+				relpath = substr(src, length(prefix) + 1)
+				dir = relpath
+				sub(/\/[^\/]+$/, "", dir)
+				if (dir != relpath) {
+					# Prefix every target on the line.
+					n = split(targets, tgt, /[[:space:]]+/)
+					targets = ""
+					for (i = 1; i <= n; i++) {
+						sep = i > 1 ? " " : ""
+						target = dir "/" tgt[i]
+						targets = targets sep target
+					}
+				}
+			}
+
+			print targets rest
+			if (nline != "") {
+				print nline
+			}
+			next
+		}
+		{ print }
+	' $TMP > $TMP.new
+	mv $TMP.new $TMP
+fi
+
+dup_targets=$(awk '
+	/^[^#[:space:]][^:]*:/ {
+		colon = index($0, ":")
+		n = split(substr($0, 1, colon - 1), tgt, /[[:space:]]+/)
+		for (i = 1; i <= n; i++)
+			counts[tgt[i]]++
+	}
+	END {
+		for (target in counts) {
+			if (counts[target] > 1)
+				printf "%s ", target
+		}
+	}
+' $TMP)
+if [ "$dup_targets" != "" ]; then
+	echo "mkdep: found duplicate targets: ${dup_targets}" >&2
+	exit 1
+fi
+
+if [ "$append" = "" ]; then
+	sed -e "$pflag_sed" -e 's; \./; ;g' < $TMP > $D
+else
+	sed -e "$pflag_sed" -e 's; \./; ;g' < $TMP >> $D
+fi
 
 exit $?
